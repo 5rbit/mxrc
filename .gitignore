@@ -82,3 +82,9 @@ secrets.yml
 # Uncomment if you want to keep lockfiles
 # package-lock.json
 # yarn.lock
+
+# Gemini
+.gemini/
+.gemini/**
+.gemini/**/*.toml
+.gemini/**/*.log

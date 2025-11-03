@@ -4,48 +4,64 @@
 #include <string>
 #include <vector>
 #include <memory>
-#include "../../../../src/core/datastore/DataStore.h" // Assuming DataStore.h defines core DataStore types
+#include <any>
+#include <chrono>
+#include "../../../../src/core/datastore/DataStore.h" // Include the actual DataStore.h for SharedData, DataType, etc.
 
 namespace mxrc {
 namespace task_mission {
 
-// Forward declarations for data model structs
-struct MissionDefinition;
-struct MissionState;
-struct Task;
-struct TaskStateHistory;
-struct AuditLog;
+// Forward declarations for DataStore's types if not directly included
+// class SharedData;
+// enum class DataType;
+// struct DataExpirationPolicy;
+// class Observer;
 
 /**
- * @brief Interface for persisting and retrieving Mission and Task related data.
- * This abstraction allows for different underlying storage implementations (e.g., SQLite, PostgreSQL).
+ * @brief Generic interface for persisting and retrieving data, aligned with the core DataStore functionality.
+ * This interface allows for storing and retrieving various data types using a common mechanism.
  */
 class IDataStore {
 public:
     virtual ~IDataStore() = default;
 
-    // Mission Definition Management
-    virtual bool saveMissionDefinition(const MissionDefinition& definition) = 0;
-    virtual std::unique_ptr<MissionDefinition> loadMissionDefinition(const std::string& missionId) = 0;
-    virtual bool deleteMissionDefinition(const std::string& missionId) = 0;
+    /**
+     * @brief Saves or updates a piece of data in the store.
+     * @param id Unique identifier for the data.
+     * @param value The data to store (can be any type).
+     * @param type The DataType enum indicating the type of data.
+     * @param policy Optional expiration policy for the data.
+     * @return True if successful, false otherwise.
+     */
+    virtual bool save(const std::string& id, const std::any& value, DataType type,
+                      const DataExpirationPolicy& policy = {ExpirationPolicyType::None, std::chrono::milliseconds(0)}) = 0;
 
-    // Mission State Management
-    virtual bool saveMissionState(const MissionState& state) = 0;
-    virtual std::unique_ptr<MissionState> loadMissionState(const std::string& missionInstanceId) = 0;
-    virtual std::vector<MissionState> loadMissionHistory(const std::string& missionInstanceId, size_t limit = 0, size_t offset = 0) = 0;
+    /**
+     * @brief Retrieves a piece of data from the store.
+     * @param id Unique identifier for the data.
+     * @return The retrieved data as std::any. Throws if not found or type mismatch.
+     */
+    virtual std::any load(const std::string& id) = 0;
 
-    // Task State Management
-    virtual bool saveTaskState(const Task& task) = 0;
-    virtual std::unique_ptr<Task> loadTaskState(const std::string& taskInstanceId) = 0;
-    virtual std::vector<TaskStateHistory> loadTaskHistory(const std::string& taskInstanceId, size_t limit = 0, size_t offset = 0) = 0;
+    /**
+     * @brief Removes a piece of data from the store.
+     * @param id Unique identifier for the data to remove.
+     * @return True if successful, false otherwise.
+     */
+    virtual bool remove(const std::string& id) = 0;
 
-    // Audit Log Management
-    virtual bool saveAuditLog(const AuditLog& logEntry) = 0;
-    virtual std::vector<AuditLog> loadAuditLogs(const std::string& missionInstanceId = "", const std::string& taskInstanceId = "", size_t limit = 0, size_t offset = 0) = 0;
+    // Observer pattern methods
+    virtual void subscribe(const std::string& id, Observer* observer) = 0;
+    virtual void unsubscribe(const std::string& id, Observer* observer) = 0;
 
-    // Recovery
-    virtual bool persistCurrentMissionState(const MissionState& state) = 0; // For crash recovery
-    virtual std::unique_ptr<MissionState> loadLastKnownMissionState() = 0; // For crash recovery
+    // State saving/loading for recovery
+    virtual void saveState(const std::string& filepath) = 0;
+    virtual void loadState(const std::string& filepath) = 0;
+
+    // Other utility methods
+    virtual size_t getCurrentDataCount() const = 0;
+    virtual size_t getCurrentMemoryUsage() const = 0;
+    virtual void cleanExpiredData() = 0;
 };
 
 } // namespace task_mission

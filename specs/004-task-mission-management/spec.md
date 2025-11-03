@@ -93,7 +93,7 @@
 - **FR-004**: Mission(워크플로우)은 JSON 또는 YAML 형식의 외부 설정 파일을 통해 정의되고 관리되어야 하며, Mission 정의는 Behavior Tree 구조를 명시적으로 표현할 수 있어야 합니다.
 - **FR-005**: Mission 설정 파일은 로드 시 스키마 유효성 검사 및 Task ID 유효성 검사를 통과해야 하며, 순환 의존성 검사를 포함해야 합니다.
 - **FR-006**: `MissionManager`는 Behavior Tree 기반으로 순차, 분기, 반복, 병렬 실행 등 복잡한 제어 흐름을 지원해야 합니다.
-- **FR-007**: Task 실행 중 오류 발생 시, Task에 정의된 `FailureStrategy`(ABORT_MISSION, RETRY_TRANSIENT, SKIP_TASK, CUSTOM_HANDLER)에 따라 자동 처리되어야 하며, 사용자 정의 오류 처리기를 등록할 수 있어야 합니다.
+- **FR-007**: Task 실행 중 오류 발생 시, Task에 정의된 `FailureStrategy`(ABORT_MISSION, RETRY_TRANSIENT, SKIP_TASK, CUSTOM_HANDLER)에 따라 자동 처리되어야 하며, 사용자 정의 오류 처리기를 등록할 수 있어야 합니다. 이때, 오류 보고는 오류 코드, 간단한 설명, 관련 Task ID를 포함해야 합니다.
 - **FR-008**: 시스템은 임무 실행 중에도 운영자가 Task 큐를 안전하게 조작(긴급 Task 삽입, 순서 변경, Task 건너뛰기, 개별 Task 일시 중지/재개/취소)할 수 있는 기능을 제공해야 합니다.
 - **FR-009**: `MissionManager`는 실행 중인 Mission의 현재 상태, Task 진행 상황, 예상 완료 시간 등을 실시간으로 외부에 제공해야 합니다.
 - **FR-010**: 시스템은 운영자의 Mission 일시 중지, 재개, 취소 명령을 안전하게 처리하고, Mission 상태를 일관성 있게 유지해야 합니다.
@@ -107,6 +107,11 @@
 - **FR-018**: 시스템은 예기치 않은 종료 후에도 Mission의 마지막으로 알려진 안전한 상태를 `DataStore`에서 자동으로 복원하고, Mission을 안전하게 재개하거나 적절한 복구 절차를 안내해야 합니다.
 - **FR-019**: Mission 제어 및 상태 보고를 위한 모든 통신 채널은 암호화되어야 하며, 메시지 무결성이 보장되어야 합니다.
 - **FR-020**: Mission 및 Task의 상태, 이력, 설정 정보 등 영속적인 데이터는 `DataStore`를 통해 안전하게 저장 및 관리되어야 합니다.
+
+## Clarifications
+
+### Session 2025-11-03
+- Q: Task 실행 중 발생하는 오류의 보고 수준(Reporting Granularity)은 어느 정도여야 합니까? → A: Standard: 오류 코드, 간단한 설명, 관련 Task ID 포함
 
 ### 주요 엔티티
 
@@ -140,3 +145,4 @@
 - **SC-010**: 모든 중요한 Mission 및 Task 이벤트(시작, 종료, 상태 변경, 제어 명령)는 100% 감사 로그로 기록되며, 로그의 무결성이 보장되어야 합니다.
 - **SC-011**: 시스템 예기치 않은 종료 후, Mission은 99%의 경우 5초 이내에 마지막으로 알려진 안전한 상태에서 `DataStore`에서 복구되어야 합니다.
 - **SC-012**: `DataStore`를 통한 Mission 및 Task 데이터의 저장 및 조회 작업은 99%의 경우 100ms 이내에 완료되어야 합니다.
+- **SC-013**: Task 오류 발생 시, 오류 코드, 간단한 설명, 관련 Task ID가 100% 정확하게 보고되어야 합니다.

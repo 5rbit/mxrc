@@ -52,7 +52,7 @@ specs/004-task-mission-management/
 # 단일 프로젝트 (기본값)
 ├── src/                      # 💡 핵심 소스 코드 (Core Source Code)
 │   ├── core/                 
-│   │   ├── task_mission_management/ # Task 및 Mission 관리 모듈
+│   │   ├── task/ # Task 및 Mission 관리 모듈
 │   │   │   ├── AbstractTask.h
 │   │   │   ├── TaskContext.h
 │   │   │   └── TaskFactory.h
@@ -86,7 +86,7 @@ specs/004-task-mission-management/
 ├── requirements.txt (또는 package.json, CMakeLists.txt 등)
 └── LICENSE
 
-**구조 결정**: Task 및 Mission 관리 관련 코드는 `src/core/task_mission_management/` 에 위치하며, 데이터 영속성은 기존 `src/core/datastore/` 모듈을 활용합니다. 테스트 코드는 `tests/unit/task_mission_management/` 에 위치합니다.
+**구조 결정**: Task 및 Mission 관리 관련 코드는 `src/core/task/` 에 위치하며, 데이터 영속성은 기존 `src/core/datastore/` 모듈을 활용합니다. 테스트 코드는 `tests/unit/task/` 에 위치합니다.
 
 ## 복잡성 추적
 

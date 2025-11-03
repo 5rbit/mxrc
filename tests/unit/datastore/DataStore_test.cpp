@@ -1,5 +1,5 @@
 #include "gtest/gtest.h"
-#include "DataStore.h"
+#include "core/datastore/DataStore.h"
 #include <thread>
 #include <vector>
 #include <atomic>
@@ -30,15 +30,23 @@ private:
     SharedData last_changed_data_;
 };
 
+class DataStoreTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // Reset DataStore instance for each test to ensure a clean state
+        DataStore::getInstance().resetPerformanceMetrics();
+    }
+};
+
 // 테스트: DataStore 인스턴스가 항상 동일한 싱글톤 인스턴스를 반환하는지 확인
-TEST(DataStoreTest, GetInstanceReturnsSameInstance) {
+TEST_F(DataStoreTest, GetInstanceReturnsSameInstance) {
     DataStore& instance1 = DataStore::getInstance();
     DataStore& instance2 = DataStore::getInstance();
     ASSERT_EQ(&instance1, &instance2);
 }
 
 // 테스트: 기본 데이터 유형(int)을 설정하고 올바르게 가져오는지 확인
-TEST(DataStoreTest, SetAndGetBasicType) {
+TEST_F(DataStoreTest, SetAndGetBasicType) {
     DataStore& ds = DataStore::getInstance();
     std::string id = "test_int";
     int value = 123;
@@ -47,7 +55,7 @@ TEST(DataStoreTest, SetAndGetBasicType) {
 }
 
 // 테스트: 복합 데이터 유형(TestData struct)을 설정하고 올바르게 가져오는지 확인
-TEST(DataStoreTest, SetAndGetComplexType) {
+TEST_F(DataStoreTest, SetAndGetComplexType) {
     DataStore& ds = DataStore::getInstance();
     std::string id = "test_data";
     TestData data = {42, "hello"};
@@ -56,14 +64,14 @@ TEST(DataStoreTest, SetAndGetComplexType) {
 }
 
 // 테스트: 존재하지 않는 데이터를 가져오려고 할 때 예외가 발생하는지 확인
-TEST(DataStoreTest, GetNonExistentDataThrowsException) {
+TEST_F(DataStoreTest, GetNonExistentDataThrowsException) {
     DataStore& ds = DataStore::getInstance();
     std::string id = "non_existent";
     ASSERT_THROW(ds.get<int>(id), std::out_of_range);
 }
 
 // 테스트: 잘못된 데이터 유형으로 데이터를 가져오려고 할 때 예외가 발생하는지 확인
-TEST(DataStoreTest, GetWithWrongTypeThrowsException) {
+TEST_F(DataStoreTest, GetWithWrongTypeThrowsException) {
     DataStore& ds = DataStore::getInstance();
     std::string id = "test_float";
     float value = 3.14f;
@@ -72,7 +80,7 @@ TEST(DataStoreTest, GetWithWrongTypeThrowsException) {
 }
 
 // 테스트: 이미 존재하는 데이터의 유형과 다른 유형으로 설정하려고 할 때 예외가 발생하는지 확인
-TEST(DataStoreTest, SetWithDifferentTypeThrowsException) {
+TEST_F(DataStoreTest, SetWithDifferentTypeThrowsException) {
     DataStore& ds = DataStore::getInstance();
     std::string id = "test_type_change";
     int value1 = 10;
@@ -82,7 +90,7 @@ TEST(DataStoreTest, SetWithDifferentTypeThrowsException) {
 }
 
 // 테스트: 기본 데이터 유형(int)을 폴링하고 올바르게 가져오는지 확인
-TEST(DataStoreTest, PollBasicType) {
+TEST_F(DataStoreTest, PollBasicType) {
     DataStore& ds = DataStore::getInstance();
     std::string id = "poll_int";
     int value = 456;
@@ -91,14 +99,14 @@ TEST(DataStoreTest, PollBasicType) {
 }
 
 // 테스트: 존재하지 않는 데이터를 폴링하려고 할 때 예외가 발생하는지 확인
-TEST(DataStoreTest, PollNonExistentDataThrowsException) {
+TEST_F(DataStoreTest, PollNonExistentDataThrowsException) {
     DataStore& ds = DataStore::getInstance();
     std::string id = "non_existent_poll";
     ASSERT_THROW(ds.poll<int>(id), std::out_of_range);
 }
 
 // 테스트: 잘못된 데이터 유형으로 데이터를 폴링하려고 할 때 예외가 발생하는지 확인
-TEST(DataStoreTest, PollWithWrongTypeThrowsException) {
+TEST_F(DataStoreTest, PollWithWrongTypeThrowsException) {
     DataStore& ds = DataStore::getInstance();
     std::string id = "poll_float";
     float value = 6.28f;
@@ -107,7 +115,7 @@ TEST(DataStoreTest, PollWithWrongTypeThrowsException) {
 }
 
 // 테스트: Observer를 구독하고 데이터 변경 시 알림을 받는지 확인
-TEST(DataStoreTest, SubscribeAndNotify) {
+TEST_F(DataStoreTest, SubscribeAndNotify) {
     DataStore& ds = DataStore::getInstance();
     MockObserver observer;
     std::string id = "alarm_event";
@@ -122,7 +130,7 @@ TEST(DataStoreTest, SubscribeAndNotify) {
 }
 
 // 테스트: Observer 구독 해지 후 알림이 중지되는지 확인
-TEST(DataStoreTest, UnsubscribeStopsNotifications) {
+TEST_F(DataStoreTest, UnsubscribeStopsNotifications) {
     DataStore& ds = DataStore::getInstance();
     MockObserver observer;
     std::string id = "unsubscribe_test";
@@ -137,7 +145,7 @@ TEST(DataStoreTest, UnsubscribeStopsNotifications) {
 }
 
 // 테스트: 여러 Observer가 데이터 변경 시 모두 알림을 받는지 확인
-TEST(DataStoreTest, MultipleSubscribers) {
+TEST_F(DataStoreTest, MultipleSubscribers) {
     DataStore& ds = DataStore::getInstance();
     MockObserver obs1, obs2;
     std::string id = "multi_sub";
@@ -152,7 +160,7 @@ TEST(DataStoreTest, MultipleSubscribers) {
 }
 
 // 테스트: 다중 스레드 환경에서 set/get 작업의 스레드 안전성 확인
-TEST(DataStoreTest, ThreadSafetySetGet) {
+TEST_F(DataStoreTest, ThreadSafetySetGet) {
     DataStore& ds = DataStore::getInstance();
     std::string id_prefix = "thread_test_";
     const int num_threads = 10;
@@ -185,23 +193,27 @@ TEST(DataStoreTest, ThreadSafetySetGet) {
 }
 
 // 테스트: set, get, poll 작업 후 성능 메트릭이 올바르게 업데이트되는지 확인
-TEST(DataStoreTest, PerformanceMetricsUpdate) {
+TEST_F(DataStoreTest, PerformanceMetricsUpdate) {
     DataStore& ds = DataStore::getInstance();
-    // 이전 메트릭을 지우고 깨끗한 테스트를 위해 (공개 clear 메서드 없음)
-    // ds.getPerformanceMetrics().clear(); 
+    
+    // Capture initial metrics
+    auto initial_metrics = ds.getPerformanceMetrics();
+    double initial_set_calls = initial_metrics["set_calls"];
+    double initial_get_calls = initial_metrics["get_calls"];
+    double initial_poll_calls = initial_metrics["poll_calls"];
 
     ds.set("metric_test_set", 1, DataType::Para);
     ds.get<int>("metric_test_set");
     ds.poll<int>("metric_test_set");
 
-    auto metrics = ds.getPerformanceMetrics();
-    ASSERT_GT(metrics["set_calls"], 0);
-    ASSERT_GT(metrics["get_calls"], 0);
-    ASSERT_GT(metrics["poll_calls"], 0);
+    auto final_metrics = ds.getPerformanceMetrics();
+    ASSERT_EQ(final_metrics["set_calls"], initial_set_calls + 1);
+    ASSERT_EQ(final_metrics["get_calls"], initial_get_calls + 1);
+    ASSERT_EQ(final_metrics["poll_calls"], initial_poll_calls + 1);
 }
 
 // 테스트: TTL(Time To Live) 정책에 따라 데이터가 만료되고 제거되는지 확인
-TEST(DataStoreTest, DataExpirationPolicyTTL) {
+TEST_F(DataStoreTest, DataExpirationPolicyTTL) {
     DataStore& ds = DataStore::getInstance();
     std::string id = "ttl_data";
     DataExpirationPolicy policy = {ExpirationPolicyType::TTL, std::chrono::milliseconds(100)};
@@ -214,7 +226,7 @@ TEST(DataStoreTest, DataExpirationPolicyTTL) {
 }
 
 // 테스트: 만료 정책이 없는 데이터가 만료되지 않고 유지되는지 확인
-TEST(DataStoreTest, DataExpirationPolicyNoExpiration) {
+TEST_F(DataStoreTest, DataExpirationPolicyNoExpiration) {
     DataStore& ds = DataStore::getInstance();
     std::string id = "no_expire_data";
     ds.set(id, 200, DataType::Para);
@@ -226,7 +238,7 @@ TEST(DataStoreTest, DataExpirationPolicyNoExpiration) {
 }
 
 // 테스트: 현재 DataStore에 저장된 데이터 항목의 수가 올바르게 반환되는지 확인
-TEST(DataStoreTest, GetCurrentDataCount) {
+TEST_F(DataStoreTest, GetCurrentDataCount) {
     DataStore& ds = DataStore::getInstance();
     // 이전 테스트로 인한 항목 수를 고려하거나, 테스트 시작 시 DataStore를 초기화해야 함
     size_t initial_count = ds.getCurrentDataCount();
@@ -236,7 +248,7 @@ TEST(DataStoreTest, GetCurrentDataCount) {
 }
 
 // 테스트: DataStore 상태를 파일에 저장하고 로드하는 기능 확인 (플레이스홀더 구현)
-TEST(DataStoreTest, SaveAndLoadState) {
+TEST_F(DataStoreTest, SaveAndLoadState) {
     DataStore& ds = DataStore::getInstance();
     std::string filepath = "test_datastore_state.txt";
     ds.set("state_data_1", 10, DataType::Para);
@@ -250,7 +262,7 @@ TEST(DataStoreTest, SaveAndLoadState) {
 }
 
 // 테스트: DataStore 접근 제어 정책이 올바르게 작동하는지 확인
-TEST(DataStoreTest, AccessControl) {
+TEST_F(DataStoreTest, AccessControl) {
     DataStore& ds = DataStore::getInstance();
     std::string data_id = "sensitive_data";
     std::string module_a = "ModuleA";

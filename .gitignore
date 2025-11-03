@@ -83,6 +83,16 @@ secrets.yml
 # package-lock.json
 # yarn.lock
 
+# C++
+bin/
+obj/
+out/
+*.o
+*.so
+*.a
+*.exe
+*.dll
+
 # Gemini
 .gemini/
 .gemini/**

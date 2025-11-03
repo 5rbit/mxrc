@@ -4,12 +4,20 @@
 #include "AbstractTask.h"
 #include "TaskFactory.h"
 #include "TaskContext.h"
+#include "TaskScheduler.h"
+#include "MissionParser.h"
+#include "TaskDependencyManager.h"
+#include "AuditLogger.h"
+#include "../../datastore/DataStore.h"
 #include <string>
 #include <memory>
 #include <vector>
 #include <map>
 #include <mutex>
-#include <behaviortree_cpp/behavior_tree.h>
+#include <thread> // For std::thread
+#include <condition_variable> // For std::condition_variable
+#include <atomic> // For std::atomic
+#include <behaviortree_cpp/bt_factory.h>
 
 namespace mxrc {
 namespace task_mission {
@@ -25,11 +33,12 @@ enum class MissionStatus {
 
 struct MissionState {
     std::string mission_id;
-    MissionStatus status;
-    std::string current_task_id; // ID of the currently executing task
+    std::string instance_id;
+    MissionStatus current_status;
+    std::string current_task_instance_id;
     double progress; // 0.0 to 1.0
     std::string estimated_completion_time; // Placeholder for now
-    std::map<std::string, TaskState> task_states; // States of all tasks in the mission
+    std::map<std::string, TaskState> active_task_states; // Use TaskState from TaskDependencyManager
 };
 
 class MissionManager {
@@ -39,40 +48,47 @@ public:
     MissionManager(const MissionManager&) = delete;
     MissionManager& operator=(const MissionManager&) = delete;
 
-    // FR-004: Load mission from file
-    bool loadMission(const std::string& mission_filepath);
+    bool loadMissionDefinition(const std::string& missionDefinitionPath);
+    std::string startMission(const std::string& missionId, const TaskContext& initialContext);
+    bool pauseMission(const std::string& missionInstanceId);
+    bool resumeMission(const std::string& missionInstanceId);
+    bool cancelMission(const std::string& missionInstanceId);
+    bool insertEmergencyTask(const std::string& missionInstanceId, std::unique_ptr<AbstractTask> emergencyTask, int priority);
+    bool skipCurrentTask(const std::string& missionInstanceId);
 
-    // FR-006: Execute mission
-    bool startMission();
-
-    // FR-008, FR-010: Control mission execution
-    void pauseMission();
-    void resumeMission();
-    void cancelMission();
-    void skipTask(const std::string& task_id);
-    void insertEmergencyTask(const std::string& task_id, TaskContext& context);
-
-    // FR-009: Get mission status
-    MissionState getMissionState() const;
-
-    // FR-016: Get task history (placeholder for now, will integrate with DataStore)
-    // std::vector<TaskHistoryEntry> getTaskHistory(const std::string& task_id) const;
+    MissionState getMissionState(const std::string& missionInstanceId) const;
+    TaskState getTaskState(const std::string& missionInstanceId, const std::string& taskInstanceId) const;
+    bool recoverMission(const std::string& missionInstanceId);
 
 private:
     MissionManager();
+    ~MissionManager();
 
     std::string current_mission_id_;
+    std::string current_mission_instance_id_;
     MissionStatus current_mission_status_;
     std::unique_ptr<BT::Tree> behavior_tree_;
     BT::Blackboard::Ptr blackboard_;
+    BT::BehaviorTreeFactory bt_factory_; // Behavior Tree Factory
     TaskContext mission_context_;
-    std::map<std::string, std::unique_ptr<AbstractTask>> active_tasks_;
-    std::mutex mutex_;
+    TaskScheduler task_scheduler_;
+    TaskDependencyManager task_dependency_manager_;
+    MissionParser mission_parser_;
+    std::map<std::string, MissionDefinition> mission_definitions_;
+    AuditLogger audit_logger_; // AuditLogger instance
 
-    // Helper to update mission state
-    void updateMissionState();
+    static MissionManager* instance_; // Static instance pointer
+    static std::mutex mutex_; // Mutex for thread-safe singleton
 
-    // Helper to execute a single task (called by BT nodes)
+    std::thread mission_thread_; // Thread for mission execution
+    std::atomic<bool> shutdown_requested_;
+    std::condition_variable cv_mission_control_;
+    std::mutex mission_control_mutex_;
+
+    void missionLoop();
+    void updateMissionState_internal();
+
+    // Custom BT node for executing AbstractTask
     BT::NodeStatus executeTaskNode(BT::TreeNode& self);
 };
 

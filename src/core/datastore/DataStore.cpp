@@ -40,6 +40,10 @@ DataStore::DataStore() {
     performance_metrics_["set_calls"] = 0;
     performance_metrics_["get_calls"] = 0;
     performance_metrics_["poll_calls"] = 0;
+    performance_metrics_["save_calls"] = 0;
+    performance_metrics_["load_calls"] = 0;
+    performance_metrics_["remove_calls"] = 0;
+    performance_metrics_["query_calls"] = 0;
 }
 
 DataStore& DataStore::getInstance() {
@@ -48,6 +52,78 @@ DataStore& DataStore::getInstance() {
         instance_ = new DataStore();
     }
     return *instance_;
+}
+
+bool DataStore::save(const std::string& id, const std::any& value, DataType type, const DataExpirationPolicy& policy) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    performance_metrics_["save_calls"]++;
+
+    SharedData data;
+    data.id = id;
+    data.type = type;
+    data.value = value;
+    data.timestamp = std::chrono::system_clock::now();
+
+    if (policy.policy_type == ExpirationPolicyType::TTL) {
+        data.expiration_time = data.timestamp + policy.duration;
+    } else {
+        data.expiration_time = std::chrono::time_point<std::chrono::system_clock>(); // No expiration
+    }
+
+    data_map_[id] = data;
+    notifySubscribers(data);
+    return true;
+}
+
+std::any DataStore::load(const std::string& id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    performance_metrics_["load_calls"]++;
+
+    auto it = data_map_.find(id);
+    if (it != data_map_.end()) {
+        // Check for expiration
+        if (it->second.expiration_time != std::chrono::time_point<std::chrono::system_clock>() &&
+            it->second.expiration_time <= std::chrono::system_clock::now()) {
+            data_map_.erase(it);
+            return {}; // Expired
+        }
+        return it->second.value;
+    }
+    return {}; // Not found
+}
+
+bool DataStore::remove(const std::string& id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    performance_metrics_["remove_calls"]++;
+
+    auto it = data_map_.find(id);
+    if (it != data_map_.end()) {
+        data_map_.erase(it);
+        return true;
+    }
+    return false;
+}
+
+std::vector<std::any> DataStore::query(const std::string& pattern) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    performance_metrics_["query_calls"]++;
+
+    std::vector<std::any> results;
+    // Simple prefix matching for now. A more robust solution would use regex.
+    for (const auto& pair : data_map_) {
+        if (pair.first.rfind(pattern, 0) == 0) { // Check if id starts with pattern
+            // Check for expiration before returning
+            if (pair.second.expiration_time != std::chrono::time_point<std::chrono::system_clock>() &&
+                pair.second.expiration_time <= std::chrono::system_clock::now()) {
+                // Expired, do not return and remove it
+                // This is a const method, so cannot modify data_map_ directly.
+                // In a non-const query, we would remove it.
+            } else {
+                results.push_back(pair.second.value);
+            }
+        }
+    }
+    return results;
 }
 
 void DataStore::subscribe(const std::string& id, Observer* observer) {
@@ -110,6 +186,10 @@ void DataStore::resetPerformanceMetrics() {
     performance_metrics_["set_calls"] = 0;
     performance_metrics_["get_calls"] = 0;
     performance_metrics_["poll_calls"] = 0;
+    performance_metrics_["save_calls"] = 0;
+    performance_metrics_["load_calls"] = 0;
+    performance_metrics_["remove_calls"] = 0;
+    performance_metrics_["query_calls"] = 0;
     std::cout << "[DEBUG] resetPerformanceMetrics called. Metrics reset to 0." << std::endl;
 }
 

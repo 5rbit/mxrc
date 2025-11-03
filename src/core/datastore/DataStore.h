@@ -23,6 +23,12 @@ enum class DataType {
     Event,
     MissionState,
     TaskState,
+    STRING,
+    INT,
+    DOUBLE,
+    BOOL,
+    JSON,
+    BINARY // For images, etc.
     // Add more as needed
 };
 
@@ -72,6 +78,15 @@ public:
     // Delete copy constructor and assignment operator
     DataStore(const DataStore&) = delete;
     DataStore& operator=(const DataStore&) = delete;
+
+    // Generic save/load for std::any values
+    bool save(const std::string& id, const std::any& value, DataType type,
+              const DataExpirationPolicy& policy = {ExpirationPolicyType::None, std::chrono::milliseconds(0)});
+    std::any load(const std::string& id);
+    bool remove(const std::string& id);
+
+    // Query method for historical data
+    std::vector<std::any> query(const std::string& pattern);
 
     // FR-006: Set/Get interfaces for data manipulation
     template<typename T>

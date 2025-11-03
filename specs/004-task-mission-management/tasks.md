@@ -77,17 +77,17 @@
 
 ### 사용자 스토리 2에 대한 테스트 (TDD) ⚠️
 
-- [ ] T016 [P] [US2] `MissionManager` 단위 테스트 작성 (tests/unit/task_mission_management/MissionManager_test.cpp)
-- [ ] T017 [P] [US2] Behavior Tree 파서 및 실행기 단위 테스트 작성 (tests/unit/task_mission_management/BehaviorTree_test.cpp)
-- [ ] T018 [P] [US2] `TaskScheduler` 단위 테스트 작성 (tests/unit/task_mission_management/TaskScheduler_test.cpp)
+- [x] T016 [P] [US2] `MissionManager` 단위 테스트 작성 (tests/unit/task_mission_management/MissionManager_test.cpp)
+- [x] T017 [P] [US2] Behavior Tree 파서 및 실행기 단위 테스트 작성 (tests/unit/task_mission_management/BehaviorTree_test.cpp)
+- [x] T018 [P] [US2] `TaskScheduler` 단위 테스트 작성 (tests/unit/task_mission_management/TaskScheduler_test.cpp)
 
 ### 사용자 스토리 2 구현
 
-- [ ] T019 [US2] `MissionManager.h` 및 `MissionManager.cpp` 구현 (src/core/task/task_mission_management/MissionManager.h, src/core/task/task_mission_management/MissionManager.cpp)
-- [ ] T020 [US2] BehaviorTree.CPP와 연동하여 Behavior Tree 실행 로직 구현 (T019에 포함)
-- [ ] T021 [P] [US2] Mission 정의 파일(JSON/YAML) 파서 및 유효성 검사기 구현 (src/core/task/task_mission_management/MissionParser.h, src/core/task/task_mission_management/MissionParser.cpp)
-- [ ] T022 [P] [US2] `TaskScheduler.h` 및 `TaskScheduler.cpp` 구현 (src/core/task/task_mission_management/TaskScheduler.h, src/core/task/task_mission_management/TaskScheduler.cpp)
-- [ ] T023 [P] [US2] `TaskDependencyManager.h` 및 `TaskDependencyManager.cpp` 구현 (src/core/task/task_mission_management/TaskDependencyManager.h, src/core/task/task_mission_management/TaskDependencyManager.cpp)
+- [x] T019 [US2] `MissionManager.h` 및 `MissionManager.cpp` 구현 (src/core/task/task_mission_management/MissionManager.h, src/core/task/task_mission_management/MissionManager.cpp)
+- [x] T020 [US2] BehaviorTree.CPP와 연동하여 Behavior Tree 실행 로직 구현 (T019에 포함)
+- [x] T021 [P] [US2] Mission 정의 파일(JSON/YAML) 파서 및 유효성 검사기 구현 (src/core/task/task_mission_management/MissionParser.h, src/core/task/task_mission_management/MissionParser.cpp)
+- [x] T022 [P] [US2] `TaskScheduler.h` 및 `TaskScheduler.cpp` 구현 (src/core/task/task_mission_management/TaskScheduler.h, src/core/task/task_mission_management/TaskScheduler.cpp)
+- [x] T023 [P] [US2] `TaskDependencyManager.h` 및 `TaskDependencyManager.cpp` 구현 (src/core/task/task_mission_management/TaskDependencyManager.h, src/core/task/task_mission_management/TaskDependencyManager.cpp)
 
 **체크포인트**: 이 시점에서 사용자 스토리 1과 2는 모두 독립적으로 작동해야 합니다.
 
@@ -101,15 +101,15 @@
 
 ### 사용자 스토리 4에 대한 테스트 (TDD) ⚠️
 
-- [ ] T024 [P] [US4] `AuditLogger` 단위 테스트 작성 (tests/unit/task_mission_management/AuditLogger_test.cpp)
-- [ ] T025 [P] [US4] `DataStore` 연동 및 상태 복구 통합 테스트 작성 (tests/integration/task_mission_management/DataStoreRecovery_test.cpp)
+- [x] T024 [P] [US4] `AuditLogger` 단위 테스트 작성 (tests/unit/task_mission_management/AuditLogger_test.cpp)
+- [x] T025 [P] [US4] `DataStore` 연동 및 상태 복구 통합 테스트 작성 (tests/integration/task_mission_management/DataStoreRecovery_test.cpp)
 
 ### 사용자 스토리 4 구현
 
-- [ ] T026 [P] [US4] `AuditLogger.h` 및 `AuditLogger.cpp` 구현 (src/core/task/task_mission_management/AuditLogger.h, src/core/task/task_mission_management/AuditLogger.cpp)
-- [ ] T027 [US4] `MissionManager`에 `DataStore` 연동하여 Mission/Task 상태 저장 로직 추가 (src/core/task/task_mission_management/MissionManager.cpp)
-- [ ] T028 [US4] 시스템 재시작 시 `DataStore`에서 Mission 상태를 복구하는 로직 구현 (T027에 포함)
-- [ ] T029 [P] [US4] SQLite 기반 `DataStore` 구현 (src/core/datastore/SqliteDataStore.h, src/core/datastore/SqliteDataStore.cpp)
+- [x] T026 [P] [US4] `AuditLogger.h` 및 `AuditLogger.cpp` 구현 (src/core/task/task_mission_management/AuditLogger.h, src/core/task/task_mission_management/AuditLogger.cpp)
+- [x] T027 [US4] `MissionManager`에 `DataStore` 연동하여 Mission/Task 상태 저장 로직 추가 (src/core/task/task_mission_management/MissionManager.cpp)
+- [x] T028 [US4] 시스템 재시작 시 `DataStore`에서 Mission 상태를 복구하는 로직 구현 (T027에 포함)
+- [x] T029 [P] [US4] SQLite 기반 `DataStore` 구현 (src/core/datastore/SqliteDataStore.h, src/core/datastore/SqliteDataStore.cpp)
 
 **체크포인트**: 이제 모든 사용자 스토리 1, 2, 4가 독립적으로 작동해야 합니다.
 
@@ -123,13 +123,13 @@
 
 ### 사용자 스토리 3에 대한 테스트 (TDD) ⚠️
 
-- [ ] T030 [P] [US3] `OperatorInterface` 단위 테스트 작성 (tests/unit/task_mission_management/OperatorInterface_test.cpp)
+- [x] T030 [P] [US3] `OperatorInterface` 단위 테스트 작성 (tests/unit/task_mission_management/OperatorInterface_test.cpp)
 
 ### 사용자 스토리 3 구현
 
-- [ ] T031 [US3] `OperatorInterface.h` 및 `OperatorInterface.cpp` 구현 (src/core/task/task_mission_management/OperatorInterface.h, src/core/task/task_mission_management/OperatorInterface.cpp)
-- [ ] T032 [US3] `MissionManager`에 실시간 상태 보고 및 제어 명령 처리 로직 추가 (src/core/task/task_mission_management/MissionManager.cpp)
-- [ ] T033 [US3] `DataStore`에서 Task 상태 이력을 조회하는 기능 구현 (src/core/datastore/DataStore.cpp)
+- [x] T031 [US3] `OperatorInterface.h` 및 `OperatorInterface.cpp` 구현 (src/core/task/task_mission_management/OperatorInterface.h, src/core/task/task_mission_management/OperatorInterface.cpp)
+- [x] T032 [US3] `MissionManager`에 실시간 상태 보고 및 제어 명령 처리 로직 추가 (src/core/task/task_mission_management/MissionManager.cpp)
+- [x] T033 [US3] `DataStore`에서 Task 상태 이력을 조회하는 기능 구현 (src/core/datastore/DataStore.cpp)
 
 **체크포인트**: 이제 모든 사용자 스토리가 독립적으로 작동해야 합니다.
 

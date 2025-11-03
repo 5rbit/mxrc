@@ -1,34 +1,34 @@
-# 사양 품질 체크리스트: Task & Mission Management (Task 및 임무 관리)
+# Specification Quality Checklist: Task & Mission Management (Task 및 임무 관리) 고도화
 
-**목적**: 계획 단계로 진행하기 전에 사양의 완전성과 품질을 검증합니다.
-**생성일**: 2025-11-03
-**기능**: [spec.md 링크](./spec.md)
+**Purpose**: Validate specification completeness and quality before proceeding to planning
+**Created**: 2025-11-03
+**Feature**: [specs/004-task-mission-management/spec.md](specs/004-task-mission-management/spec.md)
 
-## 내용 품질
+## Content Quality
 
-- [X] 구현 세부 정보(언어, 프레임워크, API) 없음
-- [X] 사용자 가치 및 비즈니스 요구사항에 중점
-- [X] 비기술적 이해관계자를 위해 작성됨
-- [X] 모든 필수 섹션 완료됨
+- [x] No implementation details (languages, frameworks, APIs)
+- [x] Focused on user value and business needs
+- [x] Written for non-technical stakeholders
+- [x] All mandatory sections completed
 
-## 요구사항 완전성
+## Requirement Completeness
 
-- [X] [명확화 필요] 마커 없음
-- [X] 요구사항은 테스트 가능하고 모호하지 않음
-- [X] 성공 기준은 측정 가능함
-- [X] 성공 기준은 기술에 구애받지 않음 (구현 세부 정보 없음)
-- [X] 모든 인수 시나리오가 정의됨
-- [X] 엣지 케이스가 식별됨
-- [X] 범위가 명확하게 제한됨
-- [X] 종속성 및 가정이 식별됨
+- [x] No [NEEDS CLARIFICATION] markers remain
+- [x] Requirements are testable and unambiguous
+- [x] Success criteria are measurable
+- [x] Success criteria are technology-agnostic (no implementation details)
+- [x] All acceptance scenarios are defined
+- [x] Edge cases are identified
+- [x] Scope is clearly bounded
+- [x] Dependencies and assumptions identified
 
-## 기능 준비 상태
+## Feature Readiness
 
-- [X] 모든 기능 요구사항에 명확한 인수 기준이 있음
-- [X] 사용자 시나리오가 주요 흐름을 다룸
-- [X] 기능이 성공 기준에 정의된 측정 가능한 결과를 충족함
-- [X] 구현 세부 정보가 사양에 유출되지 않음
+- [x] All functional requirements have clear acceptance criteria
+- [x] User scenarios cover primary flows
+- [x] Feature meets measurable outcomes defined in Success Criteria
+- [x] No implementation details leak into specification
 
-## 참고
+## Notes
 
-- 불완전으로 표시된 항목은 `/speckit.clarify` 또는 `/speckit.plan` 전에 사양 업데이트가 필요합니다.
+- Items marked incomplete require spec updates before `/speckit.clarify` or `/speckit.plan`

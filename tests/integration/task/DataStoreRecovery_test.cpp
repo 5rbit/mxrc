@@ -20,7 +20,7 @@ protected:
             std::filesystem::remove(TEST_DB_PATH);
         }
         // Ensure MissionManager is in a clean state
-        MissionManager::getInstance().cancelMission("any_mission_instance_id"); // Use a dummy ID for cancellation
+        MissionManager::getInstance(nullptr).cancelMission("any_mission_instance_id"); // Use a dummy ID for cancellation
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
@@ -38,9 +38,7 @@ TEST_F(DataStoreRecoveryTest, MissionStateRecovery) {
         // In a real scenario, MissionManager would be initialized with a DataStore
         // For this test, we'll assume MissionManager uses a DataStore internally
         // and that SqliteDataStore is the concrete implementation.
-        // This part of the test will be more robust once T029 (SqliteDataStore) is done.
-
-        MissionManager& mm = MissionManager::getInstance();
+MissionManager& mm = MissionManager::getInstance(nullptr);
         mm.loadMissionDefinition("/Users/tory/workspace/mxrc/missions/simple_mission.xml");
         std::string instance_id = mm.startMission("simple_mission", TaskContext());
         ASSERT_FALSE(instance_id.empty());

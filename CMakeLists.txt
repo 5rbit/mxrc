@@ -34,6 +34,7 @@ target_link_libraries(mxrc PRIVATE
 # Include directories
 target_include_directories(mxrc PUBLIC
     ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/src/core/task/contracts
 )
 
 # If using vendored BehaviorTree.CPP, add its include directory to mxrc
@@ -58,6 +59,7 @@ add_executable(run_tests
 
 target_include_directories(run_tests PUBLIC 
     ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/src/core/task/contracts
 )
 
 # If using vendored BehaviorTree.CPP, add its include directory to run_tests

@@ -1,17 +1,17 @@
 #include "OperatorInterface.h"
 #include <iostream>
-#include "../../datastore/DataStore.h"
+//#include "../../datastore/DataStore.h"
 #include "nlohmann/json.hpp"
 
 namespace mxrc {
 namespace task {
 
-OperatorInterface::OperatorInterface()
-    : mission_manager_(MissionManager::getInstance()) {
+OperatorInterface::OperatorInterface(std::shared_ptr<IDataStore> dataStore)
+    : mission_manager_(MissionManager::getInstance(dataStore)) {
 }
 
-OperatorInterface& OperatorInterface::getInstance() {
-    static OperatorInterface instance;
+OperatorInterface& OperatorInterface::getInstance(std::shared_ptr<IDataStore> dataStore) {
+    static OperatorInterface instance(dataStore);
     return instance;
 }
 
@@ -53,6 +53,7 @@ TaskState OperatorInterface::getTaskStatus(const std::string& missionInstanceId,
     return mission_manager_.getTaskState(missionInstanceId, taskInstanceId);
 }
 
+/*
 std::vector<TaskStateHistory> OperatorInterface::getTaskHistory(const std::string& taskInstanceId) const {
     std::vector<TaskStateHistory> history;
     std::string query_pattern = "task_history_" + taskInstanceId;
@@ -107,6 +108,7 @@ std::vector<MissionState> OperatorInterface::getMissionHistory(const std::string
     }
     return history;
 }
+*/
 
 } // namespace task
 } // namespace mxrc

@@ -1,21 +1,36 @@
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
 #include "core/task/MissionManager.h"
 #include "core/task/AbstractTask.h"
 #include "core/task/TaskFactory.h"
 #include "core/task/DriveToPositionTask.h" // Ensure DriveToPositionTask is linked
+#include "core/task/contracts/IDataStore.h"
 #include <chrono>
 #include <thread>
 
 using namespace mxrc::task;
+using ::testing::AtLeast;
+
+class MockDataStore : public IDataStore {
+public:
+    MOCK_METHOD(bool, saveMissionState, (const MissionStateDto& missionState), (override));
+    MOCK_METHOD(std::optional<MissionStateDto>, loadMissionState, (const std::string& missionId), (override));
+    MOCK_METHOD(bool, saveTaskHistory, (const std::string& missionId, const std::vector<TaskStateDto>& taskHistory), (override));
+    MOCK_METHOD(std::vector<TaskStateDto>, loadTaskHistory, (const std::string& missionId), (override));
+    MOCK_METHOD(std::vector<std::string>, getPendingMissionIds, (), (override));
+};
 
 // Test fixture for MissionManager
 class MissionManagerTest : public ::testing::Test {
 protected:
-    MissionManager& missionManager = MissionManager::getInstance();
+    std::shared_ptr<MockDataStore> mockDataStore;
+    MissionManager* missionManager;
 
     void SetUp() override {
+        mockDataStore = std::make_shared<MockDataStore>();
+        missionManager = &MissionManager::getInstance(mockDataStore);
         // Ensure mission is idle before each test
-        missionManager.cancelMission();
+        missionManager->cancelMission();
         // Small delay to allow potential mission termination to propagate
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }

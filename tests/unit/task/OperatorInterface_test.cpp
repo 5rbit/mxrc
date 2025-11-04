@@ -1,12 +1,16 @@
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
 #include "core/task/OperatorInterface.h"
 #include "core/task/MissionManager.h"
 #include "core/task/AbstractTask.h"
 #include "core/task/TaskContext.h"
+#include "core/task/contracts/IDataStore.h"
+#include "mocks/MockDataStore.h"
 #include <chrono>
 #include <thread>
 
 using namespace mxrc::task;
+using ::testing::AtLeast;
 
 // Dummy Emergency Task for testing OperatorInterface
 class OperatorEmergencyTask : public AbstractTask {
@@ -24,19 +28,22 @@ public:
 class OperatorInterfaceTest : public ::testing::Test {
 protected:
     OperatorInterface& opInterface = OperatorInterface::getInstance();
-    MissionManager& missionManager = MissionManager::getInstance();
+    std::shared_ptr<MockDataStore> mockDataStore;
+    MissionManager* missionManager;
 
     void SetUp() override {
+        mockDataStore = std::make_shared<MockDataStore>();
+        missionManager = &MissionManager::getInstance(mockDataStore);
         // Ensure mission is idle before each test
-        missionManager.cancelMission("any_mission_instance_id"); // Use a dummy ID for cancellation
+        missionManager->cancelMission("any_mission_instance_id"); // Use a dummy ID for cancellation
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
         // Load a mission definition for testing
-        missionManager.loadMissionDefinition("/Users/tory/workspace/mxrc/missions/simple_mission.xml");
+        missionManager->loadMissionDefinition("/Users/tory/workspace/mxrc/missions/simple_mission.xml");
     }
 
     void TearDown() override {
-        missionManager.cancelMission("any_mission_instance_id");
+        missionManager->cancelMission("any_mission_instance_id");
     }
 };
 

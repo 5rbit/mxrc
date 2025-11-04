@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
 #include "core/task/MissionManager.h"
-#include "core/datastore/DataStore.h"
+#include "core/task/contracts/IDataStore.h"
+#include "mocks/MockDataStore.h"
 #include "core/task/AbstractTask.h"
 #include "core/task/TaskFactory.h"
 #include "core/task/DriveToPositionTask.h"
@@ -10,83 +12,105 @@
 
 using namespace mxrc::task;
 namespace fs = std::filesystem;
+using ::testing::_; // For matching any argument
+using ::testing::Return;
 
 class MissionManagerPersistenceTest : public ::testing::Test {
 protected:
-    MissionManager& missionManager = MissionManager::getInstance();
-    mxrc::DataStore& dataStore = mxrc::DataStore::getInstance();
+    std::shared_ptr<MockDataStore> mockDataStore;
+    MissionManager* missionManager;
     const std::string TEST_MISSION_FILE = "/Users/tory/workspace/mxrc/missions/simple_mission.xml";
-    const std::string PERSISTENCE_KEY = "test_mission_persistence";
-    const std::string TEST_STATE_FILE = "test_mission_state.json"; // This might be used by DataStore's internal saveState/loadState
+const std::string TEST_MISSION_INSTANCE_ID = "test_mission_instance";
+    const std::string RESTORED_MISSION_INSTANCE_ID = "test_mission_instance_restored";
 
     void SetUp() override {
+        // Create a new mock for each test to ensure clean state
+        mockDataStore = std::make_shared<MockDataStore>();
+        // Ensure MissionManager uses our mock
+        missionManager = &MissionManager::getInstance(mockDataStore);
+
         // Ensure mission is idle before each test
-        missionManager.cancelMission(); // Use the global cancel if no instance ID is provided
-        missionManager.cancelMission("test_mission_instance"); // Cancel specific instances
-        missionManager.cancelMission("test_mission_instance_restored");
+        missionManager->cancelMission(); // Use the global cancel if no instance ID is provided
+        missionManager->cancelMission(TEST_MISSION_INSTANCE_ID); // Cancel specific instances
+        missionManager->cancelMission(RESTORED_MISSION_INSTANCE_ID);
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        // Clear any previous test data from DataStore
-        dataStore.remove(PERSISTENCE_KEY);
-        if (fs::exists(TEST_STATE_FILE)) {
-            fs::remove(TEST_STATE_FILE);
-        }
+
+        // Register the DriveToPositionTask so the mission can be loaded
+        TaskFactory::getInstance().registerTask("DriveToPosition", []() {
+            return std::make_unique<DriveToPositionTask>();
+        });
     }
 
     void TearDown() override {
         // Clean up after each test
-        missionManager.cancelMission();
-        missionManager.cancelMission("test_mission_instance");
-        missionManager.cancelMission("test_mission_instance_restored");
+        missionManager->cancelMission();
+        missionManager->cancelMission(TEST_MISSION_INSTANCE_ID);
+        missionManager->cancelMission(RESTORED_MISSION_INSTANCE_ID);
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        dataStore.remove(PERSISTENCE_KEY);
-        if (fs::exists(TEST_STATE_FILE)) {
-            fs::remove(TEST_STATE_FILE);
-        }
     }
 };
 
 TEST_F(MissionManagerPersistenceTest, SaveAndLoadMissionState) {
     // 1. Load and start a mission
-    ASSERT_TRUE(missionManager.loadMission(TEST_MISSION_FILE, "test_mission_instance"));
-    ASSERT_TRUE(missionManager.startMission("test_mission_instance"));
+    ASSERT_TRUE(missionManager->loadMission(TEST_MISSION_FILE, TEST_MISSION_INSTANCE_ID));
+    ASSERT_TRUE(missionManager->startMission(TEST_MISSION_INSTANCE_ID));
 
     // Give it a moment to run
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    // Get current state
-    MissionState preSaveState = missionManager.getMissionState("test_mission_instance");
-    ASSERT_EQ(preSaveState.instance_id, "test_mission_instance");
-    // Ensure it's not IDLE before saving
+    // Get current state - this will be the state that MissionManager attempts to save
+    MissionState preSaveState = missionManager->getMissionState(TEST_MISSION_INSTANCE_ID);
+    ASSERT_EQ(preSaveState.instance_id, TEST_MISSION_INSTANCE_ID);
     ASSERT_NE(preSaveState.status, MissionStatus::IDLE);
 
-    // 2. Save the mission state
-    // This assumes MissionManager has a method to save its state to the DataStore
-    bool saved = missionManager.saveMissionState(PERSISTENCE_KEY, "test_mission_instance");
-    ASSERT_TRUE(saved) << "Failed to save mission state.";
+    // ************* EXPECT_CALL for IDataStore::saveMissionState *************
+    // We expect MissionManager to call IDataStore::saveMissionState with a MissionStateDto
+    // that reflects the current state of the mission.
+    // The exact MissionStateDto::missionStatus might be RUNNING, but we can be flexible.
+    EXPECT_CALL(*mockDataStore, saveMissionState(
+        AllOf(
+            Field(&MissionStateDto::missionId, TEST_MISSION_FILE),
+            Field(&MissionStateDto::instanceId, TEST_MISSION_INSTANCE_ID)
+            // If you need to check status, you can add: Field(&MissionStateDto::missionStatus, to_string(MissionStatus::RUNNING))
+        )
+    )).Times(1).WillOnce(Return(true));
+
+    // 2. Save the mission state using MissionManager's public method
+    // This call should trigger the mocked IDataStore::saveMissionState
+    bool saved = missionManager->saveMissionState(TEST_MISSION_INSTANCE_ID);
+    ASSERT_TRUE(saved) << "Failed to trigger saveMissionState in MissionManager.";
 
     // 3. Cancel the current mission
-    missionManager.cancelMission("test_mission_instance");
+    missionManager->cancelMission(TEST_MISSION_INSTANCE_ID);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    MissionState cancelledState = missionManager.getMissionState("test_mission_instance");
+    MissionState cancelledState = missionManager->getMissionState(TEST_MISSION_INSTANCE_ID);
     ASSERT_EQ(cancelledState.status, MissionStatus::CANCELLED);
 
-    // 4. Load the previously saved mission state
-    bool loaded = missionManager.loadMissionState(PERSISTENCE_KEY, "test_mission_instance_restored");
-    ASSERT_TRUE(loaded) << "Failed to load mission state.";
+    // ************* EXPECT_CALL for IDataStore::loadMissionState *************
+    // When MissionManager needs to load a mission state for restoration, it will query
+    // IDataStore. Simulate the state it would have saved.
+    MissionStateDto mockLoadedDto;
+    mockLoadedDto.missionId = TEST_MISSION_FILE;
+    mockLoadedDto.instanceId = TEST_MISSION_INSTANCE_ID; // IDataStore holds the original instance ID
+    mockLoadedDto.missionStatus = to_string(MissionStatus::IDLE); // Or some other appropriate restored status
+
+    EXPECT_CALL(*mockDataStore, loadMissionState(TEST_MISSION_INSTANCE_ID)) // IDataStore is asked for the original instance ID
+        .Times(1)
+        .WillOnce(Return(mockLoadedDto));
+
+    // 4. Load the previously saved mission state into a new instance via MissionManager
+    // This call should trigger the mocked IDataStore::loadMissionState
+    bool loaded = missionManager->loadMissionState(TEST_MISSION_INSTANCE_ID, RESTORED_MISSION_INSTANCE_ID);
+    ASSERT_TRUE(loaded) << "Failed to trigger loadMissionState in MissionManager.";
 
     // 5. Verify the restored state
-    MissionState postLoadState = missionManager.getMissionState("test_mission_instance_restored");
-    ASSERT_EQ(postLoadState.mission_id, preSaveState.mission_id);
-    // The status might change based on how "load" works, e.g., it might resume or go to paused
-    // For this test, we expect it to be LOADED or IDLE (ready to be started), or even PAUSED if implemented this way.
-    // Let's assume for now it goes to IDLE if it's not RUNNING, reflecting a deserialized but not yet resumed state.
-    ASSERT_TRUE(postLoadState.status == MissionStatus::IDLE || postLoadState.status == MissionStatus::PAUSED)
-        << "Restored mission status is " << static_cast<int>(postLoadState.status) << ", expected IDLE or PAUSED.";
-    // The instance ID should be the one provided during load, not the original
-    ASSERT_EQ(postLoadState.instance_id, "test_mission_instance_restored");
+    MissionState postLoadState = missionManager->getMissionState(RESTORED_MISSION_INSTANCE_ID);
+    ASSERT_EQ(postLoadState.mission_id, TEST_MISSION_FILE);
+    ASSERT_EQ(postLoadState.instance_id, RESTORED_MISSION_INSTANCE_ID); // It should have the new instance ID
+    ASSERT_EQ(postLoadState.status, MissionStatus::IDLE); // Based on how we mocked it to return IDLE
 
     // Optional: Start the restored mission and check behaviour
-    ASSERT_TRUE(missionManager.startMission("test_mission_instance_restored"));
+    ASSERT_TRUE(missionManager->startMission(RESTORED_MISSION_INSTANCE_ID));
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    ASSERT_EQ(missionManager.getMissionState("test_mission_instance_restored").status, MissionStatus::RUNNING);
+    ASSERT_EQ(missionManager->getMissionState(RESTORED_MISSION_INSTANCE_ID).status, MissionStatus::RUNNING);
 }

@@ -8,6 +8,8 @@
 #include "AbstractTask.h"
 #include "MissionManager.h"
 
+#include "contracts/IDataStore.h"
+
 namespace mxrc {
 namespace task {
 
@@ -18,7 +20,7 @@ struct TaskStateHistory;
 
 class OperatorInterface {
 public:
-    static OperatorInterface& getInstance();
+    static OperatorInterface& getInstance(std::shared_ptr<IDataStore> dataStore);
 
     OperatorInterface(const OperatorInterface&) = delete;
     OperatorInterface& operator=(const OperatorInterface&) = delete;
@@ -37,7 +39,7 @@ public:
     std::vector<MissionState> getMissionHistory(const std::string& missionInstanceId) const;
 
 private:
-    OperatorInterface();
+    explicit OperatorInterface(std::shared_ptr<IDataStore> dataStore);
     ~OperatorInterface() = default;
 
     MissionManager& mission_manager_;

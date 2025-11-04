@@ -12,7 +12,7 @@
 #include "TaskScheduler.h"
 #include "MissionParser.h"
 #include "TaskDependencyManager.h"
-#include "../datastore/DataStore.h"
+#include "contracts/IDataStore.h"
 #include <string>
 #include <memory>
 #include <vector>
@@ -24,6 +24,8 @@
 
 namespace mxrc {
 namespace task {
+
+
 
 enum class MissionStatus {
     IDLE,
@@ -68,7 +70,8 @@ void from_json(const nlohmann::json& j, MissionState& p) {
 
 class MissionManager {
 public:
-    static MissionManager& getInstance();
+    static MissionManager& getInstance(std::shared_ptr<IDataStore> dataStore);
+    static void resetForTesting();
 
     MissionManager(const MissionManager&) = delete;
     MissionManager& operator=(const MissionManager&) = delete;
@@ -85,13 +88,13 @@ public:
     TaskState getTaskState(const std::string& missionInstanceId, const std::string& taskInstanceId) const;
     bool recoverMission(const std::string& missionInstanceId);
 
-    // Persistence methods
-    bool saveMissionState(const std::string& key, const std::string& missionInstanceId);
-    bool loadMissionState(const std::string& key, const std::string& newMissionInstanceId);
+
 
 private:
-    MissionManager();
+    explicit MissionManager(std::shared_ptr<IDataStore> dataStore);
     ~MissionManager();
+
+    std::shared_ptr<IDataStore> data_store_;
 
     std::string current_mission_id_;
     std::string current_mission_instance_id_;

@@ -1,82 +1,96 @@
-# 데이터 모델: Task & Mission Management (Task 및 임무 관리) 고도화
+# 데이터 모델: Task & Mission Management
 
-**기능 브랜치**: `004-task-mission-management`
-**생성일**: 2025-11-03
-**사양서**: [specs/004-task-mission-management/spec.md](specs/004-task-mission-management/spec.md)
-**계획**: [specs/004-task-mission-management/plan.md](specs/004-task-mission-management/plan.md)
+**브랜치**: `004-task-mission-management` | **날짜**: 2025-11-04 | **사양서**: [spec.md](./spec.md)
 
-## 1. Mission 정의 (Behavior Tree 기반)
+## 개요
 
-Mission은 Behavior Tree 구조로 정의되며, JSON 또는 YAML 형식의 설정 파일로 관리됩니다. 각 노드는 Task 또는 제어 흐름 로직을 나타냅니다.
+이 문서는 `Task & Mission Management` 모듈의 주요 엔티티와 그 관계를 정의합니다. 이 데이터 모델은 `DataStore` 의존성을 제거하고 모듈의 독립성을 강화하는 리팩터링의 결과를 반영합니다.
 
-### MissionDefinition
-- **id**: `string` (Mission 고유 식별자)
-- **name**: `string` (Mission 이름)
-- **version**: `string` (Semantic Versioning 준수)
-- **description**: `string` (Mission 설명)
-- **behavior_tree**: `object` (Behavior Tree 구조를 나타내는 JSON/YAML 객체)
-  - **root**: `string` (루트 노드의 ID)
-  - **nodes**: `array<object>` (Behavior Tree 노드 목록)
-    - **id**: `string` (노드 고유 식별자)
-    - **type**: `enum` (Sequence, Selector, Parallel, Action, Condition 등)
-    - **task_id**: `string` (Action 노드인 경우, 실행할 Task의 ID)
-    - **children**: `array<string>` (자식 노드의 ID 목록)
-    - **parameters**: `object` (노드 실행에 필요한 파라미터)
-    - **failure_strategy**: `enum` (ABORT_MISSION, RETRY_TRANSIENT, SKIP_TASK, CUSTOM_HANDLER) (선택 사항, Task 레벨의 FailureStrategy를 오버라이드)
+## 엔티티 다이어그램 (개념)
 
-## 2. Task
+```mermaid
+graph TD
+    subgraph Task & Mission Management Module
+        OperatorInterface -- controls --> MissionManager
+        MissionManager -- uses --> BehaviorTree
+        MissionManager -- manages --> TaskScheduler
+        MissionManager -- uses --> TaskFactory
+        MissionManager -- uses --> ResourceManager
+        MissionManager -- uses --> TaskDependencyManager
+        BehaviorTree -- contains --> Task
+        TaskScheduler -- schedules --> Task
+        TaskFactory -- creates --> Task
+        Task -- uses --> TaskContext
+        Task -- requires --> ResourceManager
+        TaskDependencyManager -- manages dependencies of --> Task
+    end
 
-로봇이 수행하는 가장 작은 작업 단위입니다. `AbstractTask` 인터페이스를 상속하며, 자체 상태와 오류 처리 로직을 가집니다.
+    subgraph External Modules
+        DataStoreInterface(IDataStore)
+    end
 
-### Task (런타임 인스턴스)
-- **id**: `string` (Task 정의 고유 식별자)
-- **instance_id**: `string` (Task 런타임 인스턴스 고유 식별자)
-- **name**: `string` (Task 이름)
-- **current_state**: `enum` (PENDING, RUNNING, PAUSED, COMPLETED, FAILED, CANCELLED)
-- **context**: `TaskContext` (Task 실행에 필요한 입력/출력 파라미터)
-- **priority**: `integer` (Task 스케줄링 우선순위)
-- **dependencies**: `array<string>` (의존하는 다른 Task 인스턴스 ID 목록)
-- **resource_requirements**: `array<string>` (필요한 리소스 목록)
-- **failure_strategy**: `enum` (ABORT_MISSION, RETRY_TRANSIENT, SKIP_TASK, CUSTOM_HANDLER)
-- **start_time**: `timestamp`
-- **end_time**: `timestamp` (완료 또는 실패 시)
-- **error_info**: `object` (오류 코드, 설명, 관련 Task ID)
+    MissionManager -.->|uses (injected)| DataStoreInterface
 
-### TaskContext
-- **parameters**: `map<string, any>` (다양한 데이터 타입을 저장하는 키-값 쌍)
+    style DataStoreInterface fill:#f9f,stroke:#333,stroke-width:2px,color:#000
+```
 
-## 3. MissionState (런타임 인스턴스)
+## 주요 엔티티 설명
 
-실행 중인 Mission의 현재 상태를 나타냅니다.
+### 1. MissionManager
+- **설명**: Mission의 전체 생명주기와 실행을 관리하는 핵심 오케스트레이터입니다. Behavior Tree 실행 엔진을 내장하고 있으며, Mission의 시작, 중지, 재개, 상태 모니터링 등을 담당합니다.
+- **관계**:
+    - `OperatorInterface`로부터 제어 명령을 받습니다.
+    - `BehaviorTree`를 사용하여 Mission의 로직을 실행합니다.
+    - `TaskScheduler`, `TaskFactory`, `ResourceManager`, `TaskDependencyManager` 등 하위 컴포넌트들을 조정합니다.
+    - **(리팩터링 핵심)** `IDataStore` 인터페이스에 대한 의존성을 가지며, 구체적인 구현은 외부에서 주입받습니다. 영속성 로직과 직접적인 결합이 없습니다.
 
-### MissionState
-- **mission_id**: `string` (실행 중인 Mission의 정의 ID)
-- **instance_id**: `string` (Mission 런타임 인스턴스 고유 식별자)
-- **current_status**: `enum` (RUNNING, PAUSED, COMPLETED, FAILED, CANCELLED)
-- **current_task_instance_id**: `string` (현재 실행 중인 Task 인스턴스 ID)
-- **progress**: `float` (0.0 ~ 1.0, Mission 전체 진행률)
-- **estimated_completion_time**: `timestamp`
-- **start_time**: `timestamp`
-- **end_time**: `timestamp` (완료 또는 실패 시)
-- **active_task_instances**: `array<string>` (현재 활성화된 Task 인스턴스 ID 목록)
+### 2. Task
+- **설명**: 로봇이 수행하는 가장 작은 작업 단위입니다(예: `DriveToPosition`, `LiftPallet`). 자체적인 상태(`PENDING`, `RUNNING`, `COMPLETED` 등)와 생명주기, 오류 처리 로직을 가집니다.
+- **필드**: `taskId`, `status`, `failureStrategy`, `priority`.
+- **관계**: `BehaviorTree`의 Action 노드로 표현되며, `TaskScheduler`에 의해 실행 순서가 결정됩니다.
 
-## 4. TaskStateHistory
+### 3. BehaviorTree
+- **설명**: Mission의 복잡한 제어 흐름(순차, 분기, 병렬 등)을 정의하는 데 사용되는 트리 구조입니다. `vendor/BehaviorTree.CPP` 라이브러리를 활용합니다.
+- **관계**: `MissionManager`에 의해 실행되며, `Task`를 포함하는 Action 노드들로 구성됩니다.
 
-각 Task의 상태 변화 이력을 기록합니다.
+### 4. TaskContext
+- **설명**: Task 실행에 필요한 입력 파라미터와 Task 실행 후의 출력 결과를 담는 데이터 컨테이너입니다. Task 간 데이터 공유에도 사용될 수 있습니다.
 
-### TaskStateHistory Entry
-- **task_instance_id**: `string`
-- **timestamp**: `timestamp`
-- **old_state**: `enum` (PENDING, RUNNING, PAUSED, COMPLETED, FAILED, CANCELLED)
-- **new_state**: `enum` (PENDING, RUNNING, PAUSED, COMPLETED, FAILED, CANCELLED)
-- **reason**: `string` (상태 변화 이유, 예: "Task completed successfully", "Resource unavailable")
-- **error_info**: `object` (오류 코드, 설명, 관련 Task ID) (오류로 인한 상태 변화 시)
+### 5. OperatorInterface
+- **설명**: 운영자가 Mission 및 개별 Task를 모니터링하고 제어 명령(시작, 중지, 재개 등)을 내릴 수 있는 인터페이스입니다.
 
-## 6. DataStore 저장 항목
+### 6. ResourceManager
+- **설명**: 로봇의 하드웨어 및 소프트웨어 리소스(예: 로봇 팔, 센서)를 관리하고, Task 실행에 필요한 리소스의 할당 및 해제를 담당합니다.
 
-`DataStore`는 다음 항목들을 영속적으로 저장하고 관리합니다.
+### 7. DataStore (`IDataStore` 인터페이스)
+- **설명**: Mission 및 Task 관련 영속적인 데이터를 저장하고 관리하는 **외부 모듈의 추상 인터페이스**입니다. `Task & Mission Management` 모듈은 이 인터페이스에만 의존하며, 실제 구현(인메모리, DB 등)은 알지 못합니다.
+- **역할**: Mission 상태, Task 이력 등의 저장 및 조회를 위한 메서드를 정의합니다.
+- **상태**: 이 모듈의 책임 범위를 벗어납니다. 구현은 별도의 모듈에서 제공되고 런타임에 주입됩니다.
 
-- **Mission 정의**: `MissionDefinition` 객체
-- **Mission 런타임 상태**: `MissionState` 객체 (주기적으로 또는 주요 상태 변화 시 저장)
-- **Task 런타임 상태**: `Task` 객체 (주기적으로 또는 주요 상태 변화 시 저장)
-- **Task 상태 변화 이력**: `TaskStateHistory` Entry
+## 상태 모델: TaskState
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING
+    PENDING --> RUNNING: schedule()
+    RUNNING --> COMPLETED: on_success()
+    RUNNING --> FAILED: on_failure()
+    RUNNING --> PAUSED: pause()
+    PAUSED --> RUNNING: resume()
+    PENDING --> CANCELLED: cancel()
+    RUNNING --> CANCELLED: cancel()
+    PAUSED --> CANCELLED: cancel()
+    COMPLETED --> [*]
+    FAILED --> [*]
+    CANCELLED --> [*]
+```
+
+## 데이터 흐름
+
+1.  `OperatorInterface`가 `MissionManager`에게 Mission 실행을 요청합니다.
+2.  `MissionManager`는 Mission 파일을 파싱하여 `BehaviorTree`를 생성합니다.
+3.  `MissionManager`는 `BehaviorTree`를 실행(tick)합니다.
+4.  실행할 `Task`가 결정되면, `TaskScheduler`가 우선순위와 의존성에 따라 Task를 `RUNNING` 상태로 전환합니다.
+5.  `Task` 실행 중 상태 변경이 발생하면, `MissionManager`는 이 정보를 `OperatorInterface`에 전달하고, (주입된) `IDataStore` 구현체를 통해 상태를 기록하도록 요청합니다.
+6.  Task 완료/실패 후, `MissionManager`는 다음 `BehaviorTree` 노드를 실행합니다.
+7.  Mission이 완료/실패/취소되면, `MissionManager`는 최종 상태를 `IDataStore`에 기록하고 `OperatorInterface`에 보고합니다.

@@ -118,12 +118,12 @@
 
 **목적**: 여러 사용자 스토리에 영향을 미치는 개선 사항
 
-- [ ] T034 [P] docs/task_mission_management/README.md 문서 업데이트
-- [ ] T035 코드 정리 및 리팩토링
+- [x] T034 [P] docs/task_mission_management/README.md 문서 업데이트
+- [x] T035 코드 정리 및 리팩토링
 - [ ] T036 모든 스토리에 대한 성능 최적화
 - [ ] T037 [P] 추가 단위 테스트 (요청된 경우) tests/unit/
 - [ ] T038 보안 강화 (통신 채널 암호화 등)
-- [ ] T039 quickstart.md 유효성 검사 실행
+- [x] T039 quickstart.md 유효성 검사 실행
 
 ---
 

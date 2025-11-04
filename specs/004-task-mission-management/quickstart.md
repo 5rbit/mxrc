@@ -42,7 +42,7 @@
 
 ### 1. 단위 테스트 실행
 
-`MissionManager`가 `DataStore`의 구체적인 구현 없이도 독립적으로 동작하는지 확인하는 테스트를 실행합니다. 테스트에서는 `IDataStore`의 모의(Mock) 객체를 주입하여 사용합니다.
+`MissionManager`가 `IDataStore`의 구체적인 구현 없이도 독립적으로 동작하는지 확인하는 테스트를 실행합니다. 테스트에서는 `MissionManager::getInstance()` 호출 시 `IDataStore`의 모의(Mock) 객체를 주입하여 사용합니다.
 
 빌드 디렉터리에서 `ctest`를 실행하거나, 특정 테스트 실행 파일을 직접 실행할 수 있습니다.
 

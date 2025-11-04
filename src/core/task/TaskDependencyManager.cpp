@@ -3,7 +3,7 @@
 #include <chrono>
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 TaskDependencyManager::TaskDependencyManager() {
 }
@@ -62,5 +62,5 @@ void TaskDependencyManager::clearAllDependencies() {
     task_dependencies_.clear();
 }
 
-} // namespace task_mission
+} // namespace task
 } // namespace mxrc

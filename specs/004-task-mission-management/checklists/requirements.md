@@ -1,7 +1,7 @@
 # Specification Quality Checklist: Task & Mission Management (Task 및 임무 관리) 고도화
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
-**Created**: 2025-11-03
+**Created**: 2025-11-04
 **Feature**: [specs/004-task-mission-management/spec.md](specs/004-task-mission-management/spec.md)
 
 ## Content Quality

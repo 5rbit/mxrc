@@ -1,10 +1,10 @@
 #ifndef MXRC_LIFT_PALLET_H
 #define MXRC_LIFT_PALLET_H
 
-#include "core/task/task_mission_management/AbstractTask.h"
+#include "core/task/AbstractTask.h"
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 class LiftPallet : public AbstractTask {
 public:

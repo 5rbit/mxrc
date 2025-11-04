@@ -1,9 +1,9 @@
 #include "LiftPallet.h"
-#include "core/task/task_mission_management/TaskFactory.h"
+#include "core/task/TaskFactory.h"
 #include <iostream>
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 bool LiftPallet::initialize(TaskContext& context) {
     std::cout << "LiftPallet initialized." << std::endl;

@@ -9,7 +9,7 @@
 #include "MissionManager.h"
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 // Forward declarations
 struct MissionState;
@@ -43,7 +43,7 @@ private:
     MissionManager& mission_manager_;
 };
 
-} // namespace task_mission
+} // namespace task
 } // namespace mxrc
 
 #endif // OPERATOR_INTERFACE_H

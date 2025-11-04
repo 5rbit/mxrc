@@ -1,6 +1,7 @@
 #ifndef TASK_DEPENDENCY_MANAGER_H
 #define TASK_DEPENDENCY_MANAGER_H
 
+#include "AbstractTask.h"
 #include <string>
 #include <vector>
 #include <map>
@@ -9,15 +10,7 @@
 #include <condition_variable>
 
 namespace mxrc {
-namespace task_mission {
-
-enum class TaskState {
-    PENDING,
-    RUNNING,
-    COMPLETED,
-    FAILED,
-    CANCELLED
-};
+namespace task {
 
 class TaskDependencyManager {
 public:
@@ -36,7 +29,7 @@ public:
      * @param taskId The ID of the task whose state is being updated.
      * @param newState The new state of the task.
      */
-    void updateTaskState(const std::string& taskId, TaskState newState);
+    void updateTaskState(const std::string& taskId, mxrc::task::TaskState newState);
 
     /**
      * @brief Checks if a task's dependencies are met.
@@ -61,11 +54,8 @@ public:
 private:
     mutable std::mutex mutex_;
     std::condition_variable condition_;
-    std::map<std::string, TaskState> task_states_;
+    std::map<std::string, mxrc::task::TaskState> task_states_;
     std::map<std::string, std::set<std::string>> task_dependencies_;
 };
-
-} // namespace task_mission
-} // namespace mxrc
 
 #endif // TASK_DEPENDENCY_MANAGER_H

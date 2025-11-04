@@ -1,12 +1,12 @@
 #include <gtest/gtest.h>
-#include "core/task/task_mission_management/TaskScheduler.h"
-#include "core/task/task_mission_management/AbstractTask.h"
-#include "core/task/task_mission_management/TaskContext.h"
+#include "core/task/TaskScheduler.h"
+#include "core/task/AbstractTask.h"
+#include "core/task/TaskContext.h"
 #include <chrono>
 #include <thread>
 #include <atomic>
 
-using namespace mxrc::task_mission;
+using namespace mxrc::task;
 
 // Dummy Task for testing TaskScheduler
 class DummyTask : public AbstractTask {

@@ -4,11 +4,11 @@
 #include <string>
 #include <vector>
 #include <memory>
-#include "../../../../src/core/task_mission_management/TaskContext.h"
-#include "../../../../src/core/task_mission_management/AbstractTask.h"
+#include "../../../../src/core/task/TaskContext.h"
+#include "../../../../src/core/task/AbstractTask.h"
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 // Forward declarations
 struct MissionState;
@@ -95,7 +95,7 @@ public:
     virtual bool recoverMission(const std::string& missionInstanceId) = 0;
 };
 
-} // namespace task_mission
+} // namespace task
 } // namespace mxrc
 
 #endif // I_MISSION_MANAGER_H

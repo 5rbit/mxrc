@@ -6,7 +6,7 @@
 // #include <nlohmann/json.hpp>
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 MissionDefinition MissionParser::parseMissionDefinition(const std::string& filepath) {
     std::ifstream file(filepath);
@@ -57,5 +57,5 @@ bool MissionParser::validateMissionDefinition(const MissionDefinition& missionDe
     return true;
 }
 
-} // namespace task_mission
+} // namespace task
 } // namespace mxrc

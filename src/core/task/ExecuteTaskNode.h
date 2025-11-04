@@ -8,7 +8,7 @@
 #include "AbstractTask.h"
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 // Custom Action Node to execute an AbstractTask
 class ExecuteTaskNode : public BT::SyncActionNode
@@ -28,7 +28,7 @@ public:
     BT::NodeStatus tick() override;
 };
 
-} // namespace task_mission
+} // namespace task
 } // namespace mxrc
 
 #endif // EXECUTE_TASK_NODE_H

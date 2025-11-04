@@ -4,7 +4,7 @@
 #include "nlohmann/json.hpp"
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 OperatorInterface::OperatorInterface()
     : mission_manager_(MissionManager::getInstance()) {
@@ -108,5 +108,5 @@ std::vector<MissionState> OperatorInterface::getMissionHistory(const std::string
     return history;
 }
 
-} // namespace task_mission
+} // namespace task
 } // namespace mxrc

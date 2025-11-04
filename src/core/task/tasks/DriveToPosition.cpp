@@ -1,9 +1,9 @@
 #include "DriveToPosition.h"
-#include "core/task/task_mission_management/TaskFactory.h"
+#include "core/task/TaskFactory.h"
 #include <iostream>
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 bool DriveToPosition::initialize(TaskContext& context) {
     std::cout << "DriveToPosition initialized." << std::endl;
@@ -29,5 +29,5 @@ namespace {
     });
 }
 
-} // namespace task_mission
+} // namespace task
 } // namespace mxrc

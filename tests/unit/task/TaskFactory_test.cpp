@@ -1,10 +1,10 @@
 #include "gtest/gtest.h"
-#include "core/task/task_mission_management/TaskFactory.h"
-#include "core/task/task_mission_management/AbstractTask.h"
-#include "core/task/task_mission_management/TaskContext.h"
-#include "core/task/task_mission_management/DriveToPositionTask.h"
+#include "core/task/TaskFactory.h"
+#include "core/task/AbstractTask.h"
+#include "core/task/TaskContext.h"
+#include "core/task/DriveToPositionTask.h"
 
-using namespace mxrc::task_mission;
+using namespace mxrc::task;
 
 // Define a dummy task for testing registration
 class DummyTask : public AbstractTask {
@@ -27,7 +27,7 @@ protected:
 
     void SetUp() override {
         // Ensure a clean state for each test
-        // Note: TaskFactory is a singleton, so we can't easily reset it.
+        // Note: TaskFactory is a singleton, so we't easily reset it.
         // For this test, we'll rely on unique task IDs or careful registration.
     }
 };

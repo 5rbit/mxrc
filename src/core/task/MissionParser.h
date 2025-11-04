@@ -6,7 +6,7 @@
 #include <nlohmann/json.hpp> // Assuming nlohmann/json for JSON parsing
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 // Forward declaration of MissionDefinition structure/class if it's defined elsewhere
 // For now, we'll assume a simple structure for parsing purposes.
@@ -42,7 +42,7 @@ private:
     // MissionDefinition parseYaml(const std::string& content);
 };
 
-} // namespace task_mission
+} // namespace task
 } // namespace mxrc
 
 #endif // MISSION_PARSER_H

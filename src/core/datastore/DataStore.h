@@ -9,6 +9,8 @@
 #include <chrono>
 #include <functional> // For std::function
 #include <mutex>
+#include <iosfwd> // Forward declarations for iostream types
+#include <iostream> // For debug prints
 
 // Forward declarations
 class Observer;

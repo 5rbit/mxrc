@@ -75,7 +75,7 @@ Mission은 Behavior Tree 구조를 따르는 JSON 또는 YAML 파일로 정의�
 #include <iostream>
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 class MyCustomTask : public AbstractTask {
 public:
@@ -102,7 +102,7 @@ public:
     }
 };
 
-} // namespace task_mission
+} // namespace task
 } // namespace mxrc
 
 #endif // MY_CUSTOM_TASK_H
@@ -112,17 +112,17 @@ public:
 
 ```cpp
 #include "MyCustomTask.h"
-#include "../../src/core/task_mission_management/TaskFactory.h"
+#include "../../src/core/task/TaskFactory.h"
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 // TaskFactory에 MyCustomTask 등록
 static bool registered = TaskFactory().registerTask("MyCustomTask", []() {
     return std::make_unique<MyCustomTask>();
 });
 
-} // namespace task_mission
+} // namespace task
 } // namespace mxrc
 ```
 
@@ -131,13 +131,13 @@ static bool registered = TaskFactory().registerTask("MyCustomTask", []() {
 `MissionManager`를 사용하여 Mission 정의 파일을 로드하고 실행합니다.
 
 ```cpp
-#include "../../src/core/task_mission_management/MissionManager.h" // MissionManager 구현체 포함
-#include "../../src/core/task_mission_management/TaskContext.h"
+#include "../../src/core/task/MissionManager.h" // MissionManager 구현체 포함
+#include "../../src/core/task/TaskContext.h"
 #include <iostream>
 
 int main() {
-    mxrc::task_mission::MissionManager missionManager; // 실제 구현체 사용
-    mxrc::task_mission::TaskContext initialContext;
+    mxrc::task::MissionManager missionManager; // 실제 구현체 사용
+    mxrc::task::TaskContext initialContext;
 
     if (missionManager.loadMissionDefinition("my_first_mission.json")) {
         std::string missionInstanceId = missionManager.startMission("my_first_mission", initialContext);
@@ -146,11 +146,11 @@ int main() {
 
             // Mission 상태 모니터링 (예시)
             while (true) {
-                mxrc::task_mission::MissionState state = missionManager.getMissionState(missionInstanceId);
+                mxrc::task::MissionState state = missionManager.getMissionState(missionInstanceId);
                 std::cout << "Mission Status: " << static_cast<int>(state.current_status) << ", Progress: " << state.progress << std::endl;
-                if (state.current_status == mxrc::task_mission::MissionState::Status::COMPLETED ||
-                    state.current_status == mxrc::task_mission::MissionState::Status::FAILED ||
-                    state.current_status == mxrc::task_mission::MissionState::Status::CANCELLED) {
+                if (state.current_status == mxrc::task::MissionState::Status::COMPLETED ||
+                    state.current_status == mxrc::task::MissionState::Status::FAILED ||
+                    state.current_status == mxrc::task::MissionState::Status::CANCELLED) {
                     break;
                 }
                 // 실제 시스템에서는 비동기적으로 상태를 폴링하거나 이벤트 기반으로 처리
@@ -172,12 +172,12 @@ int main() {
 `OperatorInterface`를 통해 Mission 및 Task의 상태를 모니터링하고 제어 명령을 내릴 수 있습니다.
 
 ```cpp
-#include "../../src/core/task_mission_management/OperatorInterface.h" // OperatorInterface 구현체 포함
+#include "../../src/core/task/OperatorInterface.h" // OperatorInterface 구현체 포함
 #include <iostream>
 
 // ... (Mission 실행 코드 이후)
 
-    mxrc::task_mission::OperatorInterface opInterface; // 실제 구현체 사용
+    mxrc::task::OperatorInterface opInterface; // 실제 구현체 사용
 
     // Mission 일시 중지
     if (opInterface.requestPauseMission(missionInstanceId)) {
@@ -195,7 +195,7 @@ int main() {
     // }
 
     // Task 상태 이력 조회
-    // std::vector<mxrc::task_mission::TaskStateHistory> history = opInterface.getTaskHistory("some_task_instance_id");
+    // std::vector<mxrc::task::TaskStateHistory> history = opInterface.getTaskHistory("some_task_instance_id");
     // for (const auto& entry : history) {
     //     std::cout << "Task State Change: " << static_cast<int>(entry.old_state) << " -> " << static_cast<int>(entry.new_state) << std::endl;
     // }

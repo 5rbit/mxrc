@@ -72,18 +72,6 @@ Mission은 Behavior Tree 구조로 정의되며, JSON 또는 YAML 형식의 설�
 - **reason**: `string` (상태 변화 이유, 예: "Task completed successfully", "Resource unavailable")
 - **error_info**: `object` (오류 코드, 설명, 관련 Task ID) (오류로 인한 상태 변화 시)
 
-## 5. AuditLog
-
-시스템의 중요한 이벤트를 기록합니다.
-
-### AuditLog Entry
-- **timestamp**: `timestamp`
-- **event_type**: `string` (예: "MissionStarted", "TaskFailed", "OperatorCommand")
-- **user_id**: `string` (이벤트를 발생시킨 사용자 또는 시스템)
-- **mission_instance_id**: `string` (관련 Mission 인스턴스 ID)
-- **task_instance_id**: `string` (관련 Task 인스턴스 ID)
-- **details**: `object` (이벤트에 대한 추가 상세 정보, 예: Mission 정의 버전, Task 파라미터, 오류 메시지)
-
 ## 6. DataStore 저장 항목
 
 `DataStore`는 다음 항목들을 영속적으로 저장하고 관리합니다.
@@ -92,4 +80,3 @@ Mission은 Behavior Tree 구조로 정의되며, JSON 또는 YAML 형식의 설�
 - **Mission 런타임 상태**: `MissionState` 객체 (주기적으로 또는 주요 상태 변화 시 저장)
 - **Task 런타임 상태**: `Task` 객체 (주기적으로 또는 주요 상태 변화 시 저장)
 - **Task 상태 변화 이력**: `TaskStateHistory` Entry
-- **감사 로그**: `AuditLog` Entry

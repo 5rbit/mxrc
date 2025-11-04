@@ -21,7 +21,7 @@ endif()
 find_package(GTest REQUIRED) 
 
 # Add executable
-add_executable(mxrc src/main.cpp src/core/task/task_mission_management/TaskFactory.cpp src/core/task/task_mission_management/DriveToPositionTask.cpp src/core/task/task_mission_management/MissionManager.cpp src/core/task/task_mission_management/ExecuteTaskNode.cpp)
+add_executable(mxrc src/main.cpp src/core/task/TaskFactory.cpp src/core/task/tasks/DriveToPosition.cpp src/core/task/MissionManager.cpp src/core/task/ExecuteTaskNode.cpp)
 
 # Link dependencies
 target_link_libraries(mxrc PRIVATE 
@@ -48,12 +48,12 @@ enable_testing()
 add_executable(run_tests 
     tests/unit/datastore/DataStore_test.cpp
     tests/unit/task/MissionManager_test.cpp
-    src/core/task/task_mission_management/MissionManager.cpp
+    src/core/task/MissionManager.cpp
     src/core/datastore/DataStore.cpp
-    src/core/task/task_mission_management/TaskFactory.cpp
-    src/core/task/task_mission_management/DriveToPositionTask.cpp
+    src/core/task/TaskFactory.cpp
+    src/core/task/tasks/DriveToPosition.cpp
     tests/unit/task/TaskFactory_test.cpp
-    src/core/task/task_mission_management/ExecuteTaskNode.cpp
+    src/core/task/ExecuteTaskNode.cpp
 )
 
 target_include_directories(run_tests PUBLIC 

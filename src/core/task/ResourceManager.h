@@ -6,7 +6,7 @@
 #include <unordered_set>
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 class ResourceManager {
 public:
@@ -24,7 +24,7 @@ private:
     std::unordered_set<std::string> locked_resources;
 };
 
-} // namespace task_mission
+} // namespace task
 } // namespace mxrc
 
 #endif // MXRC_RESOURCE_MANAGER_H

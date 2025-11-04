@@ -1,12 +1,12 @@
 #include <gtest/gtest.h>
-#include "core/task/task_mission_management/MissionManager.h"
-#include "core/task/task_mission_management/AbstractTask.h"
-#include "core/task/task_mission_management/TaskFactory.h"
-#include "core/task/task_mission_management/DriveToPositionTask.h" // Ensure DriveToPositionTask is linked
+#include "core/task/MissionManager.h"
+#include "core/task/AbstractTask.h"
+#include "core/task/TaskFactory.h"
+#include "core/task/DriveToPositionTask.h" // Ensure DriveToPositionTask is linked
 #include <chrono>
 #include <thread>
 
-using namespace mxrc::task_mission;
+using namespace mxrc::task;
 
 // Test fixture for MissionManager
 class MissionManagerTest : public ::testing::Test {

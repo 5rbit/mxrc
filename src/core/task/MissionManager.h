@@ -1,3 +1,8 @@
+#include <behaviortree_cpp/bt_factory.h>
+#include <nlohmann/json.hpp>
+#include <fstream> // For file operations
+#include <sstream> // For string streams
+
 #ifndef MXRC_MISSION_MANAGER_H
 #define MXRC_MISSION_MANAGER_H
 
@@ -7,8 +12,7 @@
 #include "TaskScheduler.h"
 #include "MissionParser.h"
 #include "TaskDependencyManager.h"
-#include "AuditLogger.h"
-#include "../../datastore/DataStore.h"
+#include "../datastore/DataStore.h"
 #include <string>
 #include <memory>
 #include <vector>
@@ -17,10 +21,9 @@
 #include <thread> // For std::thread
 #include <condition_variable> // For std::condition_variable
 #include <atomic> // For std::atomic
-#include <behaviortree_cpp/bt_factory.h>
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 enum class MissionStatus {
     IDLE,
@@ -41,6 +44,28 @@ struct MissionState {
     std::map<std::string, TaskState> active_task_states; // Use TaskState from TaskDependencyManager
 };
 
+// to_json for MissionState
+void to_json(nlohmann::json& j, const MissionState& p) {
+    j = nlohmann::json{
+        {"mission_id", p.mission_id},
+        {"instance_id", p.instance_id},
+        {"current_status", p.current_status},
+        {"current_task_instance_id", p.current_task_instance_id},
+        {"progress", p.progress},
+        {"estimated_completion_time", p.estimated_completion_time}
+    };
+}
+
+// from_json for MissionState (optional, but good practice)
+void from_json(const nlohmann::json& j, MissionState& p) {
+    j.at("mission_id").get_to(p.mission_id);
+    j.at("instance_id").get_to(p.instance_id);
+    j.at("current_status").get_to(p.current_status);
+    j.at("current_task_instance_id").get_to(p.current_task_instance_id);
+    j.at("progress").get_to(p.progress);
+    j.at("estimated_completion_time").get_to(p.estimated_completion_time);
+}
+
 class MissionManager {
 public:
     static MissionManager& getInstance();
@@ -60,6 +85,10 @@ public:
     TaskState getTaskState(const std::string& missionInstanceId, const std::string& taskInstanceId) const;
     bool recoverMission(const std::string& missionInstanceId);
 
+    // Persistence methods
+    bool saveMissionState(const std::string& key, const std::string& missionInstanceId);
+    bool loadMissionState(const std::string& key, const std::string& newMissionInstanceId);
+
 private:
     MissionManager();
     ~MissionManager();
@@ -75,7 +104,6 @@ private:
     TaskDependencyManager task_dependency_manager_;
     MissionParser mission_parser_;
     std::map<std::string, MissionDefinition> mission_definitions_;
-    AuditLogger audit_logger_; // AuditLogger instance
 
     static MissionManager* instance_; // Static instance pointer
     static std::mutex mutex_; // Mutex for thread-safe singleton
@@ -92,7 +120,7 @@ private:
     BT::NodeStatus executeTaskNode(BT::TreeNode& self);
 };
 
-} // namespace task_mission
+} // namespace task
 } // namespace mxrc
 
 #endif // MXRC_MISSION_MANAGER_H

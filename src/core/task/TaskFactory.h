@@ -8,7 +8,7 @@
 #include <unordered_map>
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 class TaskFactory {
 public:
@@ -27,7 +27,7 @@ private:
     std::unordered_map<std::string, TaskCreator> creators;
 };
 
-} // namespace task_mission
+} // namespace task
 } // namespace mxrc
 
 #endif // MXRC_TASK_FACTORY_H

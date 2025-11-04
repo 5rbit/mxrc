@@ -7,7 +7,7 @@
 #include <stdexcept> // For std::runtime_error
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 class TaskContext {
 public:
@@ -45,7 +45,7 @@ private:
     std::map<std::string, std::any> data_;
 };
 
-} // namespace task_mission
+} // namespace task
 } // namespace mxrc
 
 #endif // MXRC_TASK_CONTEXT_H

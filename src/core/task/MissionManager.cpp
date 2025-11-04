@@ -2,14 +2,12 @@
 #include "TaskFactory.h"
 #include "ExecuteTaskNode.h" // Include for registering custom node
 #include <iostream>
-#include <fstream>
-#include <sstream>
 #include <thread>
 #include <chrono>
 #include <uuid/uuid.h> // For generating UUIDs
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 MissionManager* MissionManager::instance_ = nullptr;
 std::mutex MissionManager::mutex_;
@@ -18,8 +16,7 @@ MissionManager::MissionManager()
     : current_mission_status_(MissionStatus::IDLE),
       blackboard_(BT::Blackboard::create()),
       bt_factory_(), // Initialize BehaviorTreeFactory
-      shutdown_requested_(false),
-      audit_logger_(&mxrc::DataStore::getInstance()) // Initialize AuditLogger with DataStore singleton
+      shutdown_requested_(false)
 {
     // Register custom BehaviorTree nodes
     bt_factory_.registerNodeType<ExecuteTaskNode>("ExecuteTask");
@@ -60,16 +57,6 @@ bool MissionManager::loadMissionDefinition(const std::string& missionDefinitionP
     std::cout << "Mission definition '" << missionDef.id << "' loaded successfully." << std::endl;
 
     // Save mission definition to DataStore
-    audit_logger_.logEvent({
-        std::chrono::system_clock::now(),
-        "MissionDefinitionLoaded",
-        "system",
-        missionDef.id,
-        "",
-        {{"mission_name", missionDef.name}, {"version", missionDef.version}}
-    });
-    mxrc::DataStore::getInstance().save("mission_def_" + missionDef.id, missionDef.behavior_tree.dump(), mxrc::DataType::JSON);
-
     return true;
 }
 
@@ -110,16 +97,7 @@ std::string MissionManager::startMission(const std::string& missionId, const Tas
 
         // Save initial mission state to DataStore
         MissionState initialState = getMissionState(current_mission_instance_id_);
-        mxrc::DataStore::getInstance().save("mission_state_" + current_mission_instance_id_, nlohmann::json(initialState).dump(), mxrc::DataType::JSON);
-        audit_logger_.logEvent({
-            std::chrono::system_clock::now(),
-            "MissionStarted",
-            "system",
-            current_mission_instance_id_,
-            "",
-            {{"mission_id", current_mission_id_}}
-        });
-
+        DataStore::getInstance().save("mission_state_" + current_mission_instance_id_, std::any(nlohmann::json(initialState).dump()), DataType::JSON);
         cv_mission_control_.notify_one(); // Notify the mission thread to start ticking
 
         return current_mission_instance_id_;
@@ -163,23 +141,7 @@ void MissionManager::missionLoop() {
                 std::cout << "Mission completed successfully." << std::endl;
                 // Save final mission state
                 MissionState finalState = getMissionState(current_mission_instance_id_);
-                mxrc::DataStore::getInstance().save("mission_state_" + current_mission_instance_id_, nlohmann::json(finalState).dump(), mxrc::DataType::JSON);
-                audit_logger_.logEvent({
-                    std::chrono::system_clock::now(),
-                    "MissionCompleted",
-                    "system",
-                    current_mission_instance_id_,
-                    "",
-                    {{"mission_id", current_mission_id_}}
-                });
-                audit_logger_.logTaskStateChange({
-                    current_mission_instance_id_,
-                    std::chrono::system_clock::now(),
-                    static_cast<TaskState>(old_status),
-                    static_cast<TaskState>(current_mission_status_),
-                    "Mission completed successfully.",
-                    {}
-                });
+                DataStore::getInstance().save("mission_state_" + current_mission_instance_id_, std::any(nlohmann::json(finalState).dump()), DataType::JSON);
             } else if (status == BT::NodeStatus::FAILURE) {
                 std::lock_guard<std::mutex> main_lock(mutex_);
                 MissionStatus old_status = current_mission_status_;
@@ -187,23 +149,7 @@ void MissionManager::missionLoop() {
                 std::cerr << "Mission failed." << std::endl;
                 // Save final mission state
                 MissionState finalState = getMissionState(current_mission_instance_id_);
-                mxrc::DataStore::getInstance().save("mission_state_" + current_mission_instance_id_, nlohmann::json(finalState).dump(), mxrc::DataType::JSON);
-                audit_logger_.logEvent({
-                    std::chrono::system_clock::now(),
-                    "MissionFailed",
-                    "system",
-                    current_mission_instance_id_,
-                    "",
-                    {{"mission_id", current_mission_id_}}
-                });
-                audit_logger_.logTaskStateChange({
-                    current_mission_instance_id_,
-                    std::chrono::system_clock::now(),
-                    static_cast<TaskState>(old_status),
-                    static_cast<TaskState>(current_mission_status_),
-                    "Mission failed.",
-                    {}
-                });
+                    DataStore::getInstance().save("mission_state_" + current_mission_instance_id_, std::any(nlohmann::json(finalState).dump()), DataType::JSON);
             }
             // if RUNNING, loop continues
         } else if (current_mission_status_ == MissionStatus::CANCELLED) {
@@ -216,23 +162,7 @@ void MissionManager::missionLoop() {
             std::cout << "Mission instance '" << current_mission_instance_id_ << "' cancelled and reset." << std::endl;
             // Save final mission state
             MissionState finalState = getMissionState(current_mission_instance_id_);
-            mxrc::DataStore::getInstance().save("mission_state_" + current_mission_instance_id_, nlohmann::json(finalState).dump(), mxrc::DataType::JSON);
-            audit_logger_.logEvent({
-                std::chrono::system_clock::now(),
-                "MissionCancelled",
-                "system",
-                current_mission_instance_id_,
-                "",
-                {{"mission_id", current_mission_id_}}
-            });
-            audit_logger_.logTaskStateChange({
-                current_mission_instance_id_,
-                std::chrono::system_clock::now(),
-                static_cast<TaskState>(old_status),
-                static_cast<TaskState>(current_mission_status_),
-                "Mission cancelled.",
-                {}
-            });
+            DataStore::getInstance().save("mission_state_" + current_mission_instance_id_, std::any(nlohmann::json(finalState).dump()), DataType::JSON);
         } else {
              // if not running, just sleep to avoid busy loop
             lock.unlock();
@@ -254,23 +184,7 @@ bool MissionManager::pauseMission(const std::string& missionInstanceId) {
         std::cout << "Mission '" << missionInstanceId << "' paused." << std::endl;
         // Save mission state
         MissionState pausedState = getMissionState(current_mission_instance_id_);
-        mxrc::DataStore::getInstance().save("mission_state_" + current_mission_instance_id_, nlohmann::json(pausedState).dump(), mxrc::DataType::JSON);
-        audit_logger_.logEvent({
-            std::chrono::system_clock::now(),
-            "MissionPaused",
-            "system",
-            current_mission_instance_id_,
-            "",
-            {{"mission_id", current_mission_id_}}
-        });
-        audit_logger_.logTaskStateChange({
-            current_mission_instance_id_,
-            std::chrono::system_clock::now(),
-            static_cast<TaskState>(old_status),
-            static_cast<TaskState>(current_mission_status_),
-            "Mission paused.",
-            {}
-        });
+        DataStore::getInstance().save("mission_state_" + current_mission_instance_id_, std::any(nlohmann::json(pausedState).dump()), DataType::JSON);
         return true;
     }
     return false;
@@ -288,23 +202,7 @@ bool MissionManager::resumeMission(const std::string& missionInstanceId) {
         std::cout << "Mission '" << missionInstanceId << "' resumed." << std::endl;
         // Save mission state
         MissionState resumedState = getMissionState(current_mission_instance_id_);
-        mxrc::DataStore::getInstance().save("mission_state_" + current_mission_instance_id_, nlohmann::json(resumedState).dump(), mxrc::DataType::JSON);
-        audit_logger_.logEvent({
-            std::chrono::system_clock::now(),
-            "MissionResumed",
-            "system",
-            current_mission_instance_id_,
-            "",
-            {{"mission_id", current_mission_id_}}
-        });
-        audit_logger_.logTaskStateChange({
-            current_mission_instance_id_,
-            std::chrono::system_clock::now(),
-            static_cast<TaskState>(old_status),
-            static_cast<TaskState>(current_mission_status_),
-            "Mission resumed.",
-            {}
-        });
+        DataStore::getInstance().save("mission_state_" + current_mission_instance_id_, std::any(nlohmann::json(resumedState).dump()), DataType::JSON);
         cv_mission_control_.notify_one(); // Notify the mission thread to resume
         return true;
     }
@@ -348,14 +246,6 @@ bool MissionManager::insertEmergencyTask(const std::string& missionInstanceId, s
     //     current_mission_status_ = MissionStatus::PAUSED;
     //     std::cout << "Main mission paused for emergency task." << std::endl;
     // }
-    audit_logger_.logEvent({
-        std::chrono::system_clock::now(),
-        "EmergencyTaskInserted",
-        "operator",
-        current_mission_instance_id_,
-        emergencyTask->getTaskId(),
-        {{"priority", priority}}
-    });
     return true;
 }
 
@@ -368,14 +258,6 @@ bool MissionManager::skipCurrentTask(const std::string& missionInstanceId) {
     std::cout << "Skipping current task in mission '" << missionInstanceId << "' (implementation pending)." << std::endl;
     // This would require more advanced BT.CPP manipulation, e.g., changing blackboard state
     // or dynamically modifying the tree. For now, it's a placeholder.
-    audit_logger_.logEvent({
-        std::chrono::system_clock::now(),
-        "TaskSkipped",
-        "operator",
-        current_mission_instance_id_,
-        "", // current_task_id to be filled later
-        {}
-    });
     return false;
 }
 
@@ -393,7 +275,7 @@ MissionState MissionManager::getMissionState(const std::string& missionInstanceI
     state.current_status = current_mission_status_;
 
     // Try to get current_task_instance_id from blackboard
-    if (behavior_tree_ && blackboard_->portExists("current_task_instance_id")) {
+    if (behavior_tree_ && blackboard_->portInfo("current_task_instance_id") != nullptr) {
         state.current_task_instance_id = blackboard_->get<std::string>("current_task_instance_id");
     } else {
         state.current_task_instance_id = "N/A";
@@ -418,70 +300,225 @@ TaskState MissionManager::getTaskState(const std::string& missionInstanceId, con
 }
 
 bool MissionManager::recoverMission(const std::string& missionInstanceId) {
+
     std::lock_guard<std::mutex> lock(mutex_);
-    std::cout << "Attempting to recover mission: " << missionInstanceId << std::endl;
 
-    std::any stored_state_any = mxrc::DataStore::getInstance().load("mission_state_" + missionInstanceId);
-    if (stored_state_any.has_value()) {
-        try {
-            std::string stored_state_json = std::any_cast<std::string>(stored_state_any);
-            nlohmann::json json_state = nlohmann::json::parse(stored_state_json);
+    std::cerr << "recoverMission is deprecated. Use loadMissionState instead." << std::endl;
 
-            // Reconstruct MissionState
-            MissionState recoveredState;
-            recoveredState.mission_id = json_state.value("mission_id", "");
-            recoveredState.instance_id = json_state.value("instance_id", "");
-            recoveredState.current_status = static_cast<MissionStatus>(json_state.value("current_status", static_cast<int>(MissionStatus::IDLE)));
-            recoveredState.current_task_instance_id = json_state.value("current_task_instance_id", "");
-            recoveredState.progress = json_state.value("progress", 0.0);
-            recoveredState.estimated_completion_time = json_state.value("estimated_completion_time", "");
-            // active_task_states would also need to be recovered
+    return false;
 
-            // Restore MissionManager's internal state
-            current_mission_id_ = recoveredState.mission_id;
-            current_mission_instance_id_ = recoveredState.instance_id;
+}
+
+
+
+// Persistence methods
+
+bool MissionManager::saveMissionState(const std::string& key, const std::string& missionInstanceId) {
+
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    if (current_mission_instance_id_ != missionInstanceId) {
+
+        std::cerr << "Mission instance ID mismatch for saveMissionState: " << missionInstanceId << std::endl;
+
+        return false;
+
+    }
+
+
+
+    try {
+
+        MissionState state_to_save = getMissionState(missionInstanceId);
+
+        nlohmann::json json_state = {
+
+            {"mission_id", state_to_save.mission_id},
+
+            {"instance_id", state_to_save.instance_id},
+
+            {"current_status", static_cast<int>(state_to_save.current_status)},
+
+            {"current_task_instance_id", state_to_save.current_task_instance_id},
+
+            {"progress", state_to_save.progress},
+
+            {"estimated_completion_time", state_to_save.estimated_completion_time}
+
+            // active_task_states would need more complex serialization
+
+        };
+
+
+
+        // Also save the mission definition if it's not already in DataStore
+
+        auto it = mission_definitions_.find(state_to_save.mission_id);
+
+        if (it != mission_definitions_.end()) {
+
+            DataStore::getInstance().save("mission_def_" + state_to_save.mission_id, std::any(it->second.behavior_tree.dump()), DataType::JSON);
+
+        }
+
+
+
+        DataStore::getInstance().save(key, std::any(json_state.dump()), DataType::JSON);
+
+        std::cout << "Mission state for instance '" << missionInstanceId << "' saved with key '" << key << "'." << std::endl;
+
+        return true;
+
+    } catch (const std::exception& e) {
+
+        std::cerr << "Error saving mission state for instance '" << missionInstanceId << "': " << e.what() << std::endl;
+
+        return false;
+
+    }
+
+}
+
+
+
+bool MissionManager::loadMissionState(const std::string& key, const std::string& newMissionInstanceId) {
+
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    std::cout << "Attempting to load mission state with key '" << key << "' into new instance '" << newMissionInstanceId << "'." << std::endl;
+
+
+
+    std::any stored_state_any = DataStore::getInstance().load(key);
+
+    if (!stored_state_any.has_value()) {
+
+        std::cerr << "No saved state found for key: " << key << std::endl;
+
+        return false;
+
+    }
+
+
+
+    try {
+
+        std::string stored_state_json = std::any_cast<std::string>(stored_state_any);
+
+        nlohmann::json json_state = nlohmann::json::parse(stored_state_json);
+
+
+
+        // Reconstruct MissionState
+
+        MissionState recoveredState;
+
+        recoveredState.mission_id = json_state.value("mission_id", "");
+
+        recoveredState.instance_id = newMissionInstanceId; // Use the new instance ID
+
+        recoveredState.current_status = static_cast<MissionStatus>(json_state.value("current_status", static_cast<int>(MissionStatus::IDLE)));
+
+        recoveredState.current_task_instance_id = json_state.value("current_task_instance_id", "");
+
+        recoveredState.progress = json_state.value("progress", 0.0);
+
+        recoveredState.estimated_completion_time = json_state.value("estimated_completion_time", "");
+
+        // active_task_states would also need to be recovered
+
+
+
+        // Restore MissionManager's internal state
+
+        current_mission_id_ = recoveredState.mission_id;
+
+        current_mission_instance_id_ = recoveredState.instance_id;
+
+        // When loading, the mission should be in an IDLE or PAUSED state, ready to be started/resumed
+
+        if (recoveredState.current_status == MissionStatus::RUNNING) {
+
+            current_mission_status_ = MissionStatus::PAUSED; // Load as paused if it was running
+
+        } else {
+
             current_mission_status_ = recoveredState.current_status;
 
-            // Load the mission definition again to rebuild the BT
-            auto it = mission_definitions_.find(current_mission_id_);
-            if (it == mission_definitions_.end()) {
-                // Try to load from DataStore if not in memory
-                std::any def_any = mxrc::DataStore::getInstance().load("mission_def_" + current_mission_id_);
-                if (def_any.has_value()) {
-                    std::string def_json_str = std::any_cast<std::string>(def_any);
-                    MissionDefinition def_from_db;
-                    def_from_db.id = current_mission_id_;
-                    def_from_db.behavior_tree = nlohmann::json::parse(def_json_str);
-                    mission_definitions_[current_mission_id_] = def_from_db;
-                    it = mission_definitions_.find(current_mission_id_);
-                }
-            }
-
-            if (it != mission_definitions_.end()) {
-                std::string bt_xml = it->second.behavior_tree.dump();
-                behavior_tree_ = std::make_unique<BT::Tree>(bt_factory_.createTreeFromText(bt_xml, blackboard_));
-                // Need to restore BT state if possible, which is complex with BT.CPP
-                // For now, we just rebuild the tree and set the mission status.
-            }
-
-            std::cout << "Mission '" << missionInstanceId << "' recovered to status: " << static_cast<int>(current_mission_status_) << std::endl;
-            audit_logger_.logEvent({
-                std::chrono::system_clock::now(),
-                "MissionRecovered",
-                "system",
-                current_mission_instance_id_,
-                "",
-                {{"mission_id", current_mission_id_}, {"recovered_status", static_cast<int>(current_mission_status_)}}
-            });
-            cv_mission_control_.notify_one(); // Wake up mission loop if it needs to resume
-            return true;
-        } catch (const std::exception& e) {
-            std::cerr << "Error recovering mission state: " << e.what() << std::endl;
-            return false;
         }
+
+
+
+
+
+        // Load the mission definition again to rebuild the BT
+
+        auto it = mission_definitions_.find(current_mission_id_);
+
+        if (it == mission_definitions_.end()) {
+
+            // Try to load from DataStore if not in memory
+
+            std::any def_any = DataStore::getInstance().load("mission_def_" + current_mission_id_);
+
+            if (def_any.has_value()) {
+
+                std::string def_json_str = std::any_cast<std::string>(def_any);
+
+                MissionDefinition def_from_db;
+
+                def_from_db.id = current_mission_id_;
+
+                def_from_db.behavior_tree = nlohmann::json::parse(def_json_str);
+
+                mission_definitions_[current_mission_id_] = def_from_db;
+
+                it = mission_definitions_.find(current_mission_id_);
+
+            }
+
+        }
+
+
+
+        if (it != mission_definitions_.end()) {
+
+            std::string bt_xml = it->second.behavior_tree.dump();
+
+            behavior_tree_ = std::make_unique<BT::Tree>(bt_factory_.createTreeFromText(bt_xml, blackboard_));
+
+            // Need to restore BT state if possible, which is complex with BT.CPP
+
+            // For now, we just rebuild the tree and set the mission status.
+
+            // The blackboard state might also need to be restored from the saved state.
+
+            // For simplicity, we'll assume the blackboard is reset for now.
+
+        } else {
+
+            std::cerr << "Mission definition '" << current_mission_id_ << "' not found for loading." << std::endl;
+
+            return false;
+
+        }
+
+
+
+        std::cout << "Mission state with key '" << key << "' loaded successfully into new instance '" << newMissionInstanceId << "'." << std::endl;
+
+        cv_mission_control_.notify_one(); // Wake up mission loop if it needs to resume
+
+        return true;
+
+    } catch (const std::exception& e) {
+
+        std::cerr << "Error loading mission state for key '" << key << "': " << e.what() << std::endl;
+
+        return false;
+
     }
-    std::cerr << "No saved state found for mission: " << missionInstanceId << std::endl;
-    return false;
+
 }
 
 void MissionManager::updateMissionState_internal() {
@@ -494,5 +531,5 @@ BT::NodeStatus MissionManager::executeTaskNode(BT::TreeNode& self) {
     return BT::NodeStatus::FAILURE; // Should not be called directly
 }
 
-} // namespace task_mission
+} // namespace task
 } // namespace mxrc

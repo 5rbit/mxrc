@@ -1,12 +1,12 @@
 #include <gtest/gtest.h>
-#include "core/task/task_mission_management/MissionManager.h"
+#include "core/task/MissionManager.h"
 #include "core/datastore/DataStore.h" // Assuming IDataStore is defined here
 #include "core/datastore/SqliteDataStore.h" // Assuming SqliteDataStore will be implemented
 #include <chrono>
 #include <thread>
 #include <filesystem>
 
-using namespace mxrc::task_mission;
+using namespace mxrc::task;
 using namespace mxrc::datastore;
 
 // Test fixture for DataStore Recovery

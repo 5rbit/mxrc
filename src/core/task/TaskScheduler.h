@@ -11,7 +11,7 @@
 #include "AbstractTask.h"
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 struct ScheduledTask {
     std::unique_ptr<AbstractTask> task;
@@ -52,7 +52,7 @@ private:
     size_t num_worker_threads_ = 2; // Example: 2 worker threads
 };
 
-} // namespace task_mission
+} // namespace task
 } // namespace mxrc
 
 #endif // TASK_SCHEDULER_H

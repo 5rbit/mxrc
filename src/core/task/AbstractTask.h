@@ -6,7 +6,7 @@
 #include <functional> // For std::function
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 enum class TaskState {
     PENDING,
@@ -41,7 +41,7 @@ protected:
     TaskState currentState = TaskState::PENDING;
 };
 
-} // namespace task_mission
+} // namespace task
 } // namespace mxrc
 
 #endif // MXRC_ABSTRACT_TASK_H

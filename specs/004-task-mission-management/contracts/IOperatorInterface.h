@@ -4,11 +4,11 @@
 #include <string>
 #include <vector>
 #include <memory>
-#include "../../../../src/core/task_mission_management/TaskContext.h"
-#include "../../../../src/core/task_mission_management/AbstractTask.h"
+#include "../../../../src/core/task/TaskContext.h"
+#include "../../../../src/core/task/AbstractTask.h"
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 /**
  * @brief Interface for operator interactions with the Mission and Task system.
@@ -93,7 +93,7 @@ public:
     virtual std::vector<MissionState> getMissionHistory(const std::string& missionInstanceId) const = 0;
 };
 
-} // namespace task_mission
+} // namespace task
 } // namespace mxrc
 
 #endif // I_OPERATOR_INTERFACE_H

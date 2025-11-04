@@ -1,13 +1,13 @@
 #include <gtest/gtest.h>
 #include <behaviortree_cpp/bt_factory.h>
 #include <behaviortree_cpp/loggers/bt_cout_logger.h>
-#include "core/task/task_mission_management/MissionManager.h"
-#include "core/task/task_mission_management/AbstractTask.h"
-#include "core/task/task_mission_management/TaskFactory.h"
-#include "core/task/task_mission_management/DriveToPositionTask.h" // For registering DriveToPosition
+#include "core/task/MissionManager.h"
+#include "core/task/AbstractTask.h"
+#include "core/task/TaskFactory.h"
+#include "core/task/DriveToPositionTask.h" // For registering DriveToPosition
 
 using namespace BT;
-using namespace mxrc::task_mission;
+using namespace mxrc::task;
 
 // Define a simple custom action for testing purposes
 class TestAction : public SyncActionNode

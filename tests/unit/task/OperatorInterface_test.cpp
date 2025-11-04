@@ -1,12 +1,12 @@
 #include <gtest/gtest.h>
-#include "core/task/task_mission_management/OperatorInterface.h"
-#include "core/task/task_mission_management/MissionManager.h"
-#include "core/task/task_mission_management/AbstractTask.h"
-#include "core/task/task_mission_management/TaskContext.h"
+#include "core/task/OperatorInterface.h"
+#include "core/task/MissionManager.h"
+#include "core/task/AbstractTask.h"
+#include "core/task/TaskContext.h"
 #include <chrono>
 #include <thread>
 
-using namespace mxrc::task_mission;
+using namespace mxrc::task;
 
 // Dummy Emergency Task for testing OperatorInterface
 class OperatorEmergencyTask : public AbstractTask {

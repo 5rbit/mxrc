@@ -2,7 +2,7 @@
 #include <iostream>
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 BT::NodeStatus ExecuteTaskNode::tick() {
     // Get inputs
@@ -39,5 +39,5 @@ BT::NodeStatus ExecuteTaskNode::tick() {
     }
 }
 
-} // namespace task_mission
+} // namespace task
 } // namespace mxrc

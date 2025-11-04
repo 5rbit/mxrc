@@ -1,7 +1,7 @@
 #include "ResourceManager.h"
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 bool ResourceManager::acquire(const std::string& resource) {
     std::lock_guard<std::mutex> lock(mtx);
@@ -13,5 +13,5 @@ void ResourceManager::release(const std::string& resource) {
     locked_resources.erase(resource);
 }
 
-} // namespace task_mission
+} // namespace task
 } // namespace mxrc

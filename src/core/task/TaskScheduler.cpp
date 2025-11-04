@@ -2,7 +2,7 @@
 #include <iostream>
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 TaskScheduler::TaskScheduler()
     : running_(false),
@@ -104,5 +104,5 @@ void TaskScheduler::schedulerLoop() {
     }
 }
 
-} // namespace task_mission
+} // namespace task
 } // namespace mxrc

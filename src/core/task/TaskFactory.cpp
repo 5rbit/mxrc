@@ -1,7 +1,7 @@
 #include "TaskFactory.h"
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 bool TaskFactory::registerTask(const std::string& taskId, TaskCreator creator) {
     if (creators.count(taskId)) {
@@ -21,5 +21,5 @@ std::unique_ptr<AbstractTask> TaskFactory::createTask(const std::string& taskId)
     return nullptr;
 }
 
-} // namespace task_mission
+} // namespace task
 } // namespace mxrc

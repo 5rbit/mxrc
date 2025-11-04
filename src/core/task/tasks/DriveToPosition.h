@@ -1,10 +1,10 @@
 #ifndef MXRC_DRIVE_TO_POSITION_H
 #define MXRC_DRIVE_TO_POSITION_H
 
-#include "core/task/task_mission_management/AbstractTask.h"
+#include "core/task/AbstractTask.h"
 
 namespace mxrc {
-namespace task_mission {
+namespace task {
 
 class DriveToPosition : public AbstractTask {
 public:

@@ -6,8 +6,8 @@ namespace task {
 
 BT::NodeStatus ExecuteTaskNode::tick() {
     // Get inputs
-    BT::Optional<std::string> task_id = getInput<std::string>("task_id");
-    BT::Optional<int> priority = getInput<int>("priority");
+    std::optional<std::string> task_id = getInput<std::string>("task_id");
+    std::optional<int> priority = getInput<int>("priority");
     // BT::Optional<TaskContext> context = getInput<TaskContext>("context"); // Not directly supported by BT.CPP ports
 
     if (!task_id) {

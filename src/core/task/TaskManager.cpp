@@ -1,10 +1,6 @@
 #include "TaskManager.h"
 #include <algorithm>
 
-namespace mxrc {
-namespace core {
-namespace task {
-
 std::string TaskManager::registerTaskDefinition(const std::string& taskName, const std::string& taskType, const std::map<std::string, std::string>& defaultParameters) {
     // Check for duplicate task name
     auto it = std::find_if(tasks_.begin(), tasks_.end(), [&](const auto& pair) {
@@ -82,7 +78,3 @@ void TaskManager::updateTaskStatus(const std::string& taskId, TaskStatus status)
         throw std::runtime_error("Task not found for status update.");
     }
 }
-
-} // namespace task
-} // namespace core
-} // namespace mxrc

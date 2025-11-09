@@ -47,7 +47,7 @@ graph TD
 - [x] T009 [US1] `OperatorInterface` 클래스 구현 및 `IOperatorInterface` 인터페이스 상속 (파일: `src/core/task/OperatorInterface.h`, `src/core/task/OperatorInterface.cpp`)
 - [x] T010 [US1] `TaskManager::registerTaskDefinition` 구현
 - [x] T011 [US1] `OperatorInterface::defineNewTask` 구현
-- [x] T012 [US1] Task 등록 기능에 대한 단위 테스트 작성 (파일: `tests/unit/task/TaskManager_test.cpp`, `tests/unit/task/OperatorInterface_test.cpp`)
+- [x] T012 [US1] Task 등록 기능에 대한 단위 테스트 작성 (파일: `tests/unit/task/TaskManager_test.cpp`, `tests/unit/task/OperatorInterface_test.cpp`) (Verified)
 
 ## Phase 4: 사용자 스토리 2 - 등록된 Task 조회 및 상세 정보 확인 [US2]
 
@@ -58,7 +58,7 @@ graph TD
 - [x] T014 [US2] `TaskManager::getTaskDefinitionById` 구현
 - [x] T015 [US2] `OperatorInterface::getAvailableTasks` 구현
 - [x] T016 [US2] `OperatorInterface::getTaskDetails` 구현
-- [x] T017 [US2] Task 조회 기능에 대한 단위 테스트 작성 (파일: `tests/unit/task/TaskManager_test.cpp`, `tests/unit/task/OperatorInterface_test.cpp`)
+- [x] T017 [US2] Task 조회 기능에 대한 단위 테스트 작성 (파일: `tests/unit/task/TaskManager_test.cpp`, `tests/unit/task/OperatorInterface_test.cpp`) (Verified)
 
 ## Phase 5: 사용자 스토리 3 - Task 실행 요청 및 상태 모니터링 [US3]
 
@@ -69,7 +69,7 @@ graph TD
 - [x] T019 [US3] `TaskManager::getTaskExecutionStatus` 구현
 - [x] T020 [US3] `OperatorInterface::startTaskExecution` 구현
 - [x] T021 [US3] `OperatorInterface::monitorTaskStatus` 구현
-- [x] T022 [US3] Task 실행 및 상태 모니터링 기능에 대한 단위 테스트 작성 (파일: `tests/unit/task/TaskManager_test.cpp`, `tests/unit/task/OperatorInterface_test.cpp`)
+- [x] T022 [US3] Task 실행 및 상태 모니터링 기능에 대한 단위 테스트 작성 (파일: `tests/unit/task/TaskManager_test.cpp`, `tests/unit/task/OperatorInterface_test.cpp`) (Verified)
 
 ## Final Phase: Polish & Cross-Cutting Concerns
 

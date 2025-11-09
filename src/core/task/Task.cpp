@@ -1,9 +1,5 @@
 #include "Task.h"
 
-namespace mxrc {
-namespace core {
-namespace task {
-
 Task::Task(const std::string& name, const std::string& type, const std::map<std::string, std::string>& parameters)
     : id_(generateUuid()),
       name_(name),
@@ -15,7 +11,3 @@ Task::Task(const std::string& name, const std::string& type, const std::map<std:
       updated_at_(getCurrentTimestamp())
 {
 }
-
-} // namespace task
-} // namespace core
-} // namespace mxrc

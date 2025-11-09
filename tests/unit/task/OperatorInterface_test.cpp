@@ -1,16 +1,16 @@
 #include "gtest/gtest.h"
-#include "src/core/task/OperatorInterface.h"
-#include "src/core/task/TaskManager.h" // For concrete TaskManager
+#include "OperatorInterface.h"
+#include "TaskManager.h" // For concrete TaskManager
 #include <memory>
 
-using namespace mxrc::core::task;
-
+// OperatorInterface 생성 시 nullptr TaskManager 주입 시 예외 처리를 테스트합니다.
 TEST(OperatorInterfaceTest, ConstructorWithNullTaskManagerThrowsException) {
     ASSERT_THROW({
         OperatorInterface opInterface(nullptr);
     }, std::invalid_argument);
 }
 
+// OperatorInterface를 통한 새로운 Task 정의 등록 기능을 성공적으로 테스트합니다.
 TEST(OperatorInterfaceTest, DefineNewTaskSuccessfully) {
     auto taskManager = std::make_shared<TaskManager>();
     OperatorInterface opInterface(taskManager);
@@ -26,6 +26,7 @@ TEST(OperatorInterfaceTest, DefineNewTaskSuccessfully) {
     EXPECT_EQ(taskDto->parameters.at("setting"), "value");
 }
 
+// OperatorInterface를 통한 사용 가능한 Task 목록 조회 기능을 테스트합니다.
 TEST(OperatorInterfaceTest, GetAvailableTasks) {
     auto taskManager = std::make_shared<TaskManager>();
     OperatorInterface opInterface(taskManager);
@@ -37,6 +38,7 @@ TEST(OperatorInterfaceTest, GetAvailableTasks) {
     EXPECT_EQ(tasks.size(), 2);
 }
 
+// OperatorInterface를 통해 존재하지 않는 ID로 Task 상세 정보 조회 시를 테스트합니다.
 TEST(OperatorInterfaceTest, GetTaskDetailsNotFound) {
     auto taskManager = std::make_shared<TaskManager>();
     OperatorInterface opInterface(taskManager);
@@ -45,6 +47,7 @@ TEST(OperatorInterfaceTest, GetTaskDetailsNotFound) {
     EXPECT_EQ(taskDto, nullptr);
 }
 
+// OperatorInterface를 통한 Task 실행 요청 및 상태 모니터링 기능을 테스트합니다.
 TEST(OperatorInterfaceTest, StartTaskExecutionAndMonitorStatus) {
     auto taskManager = std::make_shared<TaskManager>();
     OperatorInterface opInterface(taskManager);

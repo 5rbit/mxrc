@@ -34,5 +34,14 @@ struct TaskDto {
     int progress; // 0-100
     std::string created_at;
     std::string updated_at;
+
+    // Constructor to initialize all members
+    TaskDto(std::string id, std::string name, std::string type,
+            std::map<std::string, std::string> parameters, std::string status,
+            int progress, std::string created_at, std::string updated_at)
+        : id(std::move(id)), name(std::move(name)), type(std::move(type)),
+          parameters(std::move(parameters)), status(std::move(status)),
+          progress(progress), created_at(std::move(created_at)),
+          updated_at(std::move(updated_at)) {}
 };
 

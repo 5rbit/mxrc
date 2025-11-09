@@ -7,10 +7,10 @@ int main() {
     std::cout << "MXRC Task Management Module Example" << std::endl;
 
     // Create a TaskManager instance
-    auto taskManager = std::make_shared<mxrc::core::task::TaskManager>();
+    auto taskManager = std::make_shared<TaskManager>();
 
     // Create an OperatorInterface instance, injecting the TaskManager
-    mxrc::core::task::OperatorInterface opInterface(taskManager);
+    OperatorInterface opInterface(taskManager);
 
     // Define a new Task using the OperatorInterface
     std::map<std::string, std::string> driveParams = {{"speed", "1.0"}, {"distance", "10.0"}};
@@ -52,7 +52,7 @@ int main() {
 
     // Simulate task completion (manual update for now)
     // In a real system, an external executor would update this.
-    taskManager->updateTaskStatus(driveTaskId, mxrc::core::task::TaskStatus::COMPLETED);
+    taskManager->updateTaskStatus(driveTaskId, TaskStatus::COMPLETED);
     driveStatus = opInterface.monitorTaskStatus(driveExecutionId);
     if (driveStatus) {
         std::cout << "  DriveForward Status (after completion): " << driveStatus->status << std::endl;

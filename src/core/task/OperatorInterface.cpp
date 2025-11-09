@@ -1,9 +1,5 @@
 #include "OperatorInterface.h"
 
-namespace mxrc {
-namespace core {
-namespace task {
-
 OperatorInterface::OperatorInterface(std::shared_ptr<ITaskManager> taskManager)
     : taskManager_(std::move(taskManager))
 {
@@ -31,7 +27,3 @@ std::string OperatorInterface::startTaskExecution(const std::string& taskId, con
 std::unique_ptr<TaskDto> OperatorInterface::monitorTaskStatus(const std::string& executionId) const {
     return taskManager_->getTaskExecutionStatus(executionId);
 }
-
-} // namespace task
-} // namespace core
-} // namespace mxrc

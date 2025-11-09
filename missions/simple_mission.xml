@@ -1,7 +1,0 @@
-<root BTCPP_format="4">
-  <BehaviorTree Name="SimpleMission">
-    <Sequence>
-      <ExecuteTask task_id="DriveToPosition" target_x="10.0" target_y="20.0" speed="1.5" />
-    </Sequence>
-  </BehaviorTree>
-</root>

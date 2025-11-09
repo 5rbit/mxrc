@@ -8,9 +8,6 @@
 #include <any>
 #include <chrono>
 #include <functional> // For std::function
-#include <mutex>
-#include <iosfwd> // Forward declarations for iostream types
-#include <iostream> // For debug prints
 
 // Forward declarations
 class Observer;
@@ -25,12 +22,6 @@ enum class DataType {
     Event,
     MissionState,
     TaskState,
-    STRING,
-    INT,
-    DOUBLE,
-    BOOL,
-    JSON,
-    BINARY // For images, etc.
     // Add more as needed
 };
 
@@ -81,15 +72,6 @@ public:
     DataStore(const DataStore&) = delete;
     DataStore& operator=(const DataStore&) = delete;
 
-    // Generic save/load for std::any values
-    bool save(const std::string& id, const std::any& value, DataType type,
-              const DataExpirationPolicy& policy = {ExpirationPolicyType::None, std::chrono::milliseconds(0)});
-    std::any load(const std::string& id);
-    bool remove(const std::string& id);
-
-    // Query method for historical data
-    std::vector<std::any> query(const std::string& pattern);
-
     // FR-006: Set/Get interfaces for data manipulation
     template<typename T>
     void set(const std::string& id, const T& data, DataType type,
@@ -115,7 +97,6 @@ public:
     // These would typically be integrated with a separate logging/metrics module
     // For simplicity, we'll just define interfaces here.
     std::map<std::string, double> getPerformanceMetrics() const;
-    void resetPerformanceMetrics();
     std::vector<std::string> getAccessLogs() const;
     std::vector<std::string> getErrorLogs() const;
 
@@ -160,6 +141,44 @@ private:
 };
 
 // Template method implementations (typically in a .tpp or .h for header-only)
-#include "DataStore.tpp"
+template<typename T>
+void DataStore::set(const std::string& id, const T& data, DataType type,
+                    const DataExpirationPolicy& policy) {
+    // Implementation would involve:
+    // 1. Access control check (FR-014)
+    // 2. Locking mechanism for thread safety (FR-004, FR-005)
+    // 3. Creating/updating SharedData object
+    // 4. Storing in data_map_
+    // 5. Applying expiration policy (FR-007)
+    // 6. Notifying subscribers if applicable (FR-003)
+    // 7. Logging access (FR-008)
+    // 8. Error handling (FR-009)
+}
+
+template<typename T>
+T DataStore::get(const std::string& id) {
+    // Implementation would involve:
+    // 1. Access control check (FR-014)
+    // 2. Locking mechanism for thread safety (FR-004, FR-005)
+    // 3. Retrieving SharedData from data_map_
+    // 4. Type checking and casting std::any to T
+    // 5. Logging access (FR-008)
+    // 6. Error handling (FR-009) - throw if not found or type mismatch
+    // 7. Returning default value if appropriate (FR-009)
+    return T(); // Placeholder
+}
+
+template<typename T>
+T DataStore::poll(const std::string& id) {
+    // Implementation would be similar to get(), but specifically for polling data
+    // 1. Access control check (FR-014)
+    // 2. Locking mechanism for thread safety (FR-004, FR-005)
+    // 3. Retrieving SharedData from data_map_
+    // 4. Type checking and casting std::any to T
+    // 5. Logging access (FR-008)
+    // 6. Error handling (FR-009) - throw if not found or type mismatch
+    // 7. Returning default value if appropriate (FR-009)
+    return T(); // Placeholder
+}
 
 #endif // DATASTORE_H

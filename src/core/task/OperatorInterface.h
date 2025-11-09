@@ -1,51 +1,21 @@
-#ifndef OPERATOR_INTERFACE_H
-#define OPERATOR_INTERFACE_H
+#pragma once
 
-#include <string>
-#include <vector>
+#include "IOperatorInterface.h"
+#include "ITaskManager.h"
 #include <memory>
-#include "TaskContext.h"
-#include "AbstractTask.h"
-#include "MissionManager.h"
 
-#include "contracts/IDataStore.h"
-
-namespace mxrc {
-namespace task {
-
-// Forward declarations
-struct MissionState;
-enum class TaskState;
-struct TaskStateHistory;
-
-class OperatorInterface {
+class OperatorInterface : public IOperatorInterface {
 public:
-    static OperatorInterface& getInstance(std::shared_ptr<IDataStore> dataStore);
+    // Constructor takes a shared_ptr to ITaskManager to allow dependency injection
+    OperatorInterface(std::shared_ptr<ITaskManager> taskManager);
+    virtual ~OperatorInterface() = default;
 
-    OperatorInterface(const OperatorInterface&) = delete;
-    OperatorInterface& operator=(const OperatorInterface&) = delete;
-
-    std::string requestStartMission(const std::string& missionId, const TaskContext& initialContext);
-    bool requestPauseMission(const std::string& missionInstanceId);
-    bool requestResumeMission(const std::string& missionInstanceId);
-    bool requestCancelMission(const std::string& missionInstanceId);
-    bool requestInsertEmergencyTask(const std::string& missionInstanceId, std::unique_ptr<AbstractTask> emergencyTask, int priority);
-    bool requestSkipCurrentTask(const std::string& missionInstanceId);
-
-    MissionState getMissionStatus(const std::string& missionInstanceId) const;
-    TaskState getTaskStatus(const std::string& missionInstanceId, const std::string& taskInstanceId) const;
-
-    std::vector<TaskStateHistory> getTaskHistory(const std::string& taskInstanceId) const;
-    std::vector<MissionState> getMissionHistory(const std::string& missionInstanceId) const;
+    virtual std::string defineNewTask(const std::string& taskName, const std::string& taskType, const std::map<std::string, std::string>& defaultParameters) override;
+    virtual std::vector<TaskDto> getAvailableTasks() const override;
+    virtual std::unique_ptr<TaskDto> getTaskDetails(const std::string& taskId) const override;
+    virtual std::string startTaskExecution(const std::string& taskId, const std::map<std::string, std::string>& runtimeParameters) override;
+    virtual std::unique_ptr<TaskDto> monitorTaskStatus(const std::string& executionId) const override;
 
 private:
-    explicit OperatorInterface(std::shared_ptr<IDataStore> dataStore);
-    ~OperatorInterface() = default;
-
-    MissionManager& mission_manager_;
+    std::shared_ptr<ITaskManager> taskManager_;
 };
-
-} // namespace task
-} // namespace mxrc
-
-#endif // OPERATOR_INTERFACE_H

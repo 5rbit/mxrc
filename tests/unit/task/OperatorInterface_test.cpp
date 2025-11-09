@@ -1,108 +1,66 @@
-#include <gtest/gtest.h>
-#include <gmock/gmock.h>
-#include "core/task/OperatorInterface.h"
-#include "core/task/MissionManager.h"
-#include "core/task/AbstractTask.h"
-#include "core/task/TaskContext.h"
-#include "core/task/contracts/IDataStore.h"
-#include "mocks/MockDataStore.h"
-#include <chrono>
-#include <thread>
+#include "gtest/gtest.h"
+#include "OperatorInterface.h"
+#include "TaskManager.h" // For concrete TaskManager
+#include <memory>
 
-using namespace mxrc::task;
-using ::testing::AtLeast;
-
-// Dummy Emergency Task for testing OperatorInterface
-class OperatorEmergencyTask : public AbstractTask {
-public:
-    bool initialize(TaskContext& context) override { return true; }
-    bool execute(TaskContext& context) override {
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        return true;
-    }
-    void terminate(TaskContext& context) override { }
-    std::string getTaskId() const override { return "OperatorEmergencyTask"; }
-};
-
-// Test fixture for OperatorInterface
-class OperatorInterfaceTest : public ::testing::Test {
-protected:
-    OperatorInterface& opInterface = OperatorInterface::getInstance();
-    std::shared_ptr<MockDataStore> mockDataStore;
-    MissionManager* missionManager;
-
-    void SetUp() override {
-        mockDataStore = std::make_shared<MockDataStore>();
-        missionManager = &MissionManager::getInstance(mockDataStore);
-        // Ensure mission is idle before each test
-        missionManager->cancelMission("any_mission_instance_id"); // Use a dummy ID for cancellation
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-
-        // Load a mission definition for testing
-        missionManager->loadMissionDefinition("/Users/tory/workspace/mxrc/missions/simple_mission.xml");
-    }
-
-    void TearDown() override {
-        missionManager->cancelMission("any_mission_instance_id");
-    }
-};
-
-TEST_F(OperatorInterfaceTest, RequestStartAndGetMissionStatus) {
-    TaskContext initialContext;
-    std::string missionInstanceId = opInterface.requestStartMission("simple_mission", initialContext);
-    ASSERT_FALSE(missionInstanceId.empty());
-
-    // Give mission some time to start
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-    MissionState state = opInterface.getMissionStatus(missionInstanceId);
-    ASSERT_TRUE(state.current_status == MissionStatus::RUNNING || state.current_status == MissionStatus::COMPLETED);
-
-    // Wait for mission to complete
-    int max_wait_iter = 10;
-    while (state.current_status == MissionStatus::RUNNING && max_wait_iter > 0) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        state = opInterface.getMissionStatus(missionInstanceId);
-        max_wait_iter--;
-    }
-    ASSERT_EQ(state.current_status, MissionStatus::COMPLETED);
+// OperatorInterface 생성 시 nullptr TaskManager 주입 시 예외 처리를 테스트합니다.
+TEST(OperatorInterfaceTest, ConstructorWithNullTaskManagerThrowsException) {
+    ASSERT_THROW({
+        OperatorInterface opInterface(nullptr);
+    }, std::invalid_argument);
 }
 
-TEST_F(OperatorInterfaceTest, RequestPauseResumeCancelMission) {
-    TaskContext initialContext;
-    std::string missionInstanceId = opInterface.requestStartMission("simple_mission", initialContext);
-    ASSERT_FALSE(missionInstanceId.empty());
+// OperatorInterface를 통한 새로운 Task 정의 등록 기능을 성공적으로 테스트합니다.
+TEST(OperatorInterfaceTest, DefineNewTaskSuccessfully) {
+    auto taskManager = std::make_shared<TaskManager>();
+    OperatorInterface opInterface(taskManager);
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::map<std::string, std::string> params = {{"setting", "value"}};
+    std::string taskId = opInterface.defineNewTask("OpTestTask1", "OpTypeA", params);
 
-    // Pause
-    ASSERT_TRUE(opInterface.requestPauseMission(missionInstanceId));
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    ASSERT_EQ(opInterface.getMissionStatus(missionInstanceId).current_status, MissionStatus::PAUSED);
-
-    // Resume
-    ASSERT_TRUE(opInterface.requestResumeMission(missionInstanceId));
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    ASSERT_EQ(opInterface.getMissionStatus(missionInstanceId).current_status, MissionStatus::RUNNING);
-
-    // Cancel
-    ASSERT_TRUE(opInterface.requestCancelMission(missionInstanceId));
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    ASSERT_EQ(opInterface.getMissionStatus(missionInstanceId).current_status, MissionStatus::CANCELLED);
+    ASSERT_FALSE(taskId.empty());
+    auto taskDto = opInterface.getTaskDetails(taskId);
+    ASSERT_NE(taskDto, nullptr);
+    EXPECT_EQ(taskDto->name, "OpTestTask1");
+    EXPECT_EQ(taskDto->type, "OpTypeA");
+    EXPECT_EQ(taskDto->parameters.at("setting"), "value");
 }
 
-TEST_F(OperatorInterfaceTest, RequestInsertEmergencyTask) {
-    TaskContext initialContext;
-    std::string missionInstanceId = opInterface.requestStartMission("simple_mission", initialContext);
-    ASSERT_FALSE(missionInstanceId.empty());
+// OperatorInterface를 통한 사용 가능한 Task 목록 조회 기능을 테스트합니다.
+TEST(OperatorInterfaceTest, GetAvailableTasks) {
+    auto taskManager = std::make_shared<TaskManager>();
+    OperatorInterface opInterface(taskManager);
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    opInterface.defineNewTask("OpTaskA", "TypeX", {});
+    opInterface.defineNewTask("OpTaskB", "TypeY", {});
 
-    std::unique_ptr<AbstractTask> emergencyTask = std::make_unique<OperatorEmergencyTask>();
-    ASSERT_TRUE(opInterface.requestInsertEmergencyTask(missionInstanceId, std::move(emergencyTask), 100));
+    std::vector<TaskDto> tasks = opInterface.getAvailableTasks();
+    EXPECT_EQ(tasks.size(), 2);
+}
 
-    // Verify that the mission continues or completes after emergency task
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    MissionState state = opInterface.getMissionStatus(missionInstanceId);
-    ASSERT_TRUE(state.current_status == MissionStatus::RUNNING || state.current_status == MissionStatus::COMPLETED);
+// OperatorInterface를 통해 존재하지 않는 ID로 Task 상세 정보 조회 시를 테스트합니다.
+TEST(OperatorInterfaceTest, GetTaskDetailsNotFound) {
+    auto taskManager = std::make_shared<TaskManager>();
+    OperatorInterface opInterface(taskManager);
+
+    auto taskDto = opInterface.getTaskDetails("non_existent_id");
+    EXPECT_EQ(taskDto, nullptr);
+}
+
+// OperatorInterface를 통한 Task 실행 요청 및 상태 모니터링 기능을 테스트합니다.
+TEST(OperatorInterfaceTest, StartTaskExecutionAndMonitorStatus) {
+    auto taskManager = std::make_shared<TaskManager>();
+    OperatorInterface opInterface(taskManager);
+
+    std::string taskId = opInterface.defineNewTask("RunMeTask", "RunType", {});
+    std::map<std::string, std::string> runtimeParams = {{"duration", "60"}};
+
+    std::string executionId = opInterface.startTaskExecution(taskId, runtimeParams);
+    ASSERT_EQ(executionId, taskId);
+
+    auto statusDto = opInterface.monitorTaskStatus(executionId);
+    ASSERT_NE(statusDto, nullptr);
+    EXPECT_EQ(statusDto->id, taskId);
+    EXPECT_EQ(statusDto->status, taskStatusToString(TaskStatus::RUNNING));
+    EXPECT_EQ(statusDto->parameters.at("duration"), "60");
 }

@@ -1,8 +1,8 @@
-# Specification Quality Checklist: Task & Mission Management (Task 및 임무 관리) 고도화
+# Specification Quality Checklist: Task 관리 모듈
 
-**Purpose**: Validate specification completeness and quality after refactoring to decouple DataStore
-**Created**: 2025-11-04
-**Feature**: [specs/004-task-mission-management/spec.md](specs/004-task-mission-management/spec.md)
+**Purpose**: Validate specification completeness and quality before proceeding to planning
+**Created**: 2025-11-05
+**Feature**: [Link to spec.md]
 
 ## Content Quality
 
@@ -31,5 +31,4 @@
 
 ## Notes
 
-- 2025-11-04: Re-validated after refactoring to remove DataStore dependency. All items remain valid.
 - Items marked incomplete require spec updates before `/speckit.clarify` or `/speckit.plan`

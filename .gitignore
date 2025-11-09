@@ -66,6 +66,16 @@ logs/
 *.swp
 *.swo
 
+# C++ specific
+bin/
+obj/
+out/
+*.o
+*.so
+*.a
+*.exe
+*.dll
+
 # Docker
 docker-compose.override.yml
 .Dockerfile.swp

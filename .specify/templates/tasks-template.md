@@ -107,14 +107,14 @@ description: "기능 구현을 위한 작업 목록 템플릿"
 
 ### 사용자 스토리 2에 대한 테스트 (선택 사항 - 테스트가 요청된 경우에만) ⚠️
 
-- [ ] T018 [P] [US2] tests/contract/test_[name].py에서 [엔드포인트]에 대한 계약 테스트
-- [ ] T019 [P] [US2] tests/integration/test_[name].py에서 [사용자 여정]에 대한 통합 테스트
+- [ ] T018 [P] [US2] tests/contract/test_[name].cpp에서 [엔드포인트]에 대한 계약 테스트
+- [ ] T019 [P] [US2] tests/integration/test_[name].cpp에서 [사용자 여정]에 대한 통합 테스트
 
 ### 사용자 스토리 2 구현
 
-- [ ] T020 [P] [US2] src/models/[entity].py에서 [Entity] 모델 생성
-- [ ] T021 [US2] src/services/[service].py에서 [Service] 구현
-- [ ] T022 [US2] src/[location]/[file].py에서 [엔드포인트/기능] 구현
+- [ ] T020 [P] [US2] src/models/[entity].cpp에서 [Entity] 모델 생성
+- [ ] T021 [US2] src/services/[service].cpp에서 [Service] 구현
+- [ ] T022 [US2] src/[location]/[file].cpp에서 [엔드포인트/기능] 구현
 - [ ] T023 [US2] 사용자 스토리 1 구성 요소와 통합 (필요한 경우)
 
 **체크포인트**: 이 시점에서 사용자 스토리 1과 2는 모두 독립적으로 작동해야 합니다.
@@ -129,14 +129,14 @@ description: "기능 구현을 위한 작업 목록 템플릿"
 
 ### 사용자 스토리 3에 대한 테스트 (선택 사항 - 테스트가 요청된 경우에만) ⚠️
 
-- [ ] T024 [P] [US3] tests/contract/test_[name].py에서 [엔드포인트]에 대한 계약 테스트
-- [ ] T025 [P] [US3] tests/integration/test_[name].py에서 [사용자 여정]에 대한 통합 테스트
+- [ ] T024 [P] [US3] tests/contract/test_[name].cpp에서 [엔드포인트]에 대한 계약 테스트
+- [ ] T025 [P] [US3] tests/integration/test_[name].cpp에서 [사용자 여정]에 대한 통합 테스트
 
 ### 사용자 스토리 3 구현
 
-- [ ] T026 [P] [US3] src/models/[entity].py에서 [Entity] 모델 생성
-- [ ] T027 [US3] src/services/[service].py에서 [Service] 구현
-- [ ] T028 [US3] src/[location]/[file].py에서 [엔드포인트/기능] 구현
+- [ ] T026 [P] [US3] src/models/[entity].cpp에서 [Entity] 모델 생성
+- [ ] T027 [US3] src/services/[service].cpp에서 [Service] 구현
+- [ ] T028 [US3] src/[location]/[file].cpp에서 [엔드포인트/기능] 구현
 
 **체크포인트**: 이제 모든 사용자 스토리가 독립적으로 작동해야 합니다.
 
@@ -199,12 +199,12 @@ description: "기능 구현을 위한 작업 목록 템플릿"
 
 ```bash
 # 사용자 스토리 1에 대한 모든 테스트를 함께 시작 (테스트가 요청된 경우):
-Task: "tests/contract/test_[name].py에서 [엔드포인트]에 대한 계약 테스트"
-Task: "tests/integration/test_[name].py에서 [사용자 여정]에 대한 통합 테스트"
+Task: "tests/contract/test_[name].cpp에서 [엔드포인트]에 대한 계약 테스트"
+Task: "tests/integration/test_[name].cpp에서 [사용자 여정]에 대한 통합 테스트"
 
 # 사용자 스토리 1에 대한 모든 모델을 함께 시작:
-Task: "src/models/[entity1].py에서 [Entity1] 모델 생성"
-Task: "src/models/[entity2].py에서 [Entity2] 모델 생성"
+Task: "src/models/[entity1].cpp에서 [Entity1] 모델 생성"
+Task: "src/models/[entity2].cpp에서 [Entity2] 모델 생성"
 ```
 
 ---

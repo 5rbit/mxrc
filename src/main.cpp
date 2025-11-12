@@ -1,10 +1,14 @@
 #include <iostream>
 #include <memory>
-#include "core/task/TaskManager.h"
-#include "core/task/OperatorInterface.h"
+#include "core/taskmanager/TaskManager.h" // Corrected include
+#include "core/taskmanager/operator_interface/OperatorInterface.h" // Corrected include
+#include "core/taskmanager/TaskManagerInit.h" // Corrected include
 
 int main() {
     std::cout << "MXRC Task Management Module 예제" << std::endl;
+
+    // ExecutableTaskFactory에 모든 Task 유형 등록을 초기화 함수로 대체
+    initializeTaskManagerModule(); // Renamed function call
 
     // TaskManager 인스턴스 생성
     auto taskManager = std::make_shared<TaskManager>();
@@ -25,6 +29,12 @@ int main() {
     std::map<std::string, std::string> inspectParams = {{"area", "zoneA"}, {"camera", "front"}};
     std::string inspectTaskId = opInterface.defineNewTask("InspectArea", "Inspection", inspectParams);
     std::cout << "정의된 Task: InspectArea (ID: " << inspectTaskId << ")" << std::endl;
+
+    // DummyTask 정의 및 팩토리 사용 시연
+    std::map<std::string, std::string> dummyParams = {{"message", "Hello from DummyTask!"}};
+    std::string dummyTaskId = opInterface.defineNewTask("MyDummyTask", "DummyTask", dummyParams);
+    std::cout << "정의된 Task: MyDummyTask (ID: " << dummyTaskId << ")" << std::endl;
+
 
     std::cout << "\n사용 가능한 Task 목록:" << std::endl;
     for (const auto& taskDto : opInterface.getAvailableTasks()) {
@@ -54,6 +64,29 @@ int main() {
     if (driveStatus) {
         std::cout << "  DriveForward 상태: " << driveStatus->status << ", 진행률: " << driveStatus->progress << std::endl;
     }
+
+    // --- 케이스 3.5: ExecutableTaskFactory를 이용한 DummyTask 실행 시연 ---
+    std::cout << "\n--- 케이스 3.5: ExecutableTaskFactory를 이용한 DummyTask 실행 시연 ---" << std::endl;
+    auto dummyTaskDetails = opInterface.getTaskDetails(dummyTaskId);
+    if (dummyTaskDetails) {
+        try {
+            // TaskManager의 requestTaskExecution이 이제 Command Pattern을 사용하므로,
+            // 여기서 직접 createExecutableTask를 호출하는 대신,
+            // requestTaskExecution을 통해 DummyTask를 실행하는 것을 시연합니다.
+            // 실제 실행은 StartTaskCommand 내부에서 이루어집니다.
+            std::string dummyExecutionId = opInterface.startTaskExecution(dummyTaskId, dummyTaskDetails->parameters);
+            std::cout << "DummyTask 실행 요청. 실행 ID: " << dummyExecutionId << std::endl;
+            auto dummyExecutionStatus = opInterface.monitorTaskStatus(dummyExecutionId);
+            if (dummyExecutionStatus) {
+                std::cout << "  DummyTask 상태: " << dummyExecutionStatus->status << ", 진행률: " << dummyExecutionStatus->progress << std::endl;
+            }
+        } catch (const std::runtime_error& e) {
+            std::cerr << "오류: DummyTask 실행 실패: " << e.what() << std::endl;
+        }
+    } else {
+        std::cerr << "오류: DummyTask 정의를 찾을 수 없습니다." << std::endl;
+    }
+
 
     // --- 케이스 4: Task 완료 시뮬레이션 및 상태/진행률 업데이트 ---
     std::cout << "\n--- 케이스 4: Task 완료 시뮬레이션 및 상태/진행률 업데이트 ---" << std::endl;

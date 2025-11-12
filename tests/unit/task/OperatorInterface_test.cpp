@@ -1,6 +1,6 @@
 #include "gtest/gtest.h"
-#include "OperatorInterface.h"
-#include "TaskManager.h" // For concrete TaskManager
+#include "../../../src/core/taskmanager/operator_interface/OperatorInterface.h" // Corrected include
+#include "../../../src/core/taskmanager/TaskManager.h" // Corrected include
 #include <memory>
 
 // OperatorInterface 생성 시 nullptr TaskManager 주입 시 예외 처리를 테스트합니다.

@@ -1,6 +1,6 @@
 #include "gtest/gtest.h"
-#include "TaskManager.h"
-#include "Task.h"
+#include "../../../src/core/taskmanager/TaskManager.h" // Corrected include
+#include "../../../src/core/taskmanager/Task.h" // Corrected include
 #include <map>
 #include <stdexcept>
 

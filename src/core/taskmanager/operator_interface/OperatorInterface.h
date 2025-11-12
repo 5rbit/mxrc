@@ -1,7 +1,7 @@
 #pragma once
 
-#include "IOperatorInterface.h"
-#include "ITaskManager.h"
+#include "../interfaces/IOperatorInterface.h" // Updated include
+#include "../interfaces/ITaskManager.h" // Updated include
 #include <memory>
 
 class OperatorInterface : public IOperatorInterface {

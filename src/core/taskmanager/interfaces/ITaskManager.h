@@ -27,6 +27,8 @@ public:
 
     // New method to update task status
     virtual void updateTaskStatus(const std::string& taskId, TaskStatus status) = 0;
+    // New method to update task progress
+    virtual void updateTaskProgress(const std::string& taskId, int progress) = 0;
 };
 
 

@@ -1,4 +1,9 @@
-#include "OperatorInterface.h"
+#include "operator_interface/OperatorInterface.h" // Updated include
+#include "../interfaces/ITaskManager.h" // Explicitly include ITaskManager for shared_ptr
+#include "../TaskDto.h" // Explicitly include TaskDto for vector<TaskDto> and unique_ptr<TaskDto>
+#include <memory> // For std::shared_ptr
+#include <utility> // For std::move
+#include <stdexcept> // For std::invalid_argument
 
 OperatorInterface::OperatorInterface(std::shared_ptr<ITaskManager> taskManager)
     : taskManager_(std::move(taskManager))

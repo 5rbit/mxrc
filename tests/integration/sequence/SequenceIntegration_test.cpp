@@ -330,3 +330,158 @@ TEST_F(SequenceIntegrationTest, LargeSequenceExecution) {
     }
 }
 
+/**
+ * @brief 통합 테스트: 조건부 분기가 포함된 시퀀스
+ *
+ * 시나리오:
+ * - 시퀀스에 조건부 분기 포함
+ * - THEN/ELSE 경로 선택 검증
+ * - 분기 실행 후 계속 진행
+ */
+TEST_F(SequenceIntegrationTest, ConditionalBranchIntegration) {
+    // 시퀀스 정의: branch_check → final_action
+    SequenceDefinition def;
+    def.id = "conditional_workflow";
+    def.name = "Conditional Workflow";
+    def.version = "1.0.0";
+    def.actionIds = {"branch_check", "final_action"};
+
+    // 조건부 분기 정의
+    ConditionalBranch branch;
+    branch.id = "branch_check";
+    branch.condition = "status == 200";
+    branch.thenActions = {"handle_success"};
+    branch.elseActions = {"handle_error"};
+
+    registry_->registerSequence(def);
+    engine_->registerBranch(branch);
+
+    // 파라미터: status = 200 (THEN 경로 선택)
+    std::map<std::string, std::any> params;
+    params["status"] = 200;
+
+    std::string executionId = engine_->execute("conditional_workflow", params);
+    auto status_result = engine_->getStatus(executionId);
+
+    // 시퀀스 완료 확인
+    EXPECT_EQ(status_result.status, SequenceStatus::COMPLETED);
+
+    // 실행된 액션: handle_success + final_action = 2개
+    EXPECT_EQ(status_result.actionResults.size(), 2);
+    EXPECT_EQ(status_result.actionResults[0].actionId, "handle_success");
+    EXPECT_EQ(status_result.actionResults[1].actionId, "final_action");
+
+    // 모든 액션이 성공적으로 완료
+    for (const auto& actionLog : status_result.actionResults) {
+        EXPECT_EQ(actionLog.status, ActionStatus::COMPLETED);
+    }
+}
+
+/**
+ * @brief 통합 테스트: 복잡한 조건 및 다중 분기 통합
+ *
+ * 시나리오:
+ * - 여러 분기가 순차적으로 실행
+ * - 각 분기는 다른 조건 평가
+ * - 최종 결과 검증
+ */
+TEST_F(SequenceIntegrationTest, MultipleBranchesIntegration) {
+    // 시퀀스: check_range → validate_type → process_result
+    SequenceDefinition def;
+    def.id = "multi_branch_workflow";
+    def.name = "Multi-Branch Workflow";
+    def.version = "1.0.0";
+    def.actionIds = {"check_range", "validate_type", "process_result"};
+
+    // 첫 번째 분기: 범위 체크
+    ConditionalBranch branch1;
+    branch1.id = "check_range";
+    branch1.condition = "value >= 0 AND value <= 100";
+    branch1.thenActions = {"in_range"};
+    branch1.elseActions = {"out_of_range"};
+
+    // 두 번째 분기: 타입 검증
+    ConditionalBranch branch2;
+    branch2.id = "validate_type";
+    branch2.condition = "type == number";
+    branch2.thenActions = {"numeric_process"};
+    branch2.elseActions = {"non_numeric_process"};
+
+    registry_->registerSequence(def);
+    engine_->registerBranch(branch1);
+    engine_->registerBranch(branch2);
+
+    // 파라미터: value = 50, type = "number"
+    // 예상: in_range + numeric_process + process_result = 3개
+    std::map<std::string, std::any> params;
+    params["value"] = 50;
+    params["type"] = std::string("number");
+
+    std::string executionId = engine_->execute("multi_branch_workflow", params);
+    auto result = engine_->getStatus(executionId);
+
+    // 시퀀스 완료
+    EXPECT_EQ(result.status, SequenceStatus::COMPLETED);
+
+    // 실행된 액션 확인: in_range + numeric_process + process_result
+    EXPECT_EQ(result.actionResults.size(), 3);
+    EXPECT_EQ(result.actionResults[0].actionId, "in_range");
+    EXPECT_EQ(result.actionResults[1].actionId, "numeric_process");
+    EXPECT_EQ(result.actionResults[2].actionId, "process_result");
+
+    // 모두 성공
+    for (const auto& actionLog : result.actionResults) {
+        EXPECT_EQ(actionLog.status, ActionStatus::COMPLETED);
+    }
+
+    // 진행률 완료
+    EXPECT_FLOAT_EQ(result.progress, 1.0f);
+}
+
+/**
+ * @brief 통합 테스트: 조건부 분기 ELSE 경로 실행
+ *
+ * 시나리오:
+ * - 조건이 거짓이어서 ELSE 경로 선택
+ * - ELSE 액션만 실행됨
+ * - 이후 시퀀스 계속 진행
+ */
+TEST_F(SequenceIntegrationTest, ConditionalBranchElsePathIntegration) {
+    // 시퀀스: check_permission → done
+    SequenceDefinition def;
+    def.id = "permission_workflow";
+    def.name = "Permission Workflow";
+    def.version = "1.0.0";
+    def.actionIds = {"check_permission", "done"};
+
+    // 권한 체크 분기
+    ConditionalBranch branch;
+    branch.id = "check_permission";
+    branch.condition = "permission >= 3";
+    branch.thenActions = {"grant_access"};
+    branch.elseActions = {"deny_access"};
+
+    registry_->registerSequence(def);
+    engine_->registerBranch(branch);
+
+    // 파라미터: permission = 1 (거짓이므로 ELSE 경로)
+    std::map<std::string, std::any> params;
+    params["permission"] = 1;
+
+    std::string executionId = engine_->execute("permission_workflow", params);
+    auto result = engine_->getStatus(executionId);
+
+    // 시퀀스 완료
+    EXPECT_EQ(result.status, SequenceStatus::COMPLETED);
+
+    // 실행된 액션: deny_access + done
+    EXPECT_EQ(result.actionResults.size(), 2);
+    EXPECT_EQ(result.actionResults[0].actionId, "deny_access");  // ELSE 경로
+    EXPECT_EQ(result.actionResults[1].actionId, "done");
+
+    // 모두 성공
+    for (const auto& actionLog : result.actionResults) {
+        EXPECT_EQ(actionLog.status, ActionStatus::COMPLETED);
+    }
+}
+

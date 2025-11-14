@@ -64,6 +64,7 @@ add_executable(run_tests
     tests/unit/sequence/SequenceEngine_test.cpp
     tests/unit/sequence/ActionExecutor_test.cpp
     tests/unit/sequence/SequenceTemplate_test.cpp
+    tests/unit/sequence/ExecutionMonitoring_test.cpp
     tests/integration/sequence/SequenceIntegration_test.cpp
     src/core/taskmanager/Task.cpp
     src/core/taskmanager/TaskManager.cpp

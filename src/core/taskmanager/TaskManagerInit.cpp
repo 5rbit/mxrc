@@ -1,27 +1,39 @@
-#include "TaskManagerInit.h" // Updated include
-#include "factory/TaskFactory.h" // Updated include
-#include "tasks/DummyTask.h" // Updated include
-#include "tasks/DriveForwardTask.h" // Updated include
-#include "tasks/LiftPalletTask.h" // Updated include
-#include "tasks/InspectAreaTask.h" // Updated include
-#include "tasks/FailureTypeTask.h" // Updated include
+#include "TaskManagerInit.h"
+#include "TaskDefinitionRegistry.h" // Use TaskDefinitionRegistry
+#include "tasks/DummyTask.h"
+#include "tasks/DriveForwardTask.h"
+#include "tasks/LiftPalletTask.h"
+#include "tasks/InspectAreaTask.h"
+#include "tasks/FailureTypeTask.h"
 #include <iostream>
+#include <memory> // For std::make_shared
 
-void initializeTaskManagerModule() { // Renamed function
-    TaskFactory::getInstance().registerTaskType("DummyTask", [](const std::map<std::string, std::string>& params) {
-        return std::make_unique<DummyTask>(params);
+namespace mxrc::core::taskmanager {
+
+void initializeTaskManagerModule() {
+    // TODO: Implement task registration with TaskDefinitionRegistry
+    // This requires refactoring task classes to implement all ITask methods
+    std::cout << "TaskManager module initialization (placeholder)" << std::endl;
+    /* Old code using getInstance():
+    auto& registry = TaskDefinitionRegistry::getInstance();
+
+    registry.registerDefinition("DummyTask", [](const std::string& id, const std::string& type, const std::map<std::string, std::string>& params) {
+        return std::make_shared<mxrc::core::taskmanager::tasks::DummyTask>(id, type, params);
     });
-    TaskFactory::getInstance().registerTaskType("DriveToPosition", [](const std::map<std::string, std::string>& params) {
-        return std::make_unique<DriveForwardTask>(params);
+    registry.registerDefinition("DriveToPosition", [](const std::string& id, const std::string& type, const std::map<std::string, std::string>& params) {
+        return std::make_shared<mxrc::core::taskmanager::tasks::DriveForwardTask>(id, type, params);
     });
-    TaskFactory::getInstance().registerTaskType("LiftPallet", [](const std::map<std::string, std::string>& params) {
-        return std::make_unique<LiftPalletTask>(params);
+    registry.registerDefinition("LiftPallet", [](const std::string& id, const std::string& type, const std::map<std::string, std::string>& params) {
+        return std::make_shared<mxrc::core::taskmanager::tasks::LiftPalletTask>(id, type, params);
     });
-    TaskFactory::getInstance().registerTaskType("Inspection", [](const std::map<std::string, std::string>& params) {
-        return std::make_unique<InspectAreaTask>(params);
+    registry.registerDefinition("Inspection", [](const std::string& id, const std::string& type, const std::map<std::string, std::string>& params) {
+        return std::make_shared<mxrc::core::taskmanager::tasks::InspectAreaTask>(id, type, params);
     });
-    TaskFactory::getInstance().registerTaskType("FailureType", [](const std::map<std::string, std::string>& params) {
-        return std::make_unique<FailureTypeTask>(params);
+    registry.registerDefinition("FailureType", [](const std::string& id, const std::string& type, const std::map<std::string, std::string>& params) {
+        return std::make_shared<mxrc::core::taskmanager::tasks::FailureTypeTask>(id, type, params);
     });
-    std::cout << "TaskFactory에 모든 Task 유형 등록 완료 (TaskManagerInit)." << std::endl; // Updated message
+    std::cout << "TaskDefinitionRegistry에 모든 Task 유형 등록 완료 (TaskManagerInit)." << std::endl;
+    */
 }
+
+} // namespace mxrc::core::taskmanager

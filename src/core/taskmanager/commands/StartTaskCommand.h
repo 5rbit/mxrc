@@ -1,11 +1,13 @@
 #pragma once
-#include "../interfaces/ICommand.h" // Updated include
-#include "../TaskManager.h" // Updated include
-#include "../interfaces/ITask.h" // Corrected include
-#include "../factory/TaskFactory.h" // Corrected include
+#include "../interfaces/ICommand.h"
+#include "../TaskManager.h"
+#include "../interfaces/ITask.h"
+#include "../TaskDefinitionRegistry.h" // Use TaskDefinitionRegistry
 #include <string>
 #include <map>
 #include <memory>
+
+namespace mxrc::core::taskmanager {
 
 class StartTaskCommand : public ICommand {
 public:
@@ -17,3 +19,5 @@ private:
     std::string taskId_;
     std::map<std::string, std::string> runtimeParameters_;
 };
+
+} // namespace mxrc::core::taskmanager

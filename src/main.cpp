@@ -1,20 +1,28 @@
 #include <iostream>
 #include <memory>
-#include "core/taskmanager/TaskManager.h" // Corrected include
-#include "core/taskmanager/operator_interface/OperatorInterface.h" // Corrected include
-#include "core/taskmanager/TaskManagerInit.h" // Corrected include
+#include <thread> // For std::this_thread::sleep_for
+#include "core/taskmanager/TaskManager.h"
+#include "core/taskmanager/operator_interface/OperatorInterface.h"
+#include "core/taskmanager/TaskManagerInit.h"
+#include "core/taskmanager/TaskDefinitionRegistry.h"
+#include "core/taskmanager/TaskExecutor.h"
+
+using namespace mxrc::core::taskmanager; // Add this line
 
 int main() {
     std::cout << "MXRC Task Management Module 예제" << std::endl;
 
-    // ExecutableTaskFactory에 모든 Task 유형 등록을 초기화 함수로 대체
-    initializeTaskManagerModule(); // Renamed function call
+    mxrc::core::taskmanager::initializeTaskManagerModule();
 
-    // TaskManager 인스턴스 생성
-    auto taskManager = std::make_shared<TaskManager>();
+    // Create instances of TaskDefinitionRegistry and TaskExecutor
+    auto registry = std::make_shared<mxrc::core::taskmanager::TaskDefinitionRegistry>();
+    auto executor = std::make_shared<mxrc::core::taskmanager::TaskExecutor>();
+
+    // TaskManager 인스턴스 생성 및 registry, executor 주입
+    auto taskManager = std::make_shared<mxrc::core::taskmanager::TaskManager>(registry, executor);
 
     // OperatorInterface 인스턴스 생성 및 TaskManager 주입
-    OperatorInterface opInterface(taskManager);
+    mxrc::core::taskmanager::OperatorInterface opInterface(taskManager);
 
     // --- 케이스 1: 여러 Task 정의 및 목록 출력 ---
     std::cout << "\n--- 케이스 1: 여러 Task 정의 및 목록 출력 ---" << std::endl;
@@ -65,40 +73,13 @@ int main() {
         std::cout << "  DriveForward 상태: " << driveStatus->status << ", 진행률: " << driveStatus->progress << std::endl;
     }
 
-    // --- 케이스 3.5: ExecutableTaskFactory를 이용한 DummyTask 실행 시연 ---
-    std::cout << "\n--- 케이스 3.5: ExecutableTaskFactory를 이용한 DummyTask 실행 시연 ---" << std::endl;
-    auto dummyTaskDetails = opInterface.getTaskDetails(dummyTaskId);
-    if (dummyTaskDetails) {
-        try {
-            // TaskManager의 requestTaskExecution이 이제 Command Pattern을 사용하므로,
-            // 여기서 직접 createExecutableTask를 호출하는 대신,
-            // requestTaskExecution을 통해 DummyTask를 실행하는 것을 시연합니다.
-            // 실제 실행은 StartTaskCommand 내부에서 이루어집니다.
-            std::string dummyExecutionId = opInterface.startTaskExecution(dummyTaskId, dummyTaskDetails->parameters);
-            std::cout << "DummyTask 실행 요청. 실행 ID: " << dummyExecutionId << std::endl;
-            auto dummyExecutionStatus = opInterface.monitorTaskStatus(dummyExecutionId);
-            if (dummyExecutionStatus) {
-                std::cout << "  DummyTask 상태: " << dummyExecutionStatus->status << ", 진행률: " << dummyExecutionStatus->progress << std::endl;
-            }
-        } catch (const std::runtime_error& e) {
-            std::cerr << "오류: DummyTask 실행 실패: " << e.what() << std::endl;
-        }
-    } else {
-        std::cerr << "오류: DummyTask 정의를 찾을 수 없습니다." << std::endl;
-    }
-
-
     // --- 케이스 4: Task 완료 시뮬레이션 및 상태/진행률 업데이트 ---
     std::cout << "\n--- 케이스 4: Task 완료 시뮬레이션 및 상태/진행률 업데이트 ---" << std::endl;
-    taskManager->updateTaskStatus(driveTaskId, TaskStatus::RUNNING);
-    taskManager->updateTaskProgress(driveTaskId, 50); // 공개 메서드 사용
-    driveStatus = opInterface.monitorTaskStatus(driveExecutionId);
-    if (driveStatus) {
-        std::cout << "  DriveForward 상태 (실행 중): " << driveStatus->status << ", 진행률: " << driveStatus->progress << std::endl;
-    }
+    // Task status and progress are now managed internally by the Task itself.
+    // The OperatorInterface monitors the status, but does not directly update it.
+    // Simulate waiting for task completion
+    std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Wait for DriveForwardTask to complete
 
-    taskManager->updateTaskStatus(driveTaskId, TaskStatus::COMPLETED);
-    taskManager->updateTaskProgress(driveTaskId, 100); // 공개 메서드 사용
     driveStatus = opInterface.monitorTaskStatus(driveExecutionId);
     if (driveStatus) {
         std::cout << "  DriveForward 상태 (완료 후): " << driveStatus->status << ", 진행률: " << driveStatus->progress << std::endl;
@@ -135,7 +116,9 @@ int main() {
     std::cout << "\n--- 케이스 8: Task 실패 시뮬레이션 ---" << std::endl;
     std::string failingTaskId = opInterface.defineNewTask("FailingTask", "FailureType", {});
     std::string failingExecutionId = opInterface.startTaskExecution(failingTaskId, {});
-    taskManager->updateTaskStatus(failingTaskId, TaskStatus::FAILED);
+    // Simulate waiting for task failure
+    std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Wait for FailureTypeTask to fail
+
     auto failingStatus = opInterface.monitorTaskStatus(failingExecutionId);
     if (failingStatus) {
         std::cout << "  FailingTask 상태 (실패 후): " << failingStatus->status << std::endl;

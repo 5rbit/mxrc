@@ -4,7 +4,12 @@
 #include <vector>
 #include <map>
 #include <memory>
-#include "TaskDto.h" // Include the common DTO
+#include "../TaskDto.h" // Include the common DTO
+#include "ICommand.h" // Include ICommand
+
+namespace mxrc {
+namespace core {
+namespace taskmanager {
 
 class ITaskManager {
 public:
@@ -22,14 +27,16 @@ public:
     // FR-005: 등록된 Task의 실행 요청
     virtual std::string requestTaskExecution(const std::string& taskId, const std::map<std::string, std::string>& runtimeParameters) = 0;
 
-    // FR-006: 실행 중인 Task의 현재 상태 모니터링
+    // 사용자 스토리 3, FR-006: 실행 중인 Task의 상태 모니터링
     virtual std::unique_ptr<TaskDto> getTaskExecutionStatus(const std::string& executionId) const = 0;
 
-    // New method to update task status
-    virtual void updateTaskStatus(const std::string& taskId, TaskStatus status) = 0;
-    // New method to update task progress
-    virtual void updateTaskProgress(const std::string& taskId, int progress) = 0;
+    // 사용자 스토리 4, FR-XXX: Command 실행
+    virtual void executeCommand(std::shared_ptr<ICommand> command) = 0;
 };
+
+} // namespace taskmanager
+} // namespace core
+} // namespace mxrc
 
 
 

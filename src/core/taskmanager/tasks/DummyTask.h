@@ -1,37 +1,18 @@
 #pragma once
-#include "../interfaces/ITask.h" // Updated include
+#include "../Task.h" // Inherit from the new Task base class
 #include <iostream>
 #include <map>
 #include <string>
 
-class DummyTask : public ITask {
+namespace mxrc::core::taskmanager::tasks {
+
+class DummyTask : public Task {
 public:
-    DummyTask(const std::map<std::string, std::string>& params) : parameters_(params) {}
+    DummyTask(const std::string& id, const std::string& type, const std::map<std::string, std::string>& params);
 
-    void execute() override {
-        std::cout << "DummyTask::execute() called. Parameters: ";
-        for (const auto& [key, value] : parameters_) {
-            std::cout << key << "=" << value << " ";
-        }
-        std::cout << std::endl;
-    }
-
-    void cancel() override {
-        std::cout << "DummyTask::cancel() called." << std::endl;
-    }
-
-    void pause() override {
-        std::cout << "DummyTask::pause() called." << std::endl;
-    }
-
-    std::string getType() const override {
-        return "DummyTask";
-    }
-
-    std::map<std::string, std::string> getParameters() const override {
-        return parameters_;
-    }
-
-private:
-    std::map<std::string, std::string> parameters_;
+    void execute() override;
+    void cancel() override;
+    void pause() override;
 };
+
+} // namespace mxrc::core::taskmanager::tasks

@@ -1,0 +1,190 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## 프로젝트 개요
+
+MXRC는 어떤 로봇도 제어 할 수 있는 범용 로봇 제어 컨트롤러 입니다. C++20으로 개발되며, CMake 빌드 시스템을 사용하고, Linux Ubuntu 24.04 LTS PREEMPT_RT 환경에서 실시간 성능을 목표로 합니다.
+
+**핵심 성능 요구사항:**
+- OOP/인터페이스 기반 설계로 모듈 간 상호 의존성(Chaining) 최소화.
+- 구동 중심이 아닌, 고성능 아키텍처에 초점.
+- RIIA 원칙 필수 적용으로 리소스 누수 방지 및 견고성 확보.
+- 구성 요소는 추적 가능한 상세 로그 기록.
+- 모든 모듈에 대한 철저한 단위 테스트 수행.
+- 실패의 경우도 단위 테스트에 포함하여 진행.
+- RTOS 기반 다중 Task 동시 실행 구조화.
+- Task 간 공유 상태/이벤트 시스템을 통한 상태 감지 및 변경.
+- Task는 템플릿 상속을 통해 확장, 유연을 도모.
+- Task는 시작, 완료, 인터록, 타임아웃 조건 명확히 정의 및 실시간 검사.
+- Task는 재시도 횟수/지연 시간 설정을 통한 재시도 로직 내장.
+- 실패 시 자체 처리 및 안전 상태 전환 로직 포함.
+- 명확한 상태 머신 구현 및 실시간 진행률(Progress) 보고 기능.
+
+
+
+## 빌드 및 테스트
+
+### 빌드 명령어
+
+```bash
+# 빌드 설정 및 빌드
+mkdir -p build
+cd build
+cmake ..
+make
+
+# 메인 실행 파일 실행
+./mxrc
+
+# 모든 테스트 실행
+./run_tests
+
+# 상세 출력과 함께 테스트 실행
+./run_tests --gtest_verbose
+```
+
+### 단일 테스트 실행
+
+특정 테스트 파일 또는 테스트 케이스를 실행하려면:
+
+```bash
+# 특정 테스트 스위트 실행
+./run_tests --gtest_filter=TaskManagerTest.*
+
+# 특정 테스트 케이스 실행
+./run_tests --gtest_filter=TaskManagerTest.RegisterTaskDefinition
+```
+
+## 아키텍처
+
+### 핵심 모듈
+
+시스템은 `src/core/` 하위에 기능 기반 모듈로 구성되어 있습니다. 각 모듈은 `specs/`에 상세한 사양을 가진 사양 주도 개발 방식을 따릅니다.
+
+**TaskManager 모듈** (`src/core/taskmanager/`)
+태스크 관리 시스템은 관심사를 분리한 리팩터링된 아키텍처를 사용합니다:
+
+- **TaskDefinitionRegistry**: 태스크 타입 정의 및 태스크 인스턴스 생성을 위한 팩토리 함수 관리
+- **TaskExecutor**: 스레드 풀을 사용한 태스크 실행 생명주기(제출, 실행, 취소) 처리
+- **TaskManager**: Command 패턴을 통해 Registry와 Executor에 위임하여 시스템 조율
+- **OperatorInterface**: 외부 시스템을 위한 단순화된 API를 제공하는 Facade
+
+**사용 중인 디자인 패턴:**
+- Command Pattern: 모든 태스크 작업(StartTaskCommand, CancelTaskCommand, PauseTaskCommand)이 커맨드 객체로 캡슐화됨
+- Factory Pattern: TaskDefinitionRegistry가 팩토리 함수를 사용하여 태스크 인스턴스 생성
+- Facade Pattern: OperatorInterface가 TaskManager와의 상호작용 단순화
+- Dependency Injection: 컴포넌트가 생성자를 통해 의존성 주입 받음 (예: TaskManager가 Registry와 Executor를 주입받음)
+
+### 핵심 아키텍처 원칙
+
+1. **인터페이스 기반 설계**: 핵심 기능이 인터페이스(ITask, ITaskManager, ICommand, IOperatorInterface)를 통해 정의되며, `interfaces/` 디렉토리에 위치
+2. **태스크 캡슐화**: 태스크는 ITask를 상속받고 자신의 상태를 내부적으로 관리. 외부 코드는 태스크 상태를 직접 수정할 수 없으며, 액션(execute, cancel, pause)만 요청 가능
+3. **작업을 위한 Command Pattern**: 모든 태스크 작업이 커맨드 객체를 통해 수행되어, 향후 로깅, undo/redo, 트랜잭션 확장 가능
+4. **정의와 실행의 분리**: TaskDefinitionRegistry가 태스크 메타데이터를 관리하고, TaskExecutor가 런타임 실행을 처리
+
+### 디렉토리 구조
+
+```
+src/core/taskmanager/
+├── interfaces/          # 핵심 인터페이스 (ITask, ITaskManager, ICommand)
+├── commands/            # 커맨드 구현 (Start, Cancel, Pause)
+├── tasks/              # 구체적인 태스크 구현 (DriveForward, LiftPallet 등)
+├── operator_interface/ # 외부 상호작용을 위한 Facade
+├── TaskManager.*       # 메인 조율자
+├── TaskDefinitionRegistry.* # 태스크 타입 레지스트리
+├── TaskExecutor.*      # 실행 생명주기 관리자
+└── TaskManagerInit.*   # 모듈 초기화
+
+tests/unit/task/        # taskmanager 모듈 단위 테스트
+specs/                  # 기능 사양 및 계획 문서
+```
+
+## 코드 스타일 및 규칙
+
+### 네임스페이스
+
+모든 코드는 중첩된 네임스페이스를 사용: `mxrc::core::<모듈명>`
+
+예시:
+```cpp
+namespace mxrc::core::taskmanager {
+    // 구현
+}
+```
+
+### 헤더 의존성
+
+- 헤더 파일에서 forward declaration을 사용하여 컴파일 의존성 최소화
+- `.h` 파일에는 필요한 헤더만 포함; `.cpp` 파일에 포함하는 것을 선호
+- 가능한 경우 구현 헤더가 아닌 인터페이스 헤더를 포함
+
+### 태스크 구현
+
+새로운 태스크 타입을 구현할 때:
+
+1. `ITask` 인터페이스를 상속
+2. 필수 메서드 구현: `execute()`, `cancel()`, `getStatus()`, `getProgress()`, `getId()`, `toDto()`
+3. 내부 상태(`status_`, `progress_`) 관리 - setter를 절대 노출하지 않음
+4. `TaskManagerInit.cpp`에서 `TaskDefinitionRegistry::registerDefinition()`을 사용하여 태스크 타입 등록
+
+예시:
+```cpp
+class MyNewTask : public ITask {
+public:
+    void execute() override {
+        status_ = TaskStatus::RUNNING;
+        // ... 작업 수행 ...
+        status_ = TaskStatus::COMPLETED;
+    }
+
+    void cancel() override {
+        if (status_ == TaskStatus::RUNNING) {
+            status_ = TaskStatus::CANCELLING;
+        }
+    }
+
+    // ... 기타 필수 메서드
+private:
+    TaskStatus status_;
+    float progress_;
+};
+```
+
+### 테스트 규칙
+
+- 테스트는 Google Test (GTest) 프레임워크 사용
+- 테스트 파일 이름: `<컴포넌트명>_test.cpp`
+- 테스트용 Mock 클래스 이름: `Mock<클래스명>` 또는 `Mock<클래스명>For<목적>`
+- 테스트 파일에서 시나리오 설명을 위해 한글 주석을 일반적으로 사용
+- 모든 새 기능에는 해당 단위 테스트가 있어야 함
+
+## 사양 주도 개발
+
+이 프로젝트는 사양 우선 접근 방식을 따릅니다:
+
+1. 각 기능은 `specs/<기능번호>-<기능명>/`에 사양을 가짐
+2. 사양에는 사용자 스토리, 인수 기준, 기능적 요구사항, 성공 기준 포함
+3. 사양은 한글로 작성됨
+4. 기능 구현 시 관련 사양 참조 (예: `specs/016-refactor-taskmanager/spec.md`)
+
+## 의존성
+
+- **spdlog**: 로깅 프레임워크
+- **GTest**: 단위 테스트 프레임워크
+- **CMake**: 빌드 시스템 (최소 버전 3.16)
+
+Ubuntu에서 의존성 설치:
+```bash
+sudo apt-get install libspdlog-dev libgtest-dev cmake
+```
+
+## 현재 작업
+
+현재 저장소는 `016-refactor-taskmanager` 브랜치에 있으며, TaskManager 모듈을 다음과 같이 리팩터링 중입니다:
+- 태스크 정의 관리(TaskDefinitionRegistry)와 실행(TaskExecutor) 분리
+- 레지스트리 기반 팩토리 함수를 위해 TaskFactory 제거
+- 외부 상태 수정 메서드 제거로 캡슐화 강화
+- Command 패턴 사용 확대 (CancelTaskCommand, PauseTaskCommand 추가)
+
+이 코드베이스 작업 시, `specs/`의 관련 사양을 참조하고 변경사항이 위에 설명된 아키텍처 원칙과 일치하는지 확인하세요.

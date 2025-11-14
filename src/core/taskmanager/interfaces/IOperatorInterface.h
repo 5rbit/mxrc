@@ -4,7 +4,11 @@
 #include <vector>
 #include <map>
 #include <memory>
-#include "TaskDto.h" // Include the common DTO
+#include "../TaskDto.h" // Include the common DTO
+
+namespace mxrc {
+namespace core {
+namespace taskmanager {
 
 class IOperatorInterface {
 public:
@@ -24,4 +28,14 @@ public:
 
     // 사용자 스토리 3, FR-006: 실행 중인 Task의 상태 모니터링
     virtual std::unique_ptr<TaskDto> monitorTaskStatus(const std::string& executionId) const = 0;
+
+    // 사용자 스토리 4, FR-XXX: 실행 중인 Task 취소 요청
+    virtual void cancelTask(const std::string& taskId) = 0;
+
+    // 사용자 스토리 4, FR-XXX: 실행 중인 Task 일시 정지 요청
+    virtual void pauseTask(const std::string& taskId) = 0;
 };
+
+} // namespace taskmanager
+} // namespace core
+} // namespace mxrc

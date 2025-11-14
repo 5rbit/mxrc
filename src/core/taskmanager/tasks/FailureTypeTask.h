@@ -1,39 +1,18 @@
 #pragma once
-#include "../interfaces/ITask.h" // Updated include
+#include "../Task.h" // Inherit from the new Task base class
 #include <iostream>
 #include <map>
 #include <string>
 
-class FailureTypeTask : public ITask {
+namespace mxrc::core::taskmanager::tasks {
+
+class FailureTypeTask : public Task {
 public:
-    FailureTypeTask(const std::map<std::string, std::string>& params) : parameters_(params) {}
+    FailureTypeTask(const std::string& id, const std::string& type, const std::map<std::string, std::string>& params);
 
-    void execute() override {
-        std::cout << "FailureTypeTask::execute() called. Parameters: ";
-        for (const auto& [key, value] : parameters_) {
-            std::cout << key << "=" << value << " ";
-        }
-        std::cout << std::endl;
-        // Simulate a task that might fail
-        std::cerr << "Simulating a task failure within FailureTypeTask." << std::endl;
-    }
-
-    void cancel() override {
-        std::cout << "FailureTypeTask::cancel() called." << std::endl;
-    }
-
-    void pause() override {
-        std::cout << "FailureTypeTask::pause() called." << std::endl;
-    }
-
-    std::string getType() const override {
-        return "FailureType";
-    }
-
-    std::map<std::string, std::string> getParameters() const override {
-        return parameters_;
-    }
-
-private:
-    std::map<std::string, std::string> parameters_;
+    void execute() override;
+    void cancel() override;
+    void pause() override;
 };
+
+} // namespace mxrc::core::taskmanager::tasks

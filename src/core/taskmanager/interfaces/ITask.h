@@ -2,6 +2,11 @@
 #include <string>
 #include <map>
 #include <memory> // For std::unique_ptr
+#include "../TaskDto.h"
+
+namespace mxrc {
+namespace core {
+namespace taskmanager {
 
 class ITask {
 public:
@@ -11,5 +16,14 @@ public:
     virtual void pause() = 0;
     virtual std::string getType() const = 0; // To identify the task type
     virtual std::map<std::string, std::string> getParameters() const = 0; // To get current parameters
-    // Potentially other methods for status updates, progress, etc.
+
+    // Status and progress methods
+    virtual TaskStatus getStatus() const = 0;
+    virtual float getProgress() const = 0;
+    virtual const std::string& getId() const = 0;
+    virtual TaskDto toDto() const = 0;
 };
+
+} // namespace taskmanager
+} // namespace core
+} // namespace mxrc

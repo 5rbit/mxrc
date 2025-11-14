@@ -46,6 +46,8 @@ enable_testing()
 add_executable(run_tests
     tests/unit/task/TaskManager_test.cpp
     tests/unit/task/OperatorInterface_test.cpp
+    tests/unit/task/TaskDefinitionRegistry_test.cpp
+    tests/unit/task/TaskExecutor_test.cpp
     src/core/taskmanager/Task.cpp
     src/core/taskmanager/TaskManager.cpp
     src/core/taskmanager/TaskDefinitionRegistry.cpp

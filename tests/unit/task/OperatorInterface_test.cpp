@@ -1,16 +1,20 @@
+// 이 파일은 OperatorInterface 클래스의 동작을 테스트합니다.
+// TaskManager와의 상호작용을 통해 새로운 태스크 정의, 실행, 취소, 일시정지 및 상태 모니터링 기능이 올바르게 작동하는지 검증합니다.
+// 또한, 존재하지 않는 태스크에 대한 요청과 같은 예외 상황에 대한 처리도 테스트합니다.
+
 #include "gtest/gtest.h"
-#include "../../../src/core/taskmanager/operator_interface/OperatorInterface.h" // Corrected include
-#include "../../../src/core/taskmanager/TaskManager.h" // Corrected include
-#include "../../../src/core/taskmanager/TaskDefinitionRegistry.h" // Include for registry
-#include "../../../src/core/taskmanager/TaskExecutor.h" // Include for executor
-#include "../../../src/core/taskmanager/interfaces/ITask.h" // For MockTask
+#include "../../../src/core/taskmanager/operator_interface/OperatorInterface.h" // 수정된 포함
+#include "../../../src/core/taskmanager/TaskManager.h" // 수정된 포함
+#include "../../../src/core/taskmanager/TaskDefinitionRegistry.h" // 레지스트리 포함
+#include "../../../src/core/taskmanager/TaskExecutor.h" // 실행기 포함
+#include "../../../src/core/taskmanager/interfaces/ITask.h" // MockTask용
 #include <memory>
 #include <chrono>
 #include <thread>
 
 namespace mxrc::core::taskmanager {
 
-// Mock ITask for testing OperatorInterface interactions
+// OperatorInterface 상호작용 테스트를 위한 Mock ITask
 class MockTaskForOperator : public ITask {
 public:
     MockTaskForOperator(const std::string& id, const std::string& type, const std::map<std::string, std::string>& params)
@@ -19,7 +23,7 @@ public:
 
     void execute() override {
         status_ = TaskStatus::RUNNING;
-        // Simulate some work
+        // 작업 시뮬레이션
         for (int i = 0; i <= 10; ++i) {
             if (status_ == TaskStatus::CANCELLED || status_ == TaskStatus::PAUSED) {
                 return;
@@ -138,13 +142,13 @@ TEST(OperatorInterfaceTest, StartTaskExecutionAndMonitorStatus) {
     std::string executionId = opInterface.startTaskExecution(taskId, runtimeParams);
     ASSERT_EQ(executionId, taskId);
 
-    // Give some time for the task to execute
+    // 태스크가 실행될 시간을 줍니다
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     auto statusDto = opInterface.monitorTaskStatus(executionId);
     ASSERT_NE(statusDto, nullptr);
     EXPECT_EQ(statusDto->id, taskId);
-    EXPECT_EQ(statusDto->status, taskStatusToString(TaskStatus::COMPLETED)); // Should be completed by now
+    EXPECT_EQ(statusDto->status, taskStatusToString(TaskStatus::COMPLETED)); // 지금쯤 완료되어야 합니다
     
     auto finalParams = statusDto->parameters;
     EXPECT_EQ(finalParams["duration"], "60");
@@ -163,12 +167,12 @@ TEST(OperatorInterfaceTest, CancelTaskSuccessfully) {
     std::string taskId = opInterface.defineNewTask("CancellableTask", "CancellableType", {});
     std::string executionId = opInterface.startTaskExecution(taskId, {});
 
-    // Give some time for the task to start
+    // 태스크가 시작될 시간을 줍니다
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     opInterface.cancelTask(executionId);
 
-    // Give some time for the task to cancel
+    // 태스크가 취소될 시간을 줍니다
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     auto statusDto = opInterface.monitorTaskStatus(executionId);
@@ -189,12 +193,12 @@ TEST(OperatorInterfaceTest, PauseTaskSuccessfully) {
     std::string taskId = opInterface.defineNewTask("PausableTask", "PausableType", {});
     std::string executionId = opInterface.startTaskExecution(taskId, {});
 
-    // Give some time for the task to start
+    // 태스크가 시작될 시간을 줍니다
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     opInterface.pauseTask(executionId);
 
-    // Give some time for the task to pause
+    // 태스크가 일시정지될 시간을 줍니다
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     auto statusDto = opInterface.monitorTaskStatus(executionId);
@@ -354,6 +358,125 @@ TEST(OperatorInterfaceTest, TaskParameterOverrideAtRuntime) {
     // 런타임 파라미터가 기본값을 오버라이드했는지 확인
     EXPECT_EQ(statusDto->parameters["speed"], "fast");  // 오버라이드됨
     EXPECT_EQ(statusDto->parameters["priority"], "high");  // 새로 추가됨
+}
+
+TEST(OperatorInterfaceTest, DefineTaskWithUndefinedType) {
+    auto registry = std::make_shared<TaskDefinitionRegistry>();
+    auto executor = std::make_shared<TaskExecutor>();
+    auto taskManager = std::make_shared<TaskManager>(registry, executor);
+    OperatorInterface opInterface(taskManager);
+
+    // 정의되지 않은 타입으로 태스크 정의 시도
+    std::string taskId = opInterface.defineNewTask("UndefinedTask", "UndefinedType", {});
+
+    // taskId가 생성되지만, 실행 시도 시에는 정의되지 않은 타입이므로 태스크가 null로 반환됨
+    ASSERT_FALSE(taskId.empty());
+
+    // 실행 시도 - 정의되지 않은 타입의 경우 로그만 출력되고 태스크가 생성되지 않음
+    std::string executionId = opInterface.startTaskExecution(taskId, {});
+
+    // executionId는 반환되지만 실제 태스크는 없음
+    auto statusDto = opInterface.monitorTaskStatus(executionId);
+    // 정의되지 않은 타입이므로 태스크가 실제로 생성되지 않아 null이 반환될 수 있음
+    // (구현에 따라 다를 수 있음)
+}
+
+TEST(OperatorInterfaceTest, LongTaskName) {
+    auto registry = std::make_shared<TaskDefinitionRegistry>();
+    auto executor = std::make_shared<TaskExecutor>();
+    auto taskManager = std::make_shared<TaskManager>(registry, executor);
+    OperatorInterface opInterface(taskManager);
+
+    registry->registerDefinition("LongNameType", [](const std::string& id, const std::string& type, const std::map<std::string, std::string>& params) {
+        return std::make_shared<MockTaskForOperator>(id, type, params);
+    });
+
+    // 매우 긴 태스크 이름
+    std::string longName = "VeryLongTaskNameWith" + std::string(200, 'X');
+    std::string taskId = opInterface.defineNewTask(longName, "LongNameType", {});
+
+    ASSERT_FALSE(taskId.empty());
+    auto taskDto = opInterface.getTaskDetails(taskId);
+    ASSERT_NE(taskDto, nullptr);
+    ASSERT_EQ(taskDto->name, longName);
+}
+
+TEST(OperatorInterfaceTest, SpecialCharactersInParameters) {
+    auto registry = std::make_shared<TaskDefinitionRegistry>();
+    auto executor = std::make_shared<TaskExecutor>();
+    auto taskManager = std::make_shared<TaskManager>(registry, executor);
+    OperatorInterface opInterface(taskManager);
+
+    registry->registerDefinition("SpecialCharType", [](const std::string& id, const std::string& type, const std::map<std::string, std::string>& params) {
+        return std::make_shared<MockTaskForOperator>(id, type, params);
+    });
+
+    // 특수 문자가 포함된 파라미터
+    std::map<std::string, std::string> specialParams{
+        {"path", "/home/user/file.txt"},
+        {"command", "cd /tmp && ls -la"},
+        {"formula", "a + b * c = 42"}
+    };
+
+    std::string taskId = opInterface.defineNewTask("SpecialTask", "SpecialCharType", specialParams);
+    ASSERT_FALSE(taskId.empty());
+
+    auto taskDto = opInterface.getTaskDetails(taskId);
+    ASSERT_NE(taskDto, nullptr);
+    EXPECT_EQ(taskDto->parameters["path"], "/home/user/file.txt");
+    EXPECT_EQ(taskDto->parameters["command"], "cd /tmp && ls -la");
+}
+
+TEST(OperatorInterfaceTest, PauseCompletedTask) {
+    auto registry = std::make_shared<TaskDefinitionRegistry>();
+    auto executor = std::make_shared<TaskExecutor>();
+    auto taskManager = std::make_shared<TaskManager>(registry, executor);
+    OperatorInterface opInterface(taskManager);
+
+    registry->registerDefinition("PauseCompletedType", [](const std::string& id, const std::string& type, const std::map<std::string, std::string>& params) {
+        return std::make_shared<MockTaskForOperator>(id, type, params);
+    });
+
+    std::string taskId = opInterface.defineNewTask("PauseCompletedTask", "PauseCompletedType", {});
+    std::string executionId = opInterface.startTaskExecution(taskId, {});
+
+    // 완료 대기
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    auto statusDto = opInterface.monitorTaskStatus(executionId);
+    ASSERT_NE(statusDto, nullptr);
+    EXPECT_EQ(statusDto->status, taskStatusToString(TaskStatus::COMPLETED));
+
+    // 완료된 태스크를 일시정지 시도
+    ASSERT_NO_THROW(opInterface.pauseTask(executionId));
+}
+
+TEST(OperatorInterfaceTest, MonitorTaskMultipleTimes) {
+    auto registry = std::make_shared<TaskDefinitionRegistry>();
+    auto executor = std::make_shared<TaskExecutor>();
+    auto taskManager = std::make_shared<TaskManager>(registry, executor);
+    OperatorInterface opInterface(taskManager);
+
+    registry->registerDefinition("MonitorType", [](const std::string& id, const std::string& type, const std::map<std::string, std::string>& params) {
+        return std::make_shared<MockTaskForOperator>(id, type, params);
+    });
+
+    std::string taskId = opInterface.defineNewTask("MonitorTask", "MonitorType", {});
+    std::string executionId = opInterface.startTaskExecution(taskId, {});
+
+    // 여러 번 모니터링
+    auto status1 = opInterface.monitorTaskStatus(executionId);
+    ASSERT_NE(status1, nullptr);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    auto status2 = opInterface.monitorTaskStatus(executionId);
+    ASSERT_NE(status2, nullptr);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(150));
+
+    auto status3 = opInterface.monitorTaskStatus(executionId);
+    ASSERT_NE(status3, nullptr);
+    EXPECT_EQ(status3->status, taskStatusToString(TaskStatus::COMPLETED));
 }
 
 } // namespace mxrc::core::taskmanager

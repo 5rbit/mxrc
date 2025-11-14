@@ -1,3 +1,9 @@
+// 이 파일은 TaskManager 클래스의 핵심 기능을 테스트합니다.
+// TaskManager는 TaskDefinitionRegistry, TaskExecutor와 협력하여
+// 태스크의 전체 생명주기를 관리하는 중앙 컨트롤러 역할을 합니다.
+// 이 테스트 모음은 커맨드 패턴(Start, Cancel, Pause)을 사용하여
+// 태스크를 제어하는 기능과 다양한 시나리오에서의 동작을 검증합니다.
+
 #include "gtest/gtest.h"
 #include "core/taskmanager/TaskManager.h"
 #include "core/taskmanager/TaskDefinitionRegistry.h"
@@ -13,7 +19,7 @@
 
 namespace mxrc::core::taskmanager {
 
-// Mock ITask for testing TaskManager interactions
+// TaskManager 상호작용 테스트를 위한 Mock ITask
 class MockTaskForManager : public ITask {
 public:
     MockTaskForManager(const std::string& id, const std::string& type,
@@ -23,7 +29,7 @@ public:
 
     void execute() override {
         status_ = TaskStatus::RUNNING;
-        // Simulate some work
+        // 작업 시뮬레이션
         for (int i = 0; i <= 10; ++i) {
             if (status_ == TaskStatus::CANCELLED || status_ == TaskStatus::PAUSED) {
                 return;
@@ -78,24 +84,24 @@ TEST(TaskManagerTest, ExecuteStartTaskCommandSuccessfully) {
     std::string taskType = "TestTask";
     std::map<std::string, std::string> params{{"key1", "value1"}};
 
-    // 1. Register the definition directly with the registry
+    // 1. 레지스트리에 직접 정의를 등록합니다.
     registry->registerDefinition(taskType,
         [](const std::string& id, const std::string& type, const std::map<std::string, std::string>& p) {
             return std::make_shared<MockTaskForManager>(id, type, p);
         });
 
-    // 2. Register the task with the TaskManager to get a valid taskId
+    // 2. TaskManager에 태스크를 등록하여 유효한 taskId를 얻습니다.
     std::string taskId = taskManager.registerTaskDefinition(taskName, taskType, params);
     ASSERT_FALSE(taskId.empty());
 
-    // 3. Create and execute the command using the obtained taskId
+    // 3. 얻은 taskId를 사용하여 명령을 생성하고 실행합니다.
     auto startCommand = std::make_shared<StartTaskCommand>(taskManager, taskId, params);
     ASSERT_NO_THROW(taskManager.executeCommand(startCommand));
 
-    // Give some time for the task to execute
+    // 태스크가 실행될 시간을 줍니다.
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
-    // Check that the task is in the executor and completed
+    // 태스크가 실행기에 있고 완료되었는지 확인합니다.
     std::shared_ptr<ITask> executedTask = executor->getTask(taskId);
     ASSERT_NE(executedTask, nullptr);
     ASSERT_EQ(executedTask->getStatus(), TaskStatus::COMPLETED);
@@ -143,7 +149,7 @@ TEST(TaskManagerTest, ExecuteCancelTaskCommand) {
     auto startCommand = std::make_shared<StartTaskCommand>(taskManager, taskId, params);
     taskManager.executeCommand(startCommand);
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(50)); // Let it start
+    std::this_thread::sleep_for(std::chrono::milliseconds(50)); // 시작되도록 잠시 기다립니다.
 
     // 테스트: Task가 실행 중임을 확인
     std::shared_ptr<ITask> runningTask = executor->getTask(taskId);
@@ -153,7 +159,7 @@ TEST(TaskManagerTest, ExecuteCancelTaskCommand) {
     auto cancelCommand = std::make_shared<CancelTaskCommand>(taskManager, taskId);
     ASSERT_NO_THROW(taskManager.executeCommand(cancelCommand));
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(50)); // Let it cancel
+    std::this_thread::sleep_for(std::chrono::milliseconds(50)); // 취소되도록 잠시 기다립니다.
 
     // 테스트: Task가 취소됨
     std::shared_ptr<ITask> cancelledTask = executor->getTask(taskId);
@@ -180,7 +186,7 @@ TEST(TaskManagerTest, ExecutePauseTaskCommand) {
     auto startCommand = std::make_shared<StartTaskCommand>(taskManager, taskId, params);
     taskManager.executeCommand(startCommand);
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(50)); // Let it start
+    std::this_thread::sleep_for(std::chrono::milliseconds(50)); // 시작되도록 잠시 기다립니다.
 
     // 테스트: Task가 실행 중임을 확인
     std::shared_ptr<ITask> runningTask = executor->getTask(taskId);
@@ -190,7 +196,7 @@ TEST(TaskManagerTest, ExecutePauseTaskCommand) {
     auto pauseCommand = std::make_shared<PauseTaskCommand>(taskManager, taskId);
     ASSERT_NO_THROW(taskManager.executeCommand(pauseCommand));
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(50)); // Let it pause
+    std::this_thread::sleep_for(std::chrono::milliseconds(50)); // 일시정지되도록 잠시 기다립니다.
 
     // 테스트: Task가 일시정지됨
     std::shared_ptr<ITask> pausedTask = executor->getTask(taskId);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/sequence/interfaces/IAction.h"
+#include "core/sequence/interfaces/IActionFactory.h"
 #include "core/sequence/core/ExecutionContext.h"
 #include <string>
 #include <map>
@@ -168,6 +169,41 @@ private:
 };
 
 /**
+ * @brief 예외를 발생시키는 테스트용 동작
+ */
+class ExceptionThrowingAction : public IAction {
+public:
+    explicit ExceptionThrowingAction(const std::string& id)
+        : id_(id), status_(ActionStatus::PENDING), progress_(0.0f) {}
+
+    std::string getId() const override { return id_; }
+    std::string getType() const override { return "ExceptionThrowingAction"; }
+
+    void execute(ExecutionContext& context) override {
+        status_ = ActionStatus::RUNNING;
+        progress_ = 0.5f;
+
+        // 예외 발생
+        throw std::runtime_error("Mock action threw exception");
+    }
+
+    void cancel() override {
+        if (status_ == ActionStatus::RUNNING) {
+            status_ = ActionStatus::CANCELLED;
+        }
+    }
+
+    ActionStatus getStatus() const override { return status_; }
+    float getProgress() const override { return progress_; }
+    std::string getDescription() const override { return "Mock exception throwing action"; }
+
+private:
+    std::string id_;
+    ActionStatus status_;
+    float progress_;
+};
+
+/**
  * @brief 테스트용 동작 팩토리
  */
 class MockActionFactory : public IActionFactory {
@@ -183,6 +219,8 @@ public:
             return std::make_shared<FailureAction>(id);
         } else if (type == "modify" || type.find("modify") != std::string::npos) {
             return std::make_shared<ContextModifyingAction>(id);
+        } else if (type == "exception" || type.find("exception") != std::string::npos) {
+            return std::make_shared<ExceptionThrowingAction>(id);
         } else {
             // 기본값: 성공 동작
             return std::make_shared<SuccessAction>(id);
@@ -190,7 +228,7 @@ public:
     }
 
     std::vector<std::string> getSupportedTypes() const override {
-        return {"success", "failure", "modify"};
+        return {"success", "failure", "modify", "exception"};
     }
 };
 

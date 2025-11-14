@@ -1,8 +1,6 @@
-// 이 파일은 TaskDefinitionRegistry 클래스를 테스트합니다.
-// TaskDefinitionRegistry는 다양한 유형의 태스크(Task) 정의를 등록하고,
-// 등록된 정의를 기반으로 태스크 인스턴스를 생성하는 역할을 합니다.
-// 이 테스트 모음은 태스크 정의의 등록, 생성, 조회 및
-// 존재하지 않는 태스크에 대한 처리와 같은 핵심 기능이 올바르게 작동하는지 검증합니다.
+// TaskDefinitionRegistry 클래스 테스트.
+// 태스크 정의 등록, 생성, 조회 및 예외 처리 기능 검증.
+// 다양한 태스크 정의 및 생성 시나리오 테스트.
 
 #include "gtest/gtest.h"
 #include "core/taskmanager/TaskDefinitionRegistry.h"
@@ -36,6 +34,7 @@ private:
     float progress_;
 };
 
+// 태스크 정의 등록 및 생성 기본 테스트
 TEST(TaskDefinitionRegistryTest, RegisterAndCreateTask) {
     TaskDefinitionRegistry registry;
 
@@ -45,7 +44,7 @@ TEST(TaskDefinitionRegistryTest, RegisterAndCreateTask) {
             return std::make_shared<MockTask>(id, type);
         });
 
-    // 등록된 정의를 사용하여 태스크 생성
+    // 등록된 정의로 태스크 생성
     std::shared_ptr<ITask> task = registry.createTask("TestTask", "test_id_1", "TestTask", {});
 
     // 생성된 태스크 확인
@@ -54,16 +53,18 @@ TEST(TaskDefinitionRegistryTest, RegisterAndCreateTask) {
     ASSERT_EQ(task->getType(), "TestTask");
 }
 
+// 존재하지 않는 태스크 생성 시도 테스트
 TEST(TaskDefinitionRegistryTest, CreateNonExistentTask) {
     TaskDefinitionRegistry registry;
 
-    // 등록되지 않은 태스크 생성을 시도
+    // 미등록 태스크 생성 시도
     std::shared_ptr<ITask> task = registry.createTask("NonExistentTask", "test_id", "NonExistentTask", {});
 
-    // 태스크가 생성되지 않았는지 확인
+    // 태스크 미생성 확인
     ASSERT_EQ(task, nullptr);
 }
 
+// 여러 태스크 정의 및 생성 테스트
 TEST(TaskDefinitionRegistryTest, RegisterMultipleTasks) {
     TaskDefinitionRegistry registry;
 
@@ -85,6 +86,7 @@ TEST(TaskDefinitionRegistryTest, RegisterMultipleTasks) {
     ASSERT_EQ(taskB->getType(), "TaskB");
 }
 
+// 특정 태스크 정의 조회 테스트
 TEST(TaskDefinitionRegistryTest, GetDefinition) {
     TaskDefinitionRegistry registry;
 
@@ -93,16 +95,17 @@ TEST(TaskDefinitionRegistryTest, GetDefinition) {
             return std::make_shared<MockTask>(id, type);
         });
 
-    // 기존 정의 가져오기
+    // 기존 정의 조회
     const auto* definition = registry.getDefinition("TaskX");
     ASSERT_NE(definition, nullptr);
     ASSERT_EQ(definition->typeName, "TaskX");
 
-    // 존재하지 않는 정의 가져오기
+    // 미존재 정의 조회
     const auto* nonExistent = registry.getDefinition("NonExistent");
     ASSERT_EQ(nonExistent, nullptr);
 }
 
+// 기본 매개변수를 포함한 태스크 정의 테스트
 TEST(TaskDefinitionRegistryTest, RegisterWithDefaultParams) {
     TaskDefinitionRegistry registry;
 
@@ -117,13 +120,14 @@ TEST(TaskDefinitionRegistryTest, RegisterWithDefaultParams) {
         },
         defaultParams);
 
-    // 정의에 기본 매개변수가 저장되었는지 확인
+    // 기본 매개변수 저장 확인
     const auto* definition = registry.getDefinition("ParameterizedTask");
     ASSERT_NE(definition, nullptr);
     ASSERT_EQ(definition->defaultParams.at("param1"), "value1");
     ASSERT_EQ(definition->defaultParams.at("param2"), "value2");
 }
 
+// 모든 태스크 정의 조회 테스트
 TEST(TaskDefinitionRegistryTest, GetAllDefinitions) {
     TaskDefinitionRegistry registry;
 
@@ -142,10 +146,10 @@ TEST(TaskDefinitionRegistryTest, GetAllDefinitions) {
             return std::make_shared<MockTask>(id, type);
         });
 
-    // 모든 정의 가져오기
+    // 모든 정의 조회
     auto allDefinitions = registry.getAllDefinitions();
 
-    // 3개의 태스크 정의가 있어야 함
+    // 3개 정의 확인
     ASSERT_EQ(allDefinitions.size(), 3);
 
     // 태스크 유형 확인
@@ -159,12 +163,13 @@ TEST(TaskDefinitionRegistryTest, GetAllDefinitions) {
     ASSERT_TRUE(std::find(types.begin(), types.end(), "Task3") != types.end());
 }
 
+// 매개변수를 사용한 태스크 생성 테스트
 TEST(TaskDefinitionRegistryTest, TaskCreationWithParameters) {
     TaskDefinitionRegistry registry;
 
     registry.registerDefinition("ParamTask",
         [](const std::string& id, const std::string& type, const std::map<std::string, std::string>& params) {
-            // 매개변수가 팩토리에 전달되었는지 확인
+            // 팩토리에 매개변수 전달 확인
             EXPECT_EQ(params.at("velocity"), "100");
             EXPECT_EQ(params.at("direction"), "forward");
             return std::make_shared<MockTask>(id, type);
@@ -181,10 +186,11 @@ TEST(TaskDefinitionRegistryTest, TaskCreationWithParameters) {
     ASSERT_EQ(task->getId(), "param_task_1");
 }
 
+// 특수 문자가 포함된 이름의 태스크 정의 테스트
 TEST(TaskDefinitionRegistryTest, RegisterDefinitionWithSpecialCharacters) {
     TaskDefinitionRegistry registry;
 
-    // Task names with special characters
+    // 특수 문자가 포함된 태스크 이름
     registry.registerDefinition("Task-With-Dash",
         [](const std::string& id, const std::string& type, const std::map<std::string, std::string>& params) {
             return std::make_shared<MockTask>(id, type);
@@ -202,16 +208,17 @@ TEST(TaskDefinitionRegistryTest, RegisterDefinitionWithSpecialCharacters) {
     ASSERT_NE(task2, nullptr);
 }
 
+// 동일한 이름으로 태스크 재정의 시 덮어쓰기 테스트
 TEST(TaskDefinitionRegistryTest, ReRegisterDefinitionOverwrites) {
     TaskDefinitionRegistry registry;
 
-    // First registration
+    // 첫 번째 등록
     registry.registerDefinition("OverwriteTask",
         [](const std::string& id, const std::string& type, const std::map<std::string, std::string>& params) {
             return std::make_shared<MockTask>(id, type);
         });
 
-    // Re-register with different factory
+    // 다른 팩토리로 재등록
     registry.registerDefinition("OverwriteTask",
         [](const std::string& id, const std::string& type, const std::map<std::string, std::string>& params) {
             return std::make_shared<MockTask>(id + "_new", type);
@@ -219,11 +226,12 @@ TEST(TaskDefinitionRegistryTest, ReRegisterDefinitionOverwrites) {
 
     auto task = registry.createTask("OverwriteTask", "test_id", "OverwriteTask", {});
 
-    // Should use the new factory
+    // 새 팩토리 사용 확인
     ASSERT_NE(task, nullptr);
     ASSERT_EQ(task->getId(), "test_id_new");
 }
 
+// 많은 수의 매개변수를 사용한 태스크 생성 테스트
 TEST(TaskDefinitionRegistryTest, LargeParameterMap) {
     TaskDefinitionRegistry registry;
 
@@ -233,7 +241,7 @@ TEST(TaskDefinitionRegistryTest, LargeParameterMap) {
             return std::make_shared<MockTask>(id, type);
         });
 
-    // Create a large parameter map
+    // 대규모 파라미터 맵 생성
     std::map<std::string, std::string> largeParams;
     for (int i = 0; i < 100; ++i) {
         largeParams["param_" + std::to_string(i)] = "value_" + std::to_string(i);

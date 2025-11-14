@@ -1,7 +1,6 @@
-// 이 파일은 TaskExecutor 클래스를 테스트합니다.
-// TaskExecutor는 ITask 인터페이스를 구현하는 태스크들을 비동기적으로 실행하고 관리하는 역할을 합니다.
-// 이 테스트 모음은 태스크의 제출, 실행, 취소, 진행률 추적 및 여러 태스크의 동시 실행과 같은
-// 핵심 기능들이 올바르게 작동하는지 검증합니다.
+// TaskExecutor 클래스 테스트.
+// ITask 구현 태스크의 비동기 실행 및 관리 기능 검증.
+// 태스크 제출, 실행, 취소, 진행률 추적, 동시 실행 등 핵심 기능 테스트.
 
 #include "gtest/gtest.h"
 #include "core/taskmanager/TaskExecutor.h"
@@ -56,51 +55,55 @@ private:
     bool should_cancel_;
 };
 
+// 태스크 제출 및 정상 실행 테스트
 TEST(TaskExecutorTest, SubmitAndExecuteTask) {
     TaskExecutor executor;
     auto task = std::make_shared<MockExecutableTask>("task_1", "TestTask");
 
     executor.submit(task);
 
-    // 태스크가 실행될 시간을 줍니다
+    // 태스크 실행 대기
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     ASSERT_EQ(task->getStatus(), TaskStatus::COMPLETED);
     ASSERT_EQ(task->getProgress(), 1.0f);
 }
 
+// 실행 중인 태스크 취소 테스트
 TEST(TaskExecutorTest, CancelRunningTask) {
     TaskExecutor executor;
     auto task = std::make_shared<MockExecutableTask>("task_2", "CancellableTask");
 
     executor.submit(task);
 
-    // 태스크가 시작될 시간을 줍니다
+    // 태스크 시작 대기
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     ASSERT_EQ(task->getStatus(), TaskStatus::RUNNING);
 
     executor.cancel("task_2");
 
-    // 태스크가 취소될 시간을 줍니다
+    // 태스크 취소 대기
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     ASSERT_EQ(task->getStatus(), TaskStatus::CANCELLED);
 }
 
+// 존재하지 않는 태스크 취소 시도 테스트
 TEST(TaskExecutorTest, CancelNonExistentTask) {
     TaskExecutor executor;
     auto task = std::make_shared<MockExecutableTask>("task_3", "AnotherTask");
 
     executor.submit(task);
 
-    // 존재하지 않는 태스크를 취소하려고 시도
+    // 존재하지 않는 태스크 취소 시도
     executor.cancel("non_existent_task");
 
-    // 원래 태스크는 계속 완료되어야 합니다
+    // 기존 태스크는 완료되어야 함
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
     ASSERT_EQ(task->getStatus(), TaskStatus::COMPLETED);
 }
 
+// ID로 태스크 조회 테스트
 TEST(TaskExecutorTest, GetTask) {
     TaskExecutor executor;
     auto task = std::make_shared<MockExecutableTask>("task_4", "RetrievableTask");
@@ -112,11 +115,12 @@ TEST(TaskExecutorTest, GetTask) {
     ASSERT_NE(retrievedTask, nullptr);
     ASSERT_EQ(retrievedTask->getId(), "task_4");
 
-    // 존재하지 않는 태스크를 검색하려고 시도
+    // 존재하지 않는 태스크 검색 시도
     auto nonExistent = executor.getTask("non_existent");
     ASSERT_EQ(nonExistent, nullptr);
 }
 
+// 여러 태스크 동시 실행 테스트
 TEST(TaskExecutorTest, MultipleTasksExecution) {
     TaskExecutor executor;
 
@@ -129,15 +133,16 @@ TEST(TaskExecutorTest, MultipleTasksExecution) {
     executor.submit(task2);
     executor.submit(task3);
 
-    // 모든 태스크가 완료될 때까지 대기
+    // 모든 태스크 완료 대기
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
-    // 모든 태스크가 완료되어야 합니다
+    // 모든 태스크 완료 확인
     ASSERT_EQ(task1->getStatus(), TaskStatus::COMPLETED);
     ASSERT_EQ(task2->getStatus(), TaskStatus::COMPLETED);
     ASSERT_EQ(task3->getStatus(), TaskStatus::COMPLETED);
 }
 
+// 여러 태스크 동시 취소 테스트
 TEST(TaskExecutorTest, CancelMultipleTasks) {
     TaskExecutor executor;
 
@@ -147,21 +152,22 @@ TEST(TaskExecutorTest, CancelMultipleTasks) {
     executor.submit(task1);
     executor.submit(task2);
 
-    // 태스크들이 시작될 시간을 줍니다
+    // 태스크 시작 대기
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     // 두 태스크 모두 취소
     executor.cancel("cancel_multi_1");
     executor.cancel("cancel_multi_2");
 
-    // 취소가 완료될 때까지 대기
+    // 취소 완료 대기
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    // 두 태스크 모두 취소되어야 합니다
+    // 두 태스크 모두 취소 확인
     ASSERT_EQ(task1->getStatus(), TaskStatus::CANCELLED);
     ASSERT_EQ(task2->getStatus(), TaskStatus::CANCELLED);
 }
 
+// 태스크 진행률 추적 테스트
 TEST(TaskExecutorTest, TaskProgressTracking) {
     TaskExecutor executor;
     auto task = std::make_shared<MockExecutableTask>("progress_task", "ProgressTask");
@@ -171,13 +177,14 @@ TEST(TaskExecutorTest, TaskProgressTracking) {
     // 다른 간격으로 진행률 확인
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     float midProgress = task->getProgress();
-    ASSERT_GT(midProgress, 0.0f); // 약간의 진행이 있어야 합니다
+    ASSERT_GT(midProgress, 0.0f); // 진행률 0.0f 초과 확인
 
     std::this_thread::sleep_for(std::chrono::milliseconds(150));
     ASSERT_EQ(task->getStatus(), TaskStatus::COMPLETED);
-    ASSERT_EQ(task->getProgress(), 1.0f); // 완전히 완료되어야 합니다
+    ASSERT_EQ(task->getProgress(), 1.0f); // 진행률 1.0f 확인
 }
 
+// 많은 태스크 동시 실행 스트레스 테스트
 TEST(TaskExecutorTest, ManyTasksStress) {
     TaskExecutor executor;
     const int NUM_TASKS = 50;
@@ -205,6 +212,7 @@ TEST(TaskExecutorTest, ManyTasksStress) {
     ASSERT_EQ(completedCount, NUM_TASKS);
 }
 
+// 완료된 태스크 조회 테스트
 TEST(TaskExecutorTest, RetrieveTaskAfterCompletion) {
     TaskExecutor executor;
     auto task = std::make_shared<MockExecutableTask>("retrieve_after_completion", "RetrievableTask");
@@ -221,6 +229,7 @@ TEST(TaskExecutorTest, RetrieveTaskAfterCompletion) {
     ASSERT_EQ(retrieved->getStatus(), TaskStatus::COMPLETED);
 }
 
+// 존재하지 않는 태스크 조회 테스트
 TEST(TaskExecutorTest, GetNonExistentTask) {
     TaskExecutor executor;
 
@@ -229,6 +238,7 @@ TEST(TaskExecutorTest, GetNonExistentTask) {
     ASSERT_EQ(retrieved, nullptr);
 }
 
+// 이미 취소된 태스크 재취소 시도 테스트
 TEST(TaskExecutorTest, CancelAlreadyCancelledTask) {
     TaskExecutor executor;
     auto task = std::make_shared<MockExecutableTask>("double_cancel", "DoubleCancelTask");
@@ -243,7 +253,7 @@ TEST(TaskExecutorTest, CancelAlreadyCancelledTask) {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     ASSERT_EQ(task->getStatus(), TaskStatus::CANCELLED);
 
-    // 다시 취소 시도 (예외 발생 안 함)
+    // 재취소 시도 (예외 미발생)
     ASSERT_NO_THROW(executor.cancel("double_cancel"));
 }
 

@@ -7,14 +7,21 @@
 
 ## 요약
 
-복잡한 로봇 작업을 일련의 단계적 동작들로 구성하고 실행하는 시스템을 구현합니다. 시스템은 다음을 지원합니다:
-- **순차적/병렬적 실행**: 동작들을 순서대로 또는 동시에 실행
-- **조건부 분기**: 이전 동작 결과에 따른 경로 선택
-- **재시도 및 에러 처리**: 자동 재시도 및 복구 로직
-- **실시간 모니터링**: 시퀀스 실행 진행률 추적 및 제어
-- **확장성**: 플러그인 방식으로 새로운 동작 타입 추가 가능
+로봇 제어를 위한 3계층 시스템(Action, Sequence, Task)을 단계적으로 구현합니다.
 
-설계는 **Phase 1에서 독립적으로 동작**하며, **Phase 2-3에서 TaskManager와 통합**될 수 있도록 계획됨.
+**구현 순서**: Action → Sequence → Task
+- **Phase 1 - Action Layer**: 로봇 동작의 기본 정의 함수 구현
+- **Phase 2 - Sequence Layer**: 여러 Action의 순차/조건부/병렬 실행 조율
+- **Phase 3 - Task Layer**: Action/Sequence를 포함하며 주기적/트리거 방식 실행 지원
+
+각 계층은 독립적으로 테스트 가능하며, 다음 계층은 이전 계층을 기반으로 구축됩니다.
+
+**주요 기능**:
+- **Action**: 타임아웃, 취소, 에러 처리
+- **Sequence**: 순차/병렬/조건부 실행, 재시도, 모니터링
+- **Task**: 단일 실행/주기적 실행/트리거 실행, TaskManager 통합
+
+**Mission**: Task 완료 후 별도 구현 예정 (이 사양에 포함되지 않음)
 
 ## 기술 컨텍스트
 
@@ -39,10 +46,18 @@
 
 *GATE: 0단계 연구 시작 전에 반드시 통과해야 합니다. 1단계 설계 후 다시 확인합니다.*
 
-- **실시간성 보장**: ✅ 동작 실행 엔진은 비동기 논블로킹 설계로 제어 루프 영향 최소화. 각 동작은 1ms 이내의 오버헤드만 생성. 타임아웃 체크는 경량 타이머 기반.
+- **단계적 구현**: ✅ Action → Sequence → Task 순서로 구현. 각 단계 완료 후 다음 단계 시작. 각 계층은 독립적으로 테스트 가능.
+- **실시간성 보장**: ✅ Action 실행은 1ms 이내 오버헤드. Task 주기적 실행은 별도 스레드에서 관리. 타임아웃 체크는 경량 타이머 기반.
 - **신뢰성 및 안전성**: ✅ RAII 원칙 적용 (shared_ptr, unique_ptr 사용), std::any를 통한 타입 안전성 보장, 스레드 안전성을 위해 뮤텍스 기반 동기화.
-- **테스트 주도 개발**: ✅ 각 컴포넌트별 단위 테스트 (ExecutionContext, SequenceRegistry, ActionExecutor, ConditionEvaluator 등). 통합 테스트는 SequenceEngine으로 수행.
-- **모듈식 설계**: ✅ IAction, IConditionProvider, IActionFactory 인터페이스를 통한 느슨한 결합. Phase 1에서 독립적으로 동작하며 Phase 2에서 TaskManager와 통합.
+- **테스트 주도 개발**: ✅
+  - Phase 1: Action 컴포넌트 단위 테스트 + 통합 테스트
+  - Phase 2: Sequence 컴포넌트 단위 테스트 + 통합 테스트 (Action 기반)
+  - Phase 3: Task 컴포넌트 단위 테스트 + 통합 테스트 (Sequence 기반)
+- **모듈식 설계**: ✅
+  - Phase 1: IAction, IActionFactory 인터페이스
+  - Phase 2: ISequenceEngine, IConditionProvider 인터페이스
+  - Phase 3: ITask, ITaskExecutor, ITriggerProvider 인터페이스
+  - 각 계층은 느슨한 결합으로 독립적 개발 가능
 - **한글 문서화**: ✅ 모든 클래스, 메서드, 상수에 한글 주석 포함. 설계 문서는 한글로 작성.
 - **버전 관리**: ✅ 현재 spec 버전 1.0.0. 구현 후 1.0.0 태그로 관리. API 변경 시 시맨틱 버전 준수.
 

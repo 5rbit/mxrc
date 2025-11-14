@@ -1,199 +1,187 @@
-#include "ConditionEvaluator.h"
+#include "core/sequence/core/ConditionEvaluator.h"
+#include <sstream>
 #include <algorithm>
-#include <cctype>
-#include <spdlog/spdlog.h>
+#include <any>
 
 namespace mxrc::core::sequence {
 
+using namespace mxrc::core::action;
+
 bool ConditionEvaluator::evaluate(
     const std::string& expression,
-    const ExecutionContext& context) {
-
-    auto logger = spdlog::get("mxrc");
-
-    lastError_.clear();
-
-    if (expression.empty()) {
-        lastError_ = "Expression is empty";
-        return false;
-    }
-
-    try {
-        std::vector<std::string> tokens = tokenize(expression);
-
-        if (tokens.empty()) {
-            lastError_ = "No tokens in expression";
-            return false;
+    const ExecutionContext& context) const {
+    
+    // 표현식 파싱: "variable operator value"
+    std::string expr = trim(expression);
+    
+    // 연산자 찾기 (==, !=, >=, <=, >, <)
+    std::string op;
+    size_t opPos = std::string::npos;
+    
+    // 2글자 연산자 먼저 체크
+    for (const auto& candidate : {"==", "!=", ">=", "<="}) {
+        opPos = expr.find(candidate);
+        if (opPos != std::string::npos) {
+            op = candidate;
+            break;
         }
-
-        // 간단한 재귀적 평가 (AND/OR 우선순위)
-        // 이 구현은 기본 조건 평가만 지원
-        // 예: "a == 10" "a > 5 AND b < 20" "a == 10 OR b == 20"
-
-        bool result = false;
-        std::string currentOp = "AND";  // 첫 번째 토큰은 비교식
-        size_t i = 0;
-
-        while (i < tokens.size()) {
-            // 비교식 평가
-            if (i + 2 < tokens.size()) {
-                std::string varName = tokens[i];
-                std::string op = tokens[i + 1];
-                std::string varValue = tokens[i + 2];
-
-                // 변수 조회
-                std::any leftValue = context.getVariable(varName);
-                if (!leftValue.has_value()) {
-                    // 숫자 리터럴일 수 있음
-                    leftValue = parseValue(varName);
-                }
-
-                std::any rightValue = parseValue(varValue);
-
-                bool comparison = performComparison(leftValue, op, rightValue);
-
-                // AND/OR 로직
-                if (i == 0) {
-                    result = comparison;
-                } else {
-                    if (currentOp == "AND") {
-                        result = result && comparison;
-                    } else if (currentOp == "OR") {
-                        result = result || comparison;
-                    }
-                }
-
-                i += 3;
-
-                // 다음 논리 연산자 확인
-                if (i < tokens.size()) {
-                    std::string nextToken = tokens[i];
-                    if (nextToken == "AND" || nextToken == "OR") {
-                        currentOp = nextToken;
-                        i++;
-                    }
-                }
-            } else {
-                lastError_ = "Invalid expression format";
-                return false;
+    }
+    
+    // 1글자 연산자 체크
+    if (op.empty()) {
+        for (const auto& candidate : {">", "<"}) {
+            opPos = expr.find(candidate);
+            if (opPos != std::string::npos) {
+                op = candidate;
+                break;
             }
         }
+    }
+    
+    if (op.empty() || opPos == std::string::npos) {
+        Logger::get()->error("Invalid condition expression: {}", expression);
+        throw std::runtime_error("Invalid condition expression: " + expression);
+    }
+    
+    // 좌변과 우변 추출
+    std::string left = trim(expr.substr(0, opPos));
+    std::string right = trim(expr.substr(opPos + op.length()));
+    
+    // 좌변이 변수명이면 컨텍스트에서 값 조회
+    std::string leftValue = getVariableAsString(left, context);
+    
+    // 비교 수행
+    if (isNumber(leftValue) && isNumber(right)) {
+        return compareNumbers(leftValue, op, right);
+    } else {
+        return compareStrings(leftValue, op, right);
+    }
+}
 
-        logger->debug("조건 평가: expression={}, result={}", expression, result);
-        return result;
+std::string ConditionEvaluator::trim(const std::string& str) const {
+    auto start = str.find_first_not_of(" \t\n\r");
+    auto end = str.find_last_not_of(" \t\n\r");
+    
+    if (start == std::string::npos) {
+        return "";
+    }
+    
+    return str.substr(start, end - start + 1);
+}
 
+std::string ConditionEvaluator::getVariableAsString(
+    const std::string& varName,
+    const ExecutionContext& context) const {
+    
+    auto value = context.getVariable(varName);
+    if (!value.has_value()) {
+        // 변수가 없으면 리터럴 값으로 간주
+        return varName;
+    }
+    
+    // std::any에서 값 추출 시도
+    try {
+        // int 시도
+        try {
+            return std::to_string(std::any_cast<int>(value.value()));
+        } catch (...) {}
+        
+        // long 시도
+        try {
+            return std::to_string(std::any_cast<long>(value.value()));
+        } catch (...) {}
+        
+        // double 시도
+        try {
+            return std::to_string(std::any_cast<double>(value.value()));
+        } catch (...) {}
+        
+        // float 시도
+        try {
+            return std::to_string(std::any_cast<float>(value.value()));
+        } catch (...) {}
+        
+        // bool 시도
+        try {
+            return std::any_cast<bool>(value.value()) ? "true" : "false";
+        } catch (...) {}
+        
+        // string 시도
+        try {
+            return std::any_cast<std::string>(value.value());
+        } catch (...) {}
+        
+        // const char* 시도
+        try {
+            return std::string(std::any_cast<const char*>(value.value()));
+        } catch (...) {}
+        
+        // 변환 실패 시 변수명 그대로 반환
+        return varName;
+        
     } catch (const std::exception& e) {
-        lastError_ = std::string("Exception: ") + e.what();
-        logger->error("조건 평가 예외: {}", lastError_);
-        return false;
+        Logger::get()->warn("Failed to cast variable '{}': {}", varName, e.what());
+        return varName;
     }
 }
 
-bool ConditionEvaluator::isValidExpression(const std::string& expression) const {
-    if (expression.empty()) {
-        return false;
-    }
-
-    // 기본 유효성 검사
-    std::vector<std::string> tokens = tokenize(expression);
-    return !tokens.empty();
-}
-
-std::vector<std::string> ConditionEvaluator::tokenize(const std::string& expression) const {
-    std::vector<std::string> tokens;
-    std::string token;
-
-    for (size_t i = 0; i < expression.length(); ++i) {
-        char c = expression[i];
-
-        if (std::isspace(c)) {
-            if (!token.empty()) {
-                tokens.push_back(token);
-                token.clear();
-            }
-        } else {
-            token += c;
-        }
-    }
-
-    if (!token.empty()) {
-        tokens.push_back(token);
-    }
-
-    return tokens;
-}
-
-bool ConditionEvaluator::performComparison(
-    const std::any& left,
+bool ConditionEvaluator::compareStrings(
+    const std::string& left,
     const std::string& op,
-    const std::any& right) const {
-
-    // 숫자 비교
-    if (isNumeric(left) && isNumeric(right)) {
-        double leftVal = toDouble(left);
-        double rightVal = toDouble(right);
-
-        if (op == "==") return leftVal == rightVal;
-        if (op == "!=") return leftVal != rightVal;
-        if (op == "<") return leftVal < rightVal;
-        if (op == ">") return leftVal > rightVal;
-        if (op == "<=") return leftVal <= rightVal;
-        if (op == ">=") return leftVal >= rightVal;
+    const std::string& right) const {
+    
+    if (op == "==") {
+        return left == right;
+    } else if (op == "!=") {
+        return left != right;
+    } else if (op == ">") {
+        return left > right;
+    } else if (op == "<") {
+        return left < right;
+    } else if (op == ">=") {
+        return left >= right;
+    } else if (op == "<=") {
+        return left <= right;
     }
-
-    // 문자열 비교
-    try {
-        std::string leftStr = left.has_value() ? std::any_cast<std::string>(left) : "";
-        std::string rightStr = right.has_value() ? std::any_cast<std::string>(right) : "";
-
-        if (op == "==") return leftStr == rightStr;
-        if (op == "!=") return leftStr != rightStr;
-    } catch (...) {
-        // 타입 변환 실패
-    }
-
+    
     return false;
 }
 
-std::any ConditionEvaluator::parseValue(const std::string& str) const {
-    // 숫자인지 확인
-    try {
-        size_t idx;
-        double value = std::stod(str, &idx);
-        if (idx == str.length()) {
-            return value;
-        }
-    } catch (...) {
-        // 숫자가 아님
+bool ConditionEvaluator::compareNumbers(
+    const std::string& left,
+    const std::string& op,
+    const std::string& right) const {
+    
+    double leftNum = std::stod(left);
+    double rightNum = std::stod(right);
+    
+    if (op == "==") {
+        return std::abs(leftNum - rightNum) < 1e-9;
+    } else if (op == "!=") {
+        return std::abs(leftNum - rightNum) >= 1e-9;
+    } else if (op == ">") {
+        return leftNum > rightNum;
+    } else if (op == "<") {
+        return leftNum < rightNum;
+    } else if (op == ">=") {
+        return leftNum >= rightNum;
+    } else if (op == "<=") {
+        return leftNum <= rightNum;
     }
-
-    // 문자열로 반환
-    return str;
+    
+    return false;
 }
 
-bool ConditionEvaluator::isNumeric(const std::any& value) const {
-    return value.type() == typeid(int) ||
-           value.type() == typeid(float) ||
-           value.type() == typeid(double) ||
-           value.type() == typeid(long) ||
-           value.type() == typeid(long long);
-}
-
-double ConditionEvaluator::toDouble(const std::any& value) const {
-    if (value.type() == typeid(int)) {
-        return static_cast<double>(std::any_cast<int>(value));
-    } else if (value.type() == typeid(float)) {
-        return static_cast<double>(std::any_cast<float>(value));
-    } else if (value.type() == typeid(double)) {
-        return std::any_cast<double>(value);
-    } else if (value.type() == typeid(long)) {
-        return static_cast<double>(std::any_cast<long>(value));
-    } else if (value.type() == typeid(long long)) {
-        return static_cast<double>(std::any_cast<long long>(value));
+bool ConditionEvaluator::isNumber(const std::string& str) const {
+    if (str.empty()) {
+        return false;
     }
-
-    throw std::bad_any_cast();
+    
+    std::istringstream iss(str);
+    double d;
+    iss >> std::noskipws >> d;
+    
+    return iss.eof() && !iss.fail();
 }
 
 } // namespace mxrc::core::sequence
-

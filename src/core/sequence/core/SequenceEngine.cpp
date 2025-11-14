@@ -1,723 +1,345 @@
-#include "SequenceEngine.h"
-#include <spdlog/spdlog.h>
-#include <chrono>
+#include "core/sequence/core/SequenceEngine.h"
 #include <thread>
-#include <mutex>
-#include <algorithm>
-#include <ctime>
+#include <chrono>
 
 namespace mxrc::core::sequence {
 
-int SequenceEngine::executionCounter_ = 0;
+using namespace mxrc::core::action;
 
 SequenceEngine::SequenceEngine(
-    std::shared_ptr<SequenceRegistry> registry,
-    std::shared_ptr<IActionFactory> actionFactory)
-    : registry_(registry),
-      actionFactory_(actionFactory),
-      actionExecutor_(std::make_shared<ActionExecutor>()),
-      conditionEvaluator_(std::make_shared<ConditionEvaluator>()),
-      monitor_(std::make_shared<ExecutionMonitor>()) {
-
-    auto logger = spdlog::get("mxrc");
-    if (logger) {
-        logger->info("SequenceEngine 초기화됨");
-    }
+    std::shared_ptr<ActionFactory> factory,
+    std::shared_ptr<ActionExecutor> executor
+) : factory_(factory),
+    executor_(executor),
+    conditionEvaluator_(std::make_unique<ConditionEvaluator>()),
+    retryHandler_(std::make_unique<RetryHandler>()) {
+    Logger::get()->info("SequenceEngine initialized");
 }
 
-std::string SequenceEngine::execute(
-    const std::string& sequenceId,
-    const std::map<std::string, std::any>& parameters) {
+SequenceResult SequenceEngine::execute(
+    const SequenceDefinition& definition,
+    ExecutionContext& context
+) {
+    Logger::get()->info("Executing sequence: {} (name: {})", definition.id, definition.name);
 
-    auto logger = spdlog::get("mxrc");
+    auto& state = getOrCreateState(definition.id);
+    state.status = SequenceStatus::RUNNING;
+    state.totalSteps = definition.steps.size();
+    state.completedSteps = 0;
+    state.cancelRequested = false;
+    state.pauseRequested = false;
 
-    // 시퀀스 정의 조회
-    auto definition = registry_->getSequence(sequenceId);
-    if (!definition) {
-        if (logger) {
-            logger->error("시퀀스를 찾을 수 없음: {}", sequenceId);
-        }
-        throw std::runtime_error("Sequence not found: " + sequenceId);
-    }
-
-    // 실행 ID 생성
-    std::string executionId = generateExecutionId();
-    if (logger) {
-        logger->info("시퀀스 실행 시작: id={}, sequence={}", executionId, sequenceId);
-    }
-
-    // 실행 컨텍스트 생성
-    auto context = std::make_shared<ExecutionContext>();
-    context->setExecutionId(executionId);
-
-    // 파라미터를 컨텍스트에 설정
-    for (const auto& param : parameters) {
-        context->setVariable(param.first, param.second);
-    }
-
-    // 실행 추적 저장
-    executions_[executionId] = context;
-    executionState_[executionId] = {true, false};  // running, !paused
-
-    // 모니터링 시작
-    monitor_->startExecution(
-        executionId,
-        sequenceId,
-        definition->actionIds.size());
+    auto startTime = std::chrono::steady_clock::now();
 
     // 순차 실행
-    bool success = executeSequentially(definition, context, executionId);
-
-    // 실행 종료
-    SequenceStatus finalStatus = success ? SequenceStatus::COMPLETED : SequenceStatus::FAILED;
-    monitor_->endExecution(executionId, finalStatus);
-    executionState_[executionId].first = false;  // running = false
-
-    if (logger) {
-        logger->info(
-            "시퀀스 실행 완료: id={}, status={}, success={}",
-            executionId, toString(finalStatus), success);
-    }
-
-    return executionId;
-}
-
-bool SequenceEngine::pause(const std::string& executionId) {
-    auto it = executionState_.find(executionId);
-    if (it != executionState_.end() && it->second.first) {
-        it->second.second = true;  // paused = true
-
-        auto logger = spdlog::get("mxrc");
-        if (logger) {
-            logger->info("시퀀스 일시정지: {}", executionId);
-        }
-        return true;
-    }
-    return false;
-}
-
-bool SequenceEngine::resume(const std::string& executionId) {
-    auto it = executionState_.find(executionId);
-    if (it != executionState_.end() && it->second.first && it->second.second) {
-        it->second.second = false;  // paused = false
-
-        auto logger = spdlog::get("mxrc");
-        if (logger) {
-            logger->info("시퀀스 재개: {}", executionId);
-        }
-        return true;
-    }
-    return false;
-}
-
-bool SequenceEngine::cancel(const std::string& executionId) {
-    auto it = executionState_.find(executionId);
-    if (it != executionState_.end()) {
-        it->second.first = false;  // running = false
-
-        auto logger = spdlog::get("mxrc");
-        if (logger) {
-            logger->info("시퀀스 취소: {}", executionId);
-        }
-
-        // 모니터링 업데이트
-        monitor_->endExecution(executionId, SequenceStatus::CANCELLED);
-        return true;
-    }
-    return false;
-}
-
-SequenceExecutionResult SequenceEngine::getStatus(const std::string& executionId) const {
-    return monitor_->getExecutionStatus(executionId);
-}
-
-std::vector<std::string> SequenceEngine::getRunningExecutions() const {
-    return monitor_->getRunningExecutions();
-}
-
-std::vector<std::string> SequenceEngine::getCompletedExecutions() const {
-    return monitor_->getCompletedExecutions();
-}
-
-std::shared_ptr<ExecutionContext> SequenceEngine::getExecutionContext(
-    const std::string& executionId) const {
-
-    auto it = executions_.find(executionId);
-    if (it != executions_.end()) {
-        return it->second;
-    }
-    return nullptr;
-}
-
-std::string SequenceEngine::generateExecutionId() {
-    return "exec_" + std::to_string(std::time(nullptr)) + "_" +
-           std::to_string(++executionCounter_);
-}
-
-bool SequenceEngine::executeSequentially(
-    const std::shared_ptr<const SequenceDefinition>& definition,
-    std::shared_ptr<ExecutionContext> context,
-    const std::string& executionId) {
-
-    auto logger = spdlog::get("mxrc");
-
-    if (!definition || definition->actionIds.empty()) {
-        if (logger) {
-            logger->error("시퀀스 정의가 유효하지 않음");
-        }
-        return false;
-    }
-
-    int totalActions = definition->actionIds.size();
-    bool allSuccess = true;
-
-    for (size_t i = 0; i < definition->actionIds.size(); ++i) {
-        // 취소 요청 확인
-        auto stateIt = executionState_.find(executionId);
-        if (stateIt != executionState_.end() && !stateIt->second.first) {
-            if (logger) {
-                logger->info("시퀀스 실행 중단됨: {}", executionId);
-            }
-            return false;
-        }
-
-        const std::string& itemId = definition->actionIds[i];
-
-        if (logger) {
-            logger->debug("항목 실행: {} ({}/{})", itemId, i + 1, totalActions);
-        }
-
-        // 병렬 분기 확인
-        const ParallelBranch* parallelBranch = getParallelBranch(itemId);
-        if (parallelBranch) {
-            if (logger) {
-                logger->debug("병렬 분기 감지: {}", itemId);
-            }
-            // 병렬 분기 실행
-            bool parallelSuccess = executeParallel(*parallelBranch, context, executionId);
-            if (!parallelSuccess) {
-                allSuccess = false;
-            }
-        } else {
-            // 조건부 분기 확인
-            const ConditionalBranch* branch = getBranch(itemId);
-            if (branch) {
-                if (logger) {
-                    logger->debug("조건부 분기 감지: {}", itemId);
-                }
-                // 분기 실행
-                bool branchSuccess = executeBranch(*branch, context, executionId);
-                if (!branchSuccess) {
-                    allSuccess = false;
-                }
-            } else {
-                // 일반 동작 실행
-                if (logger) {
-                    logger->debug("동작 실행: {} ({}/{})", itemId, i + 1, totalActions);
-                }
-
-                // 동작 생성
-                std::map<std::string, std::string> params;  // 기본 빈 파라미터
-                auto action = actionFactory_->createAction(itemId, itemId, params);
-
-                if (!action) {
-                    if (logger) {
-                        logger->error("동작 생성 실패: {}", itemId);
-                    }
-                    monitor_->logActionExecution(
-                        executionId, itemId, ActionStatus::FAILED,
-                        "Failed to create action");
-                    allSuccess = false;
-                    continue;
-                }
-
-                // 동작 실행
-                bool actionSuccess = actionExecutor_->execute(
-                    action,
-                    *context,
-                    0,  // no timeout
-                    RetryPolicy::noRetry());  // no retry
-
-                // 로깅
-                ActionStatus status = actionSuccess ? ActionStatus::COMPLETED : ActionStatus::FAILED;
-                monitor_->logActionExecution(
-                    executionId,
-                    itemId,
-                    status,
-                    actionSuccess ? "" : actionExecutor_->getLastErrorMessage());
-
-                if (!actionSuccess) {
-                    allSuccess = false;
-                    if (logger) {
-                        logger->warn("동작 실패: {}", itemId);
-                    }
-                } else {
-                    if (logger) {
-                        logger->info("동작 완료: {}", itemId);
-                    }
-                }
-            }
-        }
-
-        // 진행률 업데이트
-        float progress = static_cast<float>(i + 1) / totalActions;
-        monitor_->updateProgress(executionId, progress);
-    }
-
-    return allSuccess;
-}
-
-void SequenceEngine::registerBranch(const ConditionalBranch& branch) {
-    auto logger = spdlog::get("mxrc");
-    if (logger) {
-        logger->info("조건부 분기 등록: id={}, condition={}", branch.id, branch.condition);
-    }
-    branches_[branch.id] = branch;
-}
-
-void SequenceEngine::registerParallelBranch(const ParallelBranch& branch) {
-    auto logger = spdlog::get("mxrc");
-    if (logger) {
-        logger->info("병렬 분기 등록: id={}, branches.size={}", branch.id, branch.branches.size());
-    }
-    parallelBranches_[branch.id] = branch;
-}
-
-const ConditionalBranch* SequenceEngine::getBranch(const std::string& branchId) const {
-    auto it = branches_.find(branchId);
-    if (it != branches_.end()) {
-        return &it->second;
-    }
-    return nullptr;
-}
-
-const ParallelBranch* SequenceEngine::getParallelBranch(const std::string& branchId) const {
-    auto it = parallelBranches_.find(branchId);
-    if (it != parallelBranches_.end()) {
-        return &it->second;
-    }
-    return nullptr;
-}
-
-bool SequenceEngine::executeBranch(
-    const ConditionalBranch& branch,
-    std::shared_ptr<ExecutionContext> context,
-    const std::string& executionId) {
-
-    auto logger = spdlog::get("mxrc");
-
-    // 조건 평가
-    bool conditionResult = false;
-    try {
-        conditionResult = conditionEvaluator_->evaluate(branch.condition, *context);
-        if (logger) {
-            logger->debug("조건 평가 결과: branch={}, condition={}, result={}",
-                branch.id, branch.condition, conditionResult);
-        }
-    } catch (const std::exception& ex) {
-        if (logger) {
-            logger->error("조건 평가 실패: branch={}, error={}", branch.id, ex.what());
-        }
-        return false;
-    }
-
-    // 조건 결과에 따라 적절한 동작 실행
-    const auto& actionsToExecute = conditionResult ? branch.thenActions : branch.elseActions;
-
-    if (logger) {
-        logger->info("분기 실행: id={}, path={}, actions={}",
-            branch.id, conditionResult ? "THEN" : "ELSE", actionsToExecute.size());
-    }
-
-    bool allSuccess = true;
-
-    for (const auto& actionId : actionsToExecute) {
-        // 취소 요청 확인
-        auto stateIt = executionState_.find(executionId);
-        if (stateIt != executionState_.end() && !stateIt->second.first) {
-            if (logger) {
-                logger->info("분기 실행 중단됨: {}", executionId);
-            }
-            return false;
-        }
-
-        if (logger) {
-            logger->debug("분기 내 동작 실행: branch={}, action={}", branch.id, actionId);
-        }
-
-        // 동작 생성
-        std::map<std::string, std::string> params;
-        auto action = actionFactory_->createAction(actionId, actionId, params);
-
-        if (!action) {
-            if (logger) {
-                logger->error("동작 생성 실패: {}", actionId);
-            }
-            monitor_->logActionExecution(
-                executionId, actionId, ActionStatus::FAILED,
-                "Failed to create action");
-            allSuccess = false;
-            continue;
-        }
-
-        // 동작 실행
-        bool actionSuccess = actionExecutor_->execute(
-            action,
-            *context,
-            0,  // no timeout
-            RetryPolicy::noRetry());
-
-        // 로깅
-        ActionStatus status = actionSuccess ? ActionStatus::COMPLETED : ActionStatus::FAILED;
-        monitor_->logActionExecution(
-            executionId,
-            actionId,
-            status,
-            actionSuccess ? "" : actionExecutor_->getLastErrorMessage());
-
-        if (!actionSuccess) {
-            allSuccess = false;
-            if (logger) {
-                logger->warn("동작 실패: {}", actionId);
-            }
-        } else {
-            if (logger) {
-                logger->info("동작 완료: {}", actionId);
-            }
-        }
-    }
-
-    return allSuccess;
-}
-
-bool SequenceEngine::executeParallel(
-    const ParallelBranch& branch,
-    std::shared_ptr<ExecutionContext> context,
-    const std::string& executionId) {
-
-    auto logger = spdlog::get("mxrc");
-
-    if (logger) {
-        logger->info("병렬 분기 실행: id={}, branches.size={}",
-            branch.id, branch.branches.size());
-    }
-
-    // 취소 요청 확인
-    auto stateIt = executionState_.find(executionId);
-    if (stateIt != executionState_.end() && !stateIt->second.first) {
-        if (logger) {
-            logger->info("병렬 분기 실행 중단됨: {}", executionId);
-        }
-        return false;
-    }
-
-    // 각 분기를 별도 스레드에서 실행
-    std::vector<std::thread> threads;
-    std::vector<bool> branchResults(branch.branches.size(), false);
-    std::vector<std::mutex> result_mutexes(branch.branches.size());
-
-    for (size_t i = 0; i < branch.branches.size(); ++i) {
-        threads.emplace_back(
-            [this, &branch, context, executionId, i, &branchResults, &result_mutexes]() {
-                bool result = executeActionSequence(
-                    branch.branches[i], context, executionId);
-                {
-                    std::lock_guard<std::mutex> lock(result_mutexes[i]);
-                    branchResults[i] = result;
-                }
-            });
-    }
-
-    // 모든 스레드 완료 대기
-    for (auto& thread : threads) {
-        if (thread.joinable()) {
-            thread.join();
-        }
-    }
-
-    if (logger) {
-        logger->info("병렬 분기 완료: id={}", branch.id);
-    }
-
-    // 모든 분기 성공 확인
-    bool allSuccess = true;
-    for (bool result : branchResults) {
-        if (!result) {
-            allSuccess = false;
-            break;
-        }
-    }
-
-    return allSuccess;
-}
-
-bool SequenceEngine::executeActionSequence(
-    const std::vector<std::string>& actionIds,
-    std::shared_ptr<ExecutionContext> context,
-    const std::string& executionId) {
-
-    auto logger = spdlog::get("mxrc");
-
-    if (actionIds.empty()) {
-        return true;
-    }
-
-    bool allSuccess = true;
-
-    for (const auto& actionId : actionIds) {
-        // 취소 요청 확인
-        auto stateIt = executionState_.find(executionId);
-        if (stateIt != executionState_.end() && !stateIt->second.first) {
-            if (logger) {
-                logger->info("액션 시퀀스 실행 중단됨: {}", executionId);
-            }
-            return false;
-        }
-
-        if (logger) {
-            logger->debug("병렬 액션 실행: {}", actionId);
-        }
-
-        // 동작 생성
-        std::map<std::string, std::string> params;
-        auto action = actionFactory_->createAction(actionId, actionId, params);
-
-        if (!action) {
-            if (logger) {
-                logger->error("병렬 액션 생성 실패: {}", actionId);
-            }
-            {
-                std::lock_guard<std::mutex> lock(monitorMutex_);
-                monitor_->logActionExecution(
-                    executionId, actionId, ActionStatus::FAILED,
-                    "Failed to create action");
-            }
-            allSuccess = false;
-            continue;
-        }
-
-        // 동작 실행
-        bool actionSuccess = actionExecutor_->execute(
-            action,
-            *context,
-            0,  // no timeout
-            RetryPolicy::noRetry());
-
-        // 로깅
-        ActionStatus status = actionSuccess ? ActionStatus::COMPLETED : ActionStatus::FAILED;
-        {
-            std::lock_guard<std::mutex> lock(monitorMutex_);
-            monitor_->logActionExecution(
-                executionId,
-                actionId,
-                status,
-                actionSuccess ? "" : actionExecutor_->getLastErrorMessage());
-        }
-
-        if (!actionSuccess) {
-            allSuccess = false;
-            if (logger) {
-                logger->warn("병렬 액션 실패: {}", actionId);
-            }
-        } else {
-            if (logger) {
-                logger->info("병렬 액션 완료: {}", actionId);
-            }
-        }
-    }
-
-    return allSuccess;
-}
-
-TemplateInstantiationResult SequenceEngine::instantiateTemplate(
-    const std::string& templateId,
-    const std::map<std::string, std::any>& parameters,
-    const std::string& instanceName) {
-
-    auto logger = spdlog::get("mxrc");
-
-    // 템플릿 조회
-    auto templatePtr = registry_->getTemplate(templateId);
-    if (!templatePtr) {
-        if (logger) {
-            logger->error("템플릿을 찾을 수 없음: id={}", templateId);
-        }
-        return {false, "", "Template not found: " + templateId, {}};
-    }
-
-    // 파라미터 검증
-    auto [valid, errors] = validateTemplateParameters(templatePtr, parameters);
-    if (!valid) {
-        if (logger) {
-            logger->error("템플릿 파라미터 검증 실패: template={}, errors={}", templateId, errors.size());
-        }
-        return {false, "", "Parameter validation failed", errors};
-    }
-
-    // 인스턴스 ID 생성
-    std::string instanceId = "inst_" + std::to_string(std::time(nullptr)) + "_" +
-                            std::to_string(++executionCounter_);
-
-    // 인스턴스 이름 (미제공 시 기본값)
-    std::string finalInstanceName = instanceName.empty() ?
-        templatePtr->name + "_" + instanceId : instanceName;
-
-    // 파라미터 치환하여 액션 ID 생성
-    std::vector<std::string> instantiatedActionIds;
-    for (const auto& actionId : templatePtr->actionIds) {
-        std::string substituted = substituteParameters(actionId, parameters);
-        instantiatedActionIds.push_back(substituted);
-    }
-
-    // 새 시퀀스 정의 생성
-    auto sequenceDef = std::make_shared<SequenceDefinition>();
-    sequenceDef->id = instanceId;
-    sequenceDef->name = finalInstanceName;
-    sequenceDef->version = "1.0.0";
-    sequenceDef->description = "Instantiated from template: " + templateId;
-    sequenceDef->actionIds = instantiatedActionIds;
-    sequenceDef->metadata = templatePtr->metadata;
-
-    // 템플릿 인스턴스 생성 및 저장
-    SequenceTemplateInstance instance;
-    instance.templateId = templateId;
-    instance.instanceId = instanceId;
-    instance.instanceName = finalInstanceName;
-    instance.parameters = parameters;
-    instance.sequenceDefinition = sequenceDef;
-    instance.createdAtMs = std::chrono::system_clock::now().time_since_epoch().count() / 1000000;
-
-    try {
-        registry_->saveTemplateInstance(instance);
-        registry_->registerSequence(*sequenceDef);
-
-        if (logger) {
-            logger->info(
-                "템플릿 인스턴스화 완료: template={}, instance={}, actions={}",
-                templateId, instanceId, instantiatedActionIds.size());
-        }
-
-        return {true, instanceId, "", {}};
-    } catch (const std::exception& ex) {
-        if (logger) {
-            logger->error("템플릿 인스턴스화 중 오류: template={}, error={}",
-                templateId, ex.what());
-        }
-        return {false, "", std::string(ex.what()), {}};
-    }
-}
-
-std::string SequenceEngine::executeTemplate(
-    const std::string& templateId,
-    const std::map<std::string, std::any>& parameters,
-    const std::string& instanceName) {
-
-    // 템플릿 인스턴스화
-    auto result = instantiateTemplate(templateId, parameters, instanceName);
-    if (!result.success) {
-        auto logger = spdlog::get("mxrc");
-        if (logger) {
-            logger->error("템플릿 실행 실패: template={}, error={}", templateId, result.errorMessage);
-        }
-        return "";
-    }
-
-    // 인스턴스 ID로 시퀀스 실행
-    try {
-        return execute(result.instanceId, parameters);
-    } catch (const std::exception& ex) {
-        auto logger = spdlog::get("mxrc");
-        if (logger) {
-            logger->error("템플릿 시퀀스 실행 실패: instance={}, error={}",
-                result.instanceId, ex.what());
-        }
-        return "";
-    }
-}
-
-std::pair<bool, std::vector<std::string>> SequenceEngine::validateTemplateParameters(
-    const std::shared_ptr<const SequenceTemplate>& templatePtr,
-    const std::map<std::string, std::any>& parameters) {
-
-    std::vector<std::string> errors;
-
-    if (!templatePtr) {
-        errors.push_back("Template is null");
-        return {false, errors};
-    }
-
-    // 필수 파라미터 확인
-    for (const auto& param : templatePtr->parameters) {
-        if (param.required) {
-            auto it = parameters.find(param.name);
-            if (it == parameters.end()) {
-                errors.push_back("Required parameter missing: " + param.name);
-            }
-        }
-    }
-
-    // 알려지지 않은 파라미터 확인 (경고 수준, 에러 아님)
-    std::vector<std::string> validParamNames;
-    for (const auto& param : templatePtr->parameters) {
-        validParamNames.push_back(param.name);
-    }
-
-    for (const auto& [paramName, _] : parameters) {
-        auto it = std::find(validParamNames.begin(), validParamNames.end(), paramName);
-        if (it == validParamNames.end()) {
-            // 알려지지 않은 파라미터는 무시 (경고만 발생)
-            auto logger = spdlog::get("mxrc");
-            if (logger) {
-                logger->warn("Unknown template parameter: {}", paramName);
-            }
-        }
-    }
-
-    return {errors.empty(), errors};
-}
-
-std::string SequenceEngine::anyToString(const std::any& value) {
-    try {
-        if (value.type() == typeid(int)) {
-            return std::to_string(std::any_cast<int>(value));
-        } else if (value.type() == typeid(float)) {
-            return std::to_string(std::any_cast<float>(value));
-        } else if (value.type() == typeid(double)) {
-            return std::to_string(std::any_cast<double>(value));
-        } else if (value.type() == typeid(bool)) {
-            return std::any_cast<bool>(value) ? "true" : "false";
-        } else if (value.type() == typeid(std::string)) {
-            return std::any_cast<std::string>(value);
-        } else if (value.type() == typeid(const char*)) {
-            return std::string(std::any_cast<const char*>(value));
-        }
-    } catch (...) {
-        return "";
-    }
-    return "";
-}
-
-std::string SequenceEngine::substituteParameters(
-    const std::string& actionId,
-    const std::map<std::string, std::any>& parameters) {
-
-    std::string result = actionId;
-
-    // 파라미터 치환: ${paramName} -> 파라미터 값
-    for (const auto& [paramName, paramValue] : parameters) {
-        std::string placeholder = "${" + paramName + "}";
-        std::string valueStr = anyToString(paramValue);
-
-        // 모든 ${paramName} 발생을 값으로 치환
-        size_t pos = 0;
-        while ((pos = result.find(placeholder, pos)) != std::string::npos) {
-            result.replace(pos, placeholder.length(), valueStr);
-            pos += valueStr.length();
-        }
-    }
+    SequenceResult result = executeSequential(definition, context, state);
+
+    auto endTime = std::chrono::steady_clock::now();
+    result.executionTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+        endTime - startTime
+    );
+
+    Logger::get()->info(
+        "Sequence {} finished with status: {} ({}/{} steps completed)",
+        definition.id,
+        sequenceStatusToString(result.status),
+        result.completedSteps,
+        result.totalSteps
+    );
 
     return result;
 }
 
-} // namespace mxrc::core::sequence
+SequenceResult SequenceEngine::executeSequential(
+    const SequenceDefinition& definition,
+    ExecutionContext& context,
+    SequenceState& state
+) {
+    SequenceResult result;
+    result.sequenceId = definition.id;
+    result.status = SequenceStatus::RUNNING;
+    result.totalSteps = definition.steps.size();
+    result.completedSteps = 0;
 
+    std::set<std::string> executedActions;  // 실행된 Action ID 추적
+
+    for (size_t i = 0; i < definition.steps.size(); ++i) {
+        // 취소 확인
+        if (state.cancelRequested) {
+            Logger::get()->info("Sequence {} cancelled at step {}", definition.id, i);
+            result.status = SequenceStatus::CANCELLED;
+            state.status = SequenceStatus::CANCELLED;
+            return result;
+        }
+
+        // 일시정지 확인
+        while (state.pauseRequested && !state.cancelRequested) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+
+        const auto& step = definition.steps[i];
+        
+        Logger::get()->info(
+            "Sequence {}: Executing step {}/{} - {} (type: {})",
+            definition.id, i + 1, definition.steps.size(),
+            step.actionId, step.actionType
+        );
+
+        try {
+            // Action 파라미터 준비
+            std::map<std::string, std::string> params = step.parameters;
+            params["id"] = step.actionId;
+
+            // 재시도 로직
+            int retryCount = 0;
+            ExecutionResult actionResult;
+            bool actionSucceeded = false;
+
+            while (!actionSucceeded) {
+                // Action 생성
+                auto action = factory_->createAction(step.actionType, params);
+
+                // Action 실행
+                actionResult = executor_->execute(action, context);
+
+                if (actionResult.isSuccessful()) {
+                    actionSucceeded = true;
+                } else {
+                    // 재시도 정책 확인
+                    if (definition.retryPolicy.has_value() &&
+                        retryHandler_->canRetry(definition.retryPolicy.value(), retryCount)) {
+
+                        Logger::get()->warn(
+                            "Sequence {}: Step {} ({}) failed, retrying ({}/{}): {}",
+                            definition.id, i + 1, step.actionId,
+                            retryCount + 1, definition.retryPolicy->maxRetries,
+                            actionResult.errorMessage
+                        );
+
+                        retryHandler_->waitBeforeRetry(definition.retryPolicy.value(), retryCount);
+                        retryCount++;
+                    } else {
+                        // 재시도 불가능 또는 정책 없음
+                        break;
+                    }
+                }
+            }
+
+            // Action 결과 저장
+            context.setActionResult(step.actionId, actionResult);
+
+            // Action 실패 시 (재시도 후에도)
+            if (actionResult.isFailed()) {
+                Logger::get()->error(
+                    "Sequence {}: Step {} ({}) failed after {} retries: {}",
+                    definition.id, i + 1, step.actionId, retryCount, actionResult.errorMessage
+                );
+                result.status = SequenceStatus::FAILED;
+                result.errorMessage = "Step " + std::to_string(i + 1) +
+                                     " (" + step.actionId + ") failed after " +
+                                     std::to_string(retryCount) + " retries: " + actionResult.errorMessage;
+                state.status = SequenceStatus::FAILED;
+                return result;
+            }
+
+            // 완료 스텝 업데이트
+            result.completedSteps++;
+            state.completedSteps++;
+            executedActions.insert(step.actionId);
+            updateProgress(state, result.completedSteps, result.totalSteps);
+
+            // 조건부 분기 처리
+            int branchSteps = handleConditionalBranch(step.actionId, definition, context, executedActions, state);
+            result.completedSteps += branchSteps;
+            state.completedSteps += branchSteps;
+            if (branchSteps > 0) {
+                updateProgress(state, result.completedSteps, result.totalSteps);
+            }
+
+        } catch (const std::exception& e) {
+            Logger::get()->error(
+                "Sequence {}: Exception at step {} ({}): {}",
+                definition.id, i + 1, step.actionId, e.what()
+            );
+            result.status = SequenceStatus::FAILED;
+            result.errorMessage = "Step " + std::to_string(i + 1) + 
+                                 " (" + step.actionId + ") exception: " + e.what();
+            state.status = SequenceStatus::FAILED;
+            return result;
+        }
+    }
+
+    // 모든 스텝 완료
+    result.status = SequenceStatus::COMPLETED;
+    result.progress = 1.0f;
+    state.status = SequenceStatus::COMPLETED;
+    state.progress = 1.0f;
+
+    return result;
+}
+
+void SequenceEngine::cancel(const std::string& sequenceId) {
+    std::lock_guard<std::mutex> lock(stateMutex_);
+    auto it = states_.find(sequenceId);
+    if (it != states_.end()) {
+        it->second.cancelRequested = true;
+        Logger::get()->info("Cancel requested for sequence: {}", sequenceId);
+    }
+}
+
+void SequenceEngine::pause(const std::string& sequenceId) {
+    std::lock_guard<std::mutex> lock(stateMutex_);
+    auto it = states_.find(sequenceId);
+    if (it != states_.end()) {
+        it->second.pauseRequested = true;
+        it->second.status = SequenceStatus::PAUSED;
+        Logger::get()->info("Pause requested for sequence: {}", sequenceId);
+    }
+}
+
+void SequenceEngine::resume(const std::string& sequenceId) {
+    std::lock_guard<std::mutex> lock(stateMutex_);
+    auto it = states_.find(sequenceId);
+    if (it != states_.end()) {
+        it->second.pauseRequested = false;
+        it->second.status = SequenceStatus::RUNNING;
+        Logger::get()->info("Resume requested for sequence: {}", sequenceId);
+    }
+}
+
+SequenceStatus SequenceEngine::getStatus(const std::string& sequenceId) const {
+    std::lock_guard<std::mutex> lock(stateMutex_);
+    auto it = states_.find(sequenceId);
+    if (it != states_.end()) {
+        return it->second.status;
+    }
+    return SequenceStatus::PENDING;
+}
+
+float SequenceEngine::getProgress(const std::string& sequenceId) const {
+    std::lock_guard<std::mutex> lock(stateMutex_);
+    auto it = states_.find(sequenceId);
+    if (it != states_.end()) {
+        return it->second.progress.load();
+    }
+    return 0.0f;
+}
+
+SequenceEngine::SequenceState& SequenceEngine::getOrCreateState(const std::string& sequenceId) {
+    std::lock_guard<std::mutex> lock(stateMutex_);
+    return states_[sequenceId];
+}
+
+void SequenceEngine::updateProgress(SequenceState& state, int completedSteps, int totalSteps) {
+    if (totalSteps > 0) {
+        float progress = static_cast<float>(completedSteps) / static_cast<float>(totalSteps);
+        state.progress = progress;
+    }
+}
+
+
+int SequenceEngine::handleConditionalBranch(
+    const std::string& actionId,
+    const SequenceDefinition& definition,
+    ExecutionContext& context,
+    std::set<std::string>& executedActions,
+    SequenceState& state
+) {
+    // 조건부 분기가 정의되어 있는지 확인
+    auto branchIt = definition.conditionalBranches.find(actionId);
+    if (branchIt == definition.conditionalBranches.end()) {
+        return 0;  // 조건부 분기 없음
+    }
+
+    const auto& branch = branchIt->second;
+    
+    // 조건 평가
+    bool conditionResult = false;
+    try {
+        conditionResult = conditionEvaluator_->evaluate(branch.condition, context);
+        Logger::get()->info(
+            "Sequence {}: Condition '{}' evaluated to {}",
+            definition.id, branch.condition, conditionResult ? "true" : "false"
+        );
+    } catch (const std::exception& e) {
+        Logger::get()->error(
+            "Sequence {}: Failed to evaluate condition '{}': {}",
+            definition.id, branch.condition, e.what()
+        );
+        return 0;
+    }
+
+    // 조건 결과에 따라 실행할 Action 목록 선택
+    const auto& actionsToExecute = conditionResult ? branch.trueActions : branch.falseActions;
+
+    int additionalSteps = 0;
+
+    // 분기 Action들 실행
+    for (const auto& branchActionId : actionsToExecute) {
+        // 이미 실행된 Action은 스킵
+        if (executedActions.find(branchActionId) != executedActions.end()) {
+            continue;
+        }
+
+        // Action 정의 찾기 (steps에서)
+        ActionStep const* stepPtr = nullptr;
+        for (const auto& step : definition.steps) {
+            if (step.actionId == branchActionId) {
+                stepPtr = &step;
+                break;
+            }
+        }
+
+        if (!stepPtr) {
+            Logger::get()->warn(
+                "Sequence {}: Branch action '{}' not found in steps",
+                definition.id, branchActionId
+            );
+            continue;
+        }
+
+        Logger::get()->info(
+            "Sequence {}: Executing branch action {} (type: {})",
+            definition.id, stepPtr->actionId, stepPtr->actionType
+        );
+
+        try {
+            // Action 파라미터 준비
+            std::map<std::string, std::string> params = stepPtr->parameters;
+            params["id"] = stepPtr->actionId;
+
+            // Action 생성
+            auto action = factory_->createAction(stepPtr->actionType, params);
+            
+            // Action 실행
+            auto actionResult = executor_->execute(action, context);
+
+            // Action 결과 저장
+            context.setActionResult(stepPtr->actionId, actionResult);
+
+            // 실행된 Action 기록
+            executedActions.insert(stepPtr->actionId);
+            additionalSteps++;
+
+            // Action 실패 시
+            if (actionResult.isFailed()) {
+                Logger::get()->error(
+                    "Sequence {}: Branch action {} ({}) failed: {}",
+                    definition.id, stepPtr->actionId, stepPtr->actionType, actionResult.errorMessage
+                );
+                // 분기 Action 실패는 전체 Sequence 실패로 이어지지 않음 (선택적)
+                // 필요시 여기서 예외를 throw할 수 있음
+            }
+
+        } catch (const std::exception& e) {
+            Logger::get()->error(
+                "Sequence {}: Exception executing branch action {}: {}",
+                definition.id, branchActionId, e.what()
+            );
+        }
+    }
+
+    return additionalSteps;
+}
+
+} // namespace mxrc::core::sequence

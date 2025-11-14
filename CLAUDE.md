@@ -65,24 +65,26 @@ MXRC는 네 가지 계층으로 구성된 명확한 개념 구조를 따릅니�
 ```
 ┌─────────────────────────────────────────────┐
 │        MISSION (미션)                       │
-│   상위 시스템이 지시한 작업의 큰 범주      │
+│   상위에서 주는 특정 태스크 수행 단위      │
 │   예: "Pick & Place", "Assembly"            │
 │   - 여러 Task들의 조합으로 구성             │
+│   - 인터페이스를 통한 상태 변경 가능       │
 │   - 선형 또는 조건부 실행 시퀀스            │
 └─────────────────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────┐
 │        TASK (태스크)                        │
-│   로봇의 작업 단위, Sequence로 구성        │
+│   로봇의 작업 관리 단위                    │
 │   예: "PickObject", "MoveToLocation"       │
-│   - 원자적(Atomic) 작업 단위               │
+│   - 단일 Action 또는 Sequence 포함 가능    │
+│   - 주기적 실행 또는 트리거 방식 동작      │
 │   - 상태 관리, 재시도, 타임아웃 포함       │
 │   - TaskManager에 의해 관리                │
 └─────────────────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────┐
 │    SEQUENCE (시퀀스)                        │
-│   작업 내부의 순차적 Action 조성            │
+│   작업 내부의 순차적 Action 조합            │
 │   예: "GripperOpen → Move → GripperClose"  │
 │   - 순차/조건부/병렬 실행 지원             │
 │   - SequenceEngine에 의해 실행             │
@@ -91,9 +93,10 @@ MXRC는 네 가지 계층으로 구성된 명확한 개념 구조를 따릅니�
                     ↓
 ┌─────────────────────────────────────────────┐
 │      ACTION (액션)                         │
-│   로봇의 단위 동작                          │
+│   로봇 동작의 정의 함수                     │
 │   예: "MoveMotor", "SetGripper", "Delay"  │
 │   - 가장 낮은 수준의 실행 단위             │
+│   - 로봇 제어에 필요한 다양한 동작 정의    │
 │   - ActionExecutor에 의해 실행             │
 │   - 결과 저장, 에러 처리                   │
 └─────────────────────────────────────────────┘
@@ -101,18 +104,26 @@ MXRC는 네 가지 계층으로 구성된 명확한 개념 구조를 따릅니�
 
 ### 계층 간 관계
 
-- **Mission → Task**: Mission은 여러 Task의 조합으로 정의됨
-- **Task → Sequence**: Task는 내부적으로 Sequence로 구성됨
+- **Mission → Task**: Mission은 여러 Task의 조합으로 정의되며, 인터페이스를 통해 Task 상태를 제어
+- **Task → Action/Sequence**: Task는 단일 Action 또는 Sequence를 포함하며, 파라미터에 따라 주기적/트리거 방식으로 실행
 - **Sequence → Action**: Sequence는 여러 Action의 순서를 정의함
 - **Action**: 최종 실행 단위, 로봇 제어 명령으로 변환됨
+
+### 실행 모드
+
+**Task 실행 방식:**
+- **단일 실행**: Task가 완료될 때까지 한 번 실행
+- **주기적 실행**: 설정된 주기(interval)마다 반복 실행
+- **트리거 실행**: 특정 조건이나 이벤트 발생 시 실행
 
 ### 모듈 및 책임
 
 | 계층 | 모듈 | 책임 | 상태 관리 |
 |------|------|------|---------|
-| Task | `taskmanager` | Task 정의, 등록, 실행 생명주기 | TaskStatus |
+| Mission | `mission` (예정) | Mission 정의, Task 조합, 상태 인터페이스 | MissionStatus |
+| Task | `taskmanager` | Task 정의, 등록, 실행 생명주기, Action/Sequence 관리 | TaskStatus |
 | Sequence | `sequence` | Action 순서 정의, 조건/분기/병렬 제어 | SequenceStatus |
-| Action | `sequence/executor` | 개별 Action 실행 | ActionStatus |
+| Action | `action` (예정) | 로봇 동작 정의, 실행 | ActionStatus |
 
 ---
 

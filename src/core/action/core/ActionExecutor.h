@@ -1,0 +1,59 @@
+#ifndef MXRC_CORE_ACTION_ACTION_EXECUTOR_H
+#define MXRC_CORE_ACTION_ACTION_EXECUTOR_H
+
+#include "core/action/interfaces/IAction.h"
+#include "core/action/dto/ExecutionResult.h"
+#include "core/action/util/ExecutionContext.h"
+#include <memory>
+#include <chrono>
+
+namespace mxrc::core::action {
+
+/**
+ * @brief Action 실행기
+ *
+ * 개별 Action의 실행, 타임아웃 관리, 결과 수집을 담당합니다.
+ */
+class ActionExecutor {
+public:
+    ActionExecutor() = default;
+    ~ActionExecutor() = default;
+
+    /**
+     * @brief Action 실행
+     *
+     * @param action 실행할 Action
+     * @param context 실행 컨텍스트
+     * @param timeout 타임아웃 (0 = 무제한)
+     * @return 실행 결과
+     */
+    ExecutionResult execute(
+        std::shared_ptr<IAction> action,
+        ExecutionContext& context,
+        std::chrono::milliseconds timeout = std::chrono::milliseconds(0));
+
+    /**
+     * @brief Action 취소
+     *
+     * @param action 취소할 Action
+     */
+    void cancel(std::shared_ptr<IAction> action);
+
+private:
+    /**
+     * @brief 타임아웃 체크
+     *
+     * @param action Action
+     * @param startTime 시작 시간
+     * @param timeout 타임아웃
+     * @return 타임아웃 발생 시 true
+     */
+    bool checkTimeout(
+        std::shared_ptr<IAction> action,
+        std::chrono::steady_clock::time_point startTime,
+        std::chrono::milliseconds timeout);
+};
+
+} // namespace mxrc::core::action
+
+#endif // MXRC_CORE_ACTION_ACTION_EXECUTOR_H

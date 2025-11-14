@@ -1,6 +1,6 @@
-# 구현 작업 목록: 동작 시퀀스 관리 시스템
+# 구현 작업 목록: Action, Sequence, Task 통합 시스템
 
-**특성**: Action Sequence Orchestration (동작 시퀀스 관리 시스템)
+**특성**: Action, Sequence, Task 3계층 시스템
 **계획**: `specs/017-action-sequence-orchestration/plan.md`
 **사양**: `specs/017-action-sequence-orchestration/spec.md`
 **기본 브랜치**: `017-action-sequence-orchestration`
@@ -10,308 +10,288 @@
 ## 작업 실행 순서 및 의존성
 
 ```
-Phase 1: Setup (기초 설정)
+Phase 1: Action Layer (동작 계층)
+├─ 1A: Setup & DTOs
+├─ 1B: Action Interfaces & Core
+├─ 1C: Action Implementation & Tests
+└─ 완료 기준: Action 단위/통합 테스트 통과
     ↓
-Phase 2: Foundational (핵심 기초 모듈)
+Phase 2: Sequence Layer (시퀀스 계층)
+├─ 2A: Sequence DTOs & Interfaces
+├─ 2B: Sequence Core Components
+│   ├─ 2B-1: Sequential Execution
+│   ├─ 2B-2: Conditional Branches
+│   ├─ 2B-3: Parallel Execution
+│   └─ 2B-4: Retry & Error Handling
+├─ 2C: Sequence Engine Integration
+└─ 완료 기준: Sequence 단위/통합 테스트 통과
     ↓
-Phase 3: US1 - Basic Sequential Execution (순차 실행 - P1)
+Phase 3: Task Layer (Task 계층)
+├─ 3A: Task DTOs & Interfaces
+├─ 3B: Task Core Components
+│   ├─ 3B-1: Single Execution
+│   ├─ 3B-2: Periodic Execution
+│   └─ 3B-3: Triggered Execution
+├─ 3C: TaskManager Integration
+└─ 완료 기준: Task 단위/통합 테스트 통과
     ↓
-Phase 4: US2 - Conditional Flow Control (조건부 분기 - P1)
-    ├─→ Phase 5: US3 - Parallel Execution (병렬 실행 - P2)
-    └─→ Phase 6: US4 - Retry & Error Handling (재시도/에러 처리 - P2)
-    ↓
-Phase 7: US5 - Sequence Templates (시퀀스 템플릿 - P3)
-    ↓
-Phase 8: US6 - Monitoring & Control (모니터링 제어 - P3)
-    ↓
-Phase 9: Polish & Integration (마무리 및 통합)
+Phase 4: System Integration & Polish
+├─ 4A: Full System Integration Tests
+├─ 4B: Performance & Memory Tests
+└─ 4C: Documentation
 
 **병렬 실행 가능**:
-- Phase 3과 Phase 5는 독립적 (다른 파일)
-- Phase 5와 Phase 6는 독립적 (병렬 실행 가능)
-- Phase 7과 Phase 8은 Phase 6 완료 후 병렬 가능
+- Phase 2B-2, 2B-3, 2B-4는 독립적 (병렬 가능)
+- Phase 3B-1, 3B-2, 3B-3는 독립적 (병렬 가능)
 ```
 
 ---
 
-## Phase 1: 설정 (Setup)
+## Phase 1: Action Layer (동작 계층)
 
-### 목표
-프로젝트 구조, 빌드 설정, 기본 로깅/테스트 프레임워크 구성
+### Phase 1A: Setup & DTOs
 
-### 작업
+#### 목표
+프로젝트 구조 설정 및 Action Layer 기본 데이터 타입 정의
 
-- [ ] T001 Create CMakeLists.txt configuration for sequence module with test discovery in `CMakeLists.txt`
-- [ ] T002 Set up spdlog logging infrastructure for sequence system in `src/core/sequence/core/Logger.h`
-- [ ] T003 Create base test fixtures and utilities for sequence tests in `tests/unit/sequence/SequenceTestFixtures.h`
+#### 작업
 
----
+- [ ] T001 Create CMakeLists.txt configuration for action module in `CMakeLists.txt`
+- [ ] T002 Set up spdlog logging infrastructure for action system in `src/core/action/util/Logger.h`
+- [ ] T003 Create ActionStatus enum with states (PENDING, RUNNING, COMPLETED, FAILED, CANCELLED, TIMEOUT) in `src/core/action/dto/ActionStatus.h`
+- [ ] T004 Create ActionDefinition struct in `src/core/action/dto/ActionDefinition.h`
+- [ ] T005 Create ExecutionResult struct in `src/core/action/dto/ExecutionResult.h`
+- [ ] T006 Create ExecutionContext class for sharing state in `src/core/action/util/ExecutionContext.h`
 
-## Phase 2: 기초 (Foundational)
+### Phase 1B: Action Interfaces & Core
 
-### 목표
-모든 사용자 스토리가 의존하는 핵심 컴포넌트 구현
+#### 목표
+Action 인터페이스 및 핵심 컴포넌트 구현
 
-### 작업
+#### 작업
 
-- [x] T004 Fix and enhance ActionStatus enum with all 7 states in `src/core/sequence/dto/ActionStatus.h`
-- [x] T005 Create RetryPolicy struct for retry configuration in `src/core/sequence/core/RetryPolicy.h`
-- [x] T006 Implement RetryHandler for managing retry logic in `src/core/sequence/core/RetryHandler.h` and `.cpp`
-- [x] T007 Implement SequenceRegistry for sequence definition management in `src/core/sequence/core/SequenceRegistry.h` and `.cpp`
-- [x] T008 Create SequenceRegistry unit tests in `tests/unit/sequence/SequenceRegistry_test.cpp`
-- [x] T009 Implement ActionExecutor for individual action execution in `src/core/sequence/core/ActionExecutor.h` and `.cpp`
-- [x] T010 Create ActionExecutor unit tests in `tests/unit/sequence/ActionExecutor_test.cpp`
-- [x] T011 Implement ConditionEvaluator for condition expression evaluation in `src/core/sequence/core/ConditionEvaluator.h` and `.cpp`
-- [x] T012 Create ConditionEvaluator unit tests in `tests/unit/sequence/ConditionEvaluator_test.cpp`
-- [x] T013 Implement ExecutionMonitor for tracking sequence execution progress in `src/core/sequence/core/ExecutionMonitor.h` and `.cpp`
-- [x] T014 Create ExecutionMonitor unit tests in `tests/unit/sequence/ExecutionMonitor_test.cpp`
+- [ ] T007 Create IAction interface in `src/core/action/interfaces/IAction.h`
+- [ ] T008 Create IActionFactory interface in `src/core/action/interfaces/IActionFactory.h`
+- [ ] T009 Implement ActionExecutor for executing individual actions in `src/core/action/core/ActionExecutor.h` and `.cpp`
+- [ ] T010 Implement ActionFactory for creating actions in `src/core/action/core/ActionFactory.h` and `.cpp`
+- [ ] T011 Implement ActionRegistry for managing action types in `src/core/action/core/ActionRegistry.h` and `.cpp`
 
----
+### Phase 1C: Action Implementation & Tests
 
-## Phase 3: US1 - 순차 동작 실행 (Sequential Actions)
+#### 목표
+기본 Action 구현 및 전체 Action Layer 테스트
 
-### 사용자 스토리
-사용자가 동작 시퀀스를 정의하고 순차적으로 실행할 수 있습니다. 각 동작 완료 후 다음 동작이 시작됩니다.
+#### 작업
 
-### 성공 기준
-1. 시퀀스가 정의된 순서대로 모든 동작을 완료
-2. 각 동작 결과가 다음 동작에서 참조 가능
-3. 모든 동작 완료 시 시퀀스 상태가 COMPLETED로 변경
-4. 메모리 누수 없음 (RAII 원칙 준수)
+- [ ] T012 Implement DelayAction (basic action for testing) in `src/core/action/impl/DelayAction.h` and `.cpp`
+- [ ] T013 Implement MoveAction (robot movement action) in `src/core/action/impl/MoveAction.h` and `.cpp`
+- [ ] T014 Create ActionExecutor unit tests in `tests/unit/action/ActionExecutor_test.cpp`
+- [ ] T015 Create ActionFactory unit tests in `tests/unit/action/ActionFactory_test.cpp`
+- [ ] T016 Create ActionRegistry unit tests in `tests/unit/action/ActionRegistry_test.cpp`
+- [ ] T017 Create Action integration tests in `tests/integration/action_integration_test.cpp`
 
-### 독립 테스트 기준
-- 3-5개 동작으로 구성된 시퀀스 정상 실행
-- 동작 결과 검증 및 전달
-- 시퀀스 상태 전이 검증
-
-### 작업
-
-- [ ] T015 [US1] Implement SequenceEngine core for sequential execution in `src/core/sequence/core/SequenceEngine.h`
-- [ ] T016 [US1] Implement SequenceEngine sequential execution logic in `src/core/sequence/core/SequenceEngine.cpp`
-- [ ] T017 [US1] Create mock action implementations for testing in `tests/unit/sequence/MockActions.h`
-- [ ] T018 [US1] Create SequenceEngine unit tests for sequential execution in `tests/unit/sequence/SequenceEngine_test.cpp`
-- [ ] T019 [US1] Create integration test for simple 3-action sequence in `tests/integration/sequence/SequenceIntegration_test.cpp`
+**Phase 1 완료 기준**: 모든 Action 컴포넌트 단위 테스트 통과, Action 실행 통합 테스트 통과, 메모리 누수 없음
 
 ---
 
-## Phase 4: US2 - 조건부 분기 (Conditional Flow Control)
+## Phase 2: Sequence Layer (시퀀스 계층)
 
-### 사용자 스토리
-조건식을 기반으로 다양한 실행 경로를 선택할 수 있습니다. 이전 동작의 결과를 조건식에서 참조합니다.
+### Phase 2A: Sequence DTOs & Interfaces
 
-### 성공 기준
-1. IF-THEN-ELSE 조건문 지원
-2. 조건식에서 이전 동작 결과 참조 가능
-3. 비교 연산자 (==, !=, <, >, <=, >=) 지원
-4. 논리 연산자 (AND, OR, NOT) 지원
-5. 조건 평가 에러 처리
+#### 목표
+Sequence Layer 기본 데이터 타입 및 인터페이스 정의
 
-### 독립 테스트 기준
-- 단순 조건 (가중치 > 10) 평가
-- 복합 조건 (A AND B OR C) 평가
-- 조건에 따른 경로 선택 검증
+#### 작업
 
-### 작업
+- [ ] T018 Create SequenceStatus enum in `src/core/sequence/dto/SequenceStatus.h`
+- [ ] T019 Create SequenceDefinition struct in `src/core/sequence/dto/SequenceDefinition.h`
+- [ ] T020 Create ConditionalBranch struct in `src/core/sequence/dto/ConditionalBranch.h`
+- [ ] T021 Create RetryPolicy struct in `src/core/sequence/dto/RetryPolicy.h`
+- [ ] T022 Create ISequenceEngine interface in `src/core/sequence/interfaces/ISequenceEngine.h`
+- [ ] T023 Create IConditionProvider interface in `src/core/sequence/interfaces/IConditionProvider.h`
 
-- [ ] T020 [P] [US2] Enhance SequenceEngine with conditional branch support in `src/core/sequence/core/SequenceEngine.cpp`
-- [ ] T021 [US2] Create condition expression structure in `src/core/sequence/core/ConditionalBranch.h`
-- [ ] T022 [US2] Implement condition evaluation in SequenceEngine in `src/core/sequence/core/SequenceEngine.cpp`
-- [ ] T023 [US2] Create unit tests for conditional evaluation in `tests/unit/sequence/SequenceEngine_test.cpp`
-- [ ] T024 [US2] Create integration test for branching sequence in `tests/integration/sequence/SequenceIntegration_test.cpp`
+### Phase 2B: Sequence Core Components
 
----
+#### Phase 2B-1: Sequential Execution
 
-## Phase 5: US3 - 병렬 동작 실행 (Parallel Execution)
+- [ ] T024 Implement SequenceRegistry for sequence definition management in `src/core/sequence/core/SequenceRegistry.h` and `.cpp`
+- [ ] T025 Implement SequenceEngine core for sequential execution in `src/core/sequence/core/SequenceEngine.h` and `.cpp`
+- [ ] T026 Create SequenceRegistry unit tests in `tests/unit/sequence/SequenceRegistry_test.cpp`
+- [ ] T027 Create SequenceEngine unit tests for sequential execution in `tests/unit/sequence/SequenceEngine_test.cpp`
 
-### 사용자 스토리
-여러 동작을 동시에 실행할 수 있습니다. 모든 병렬 동작이 완료될 때까지 다음 단계로 진행하지 않습니다.
+#### Phase 2B-2: Conditional Branches
 
-### 성공 기준
-1. 여러 동작을 병렬로 실행 가능
-2. 모든 동작 완료 대기 (Join semantics)
-3. 병렬 그룹 내 최대 32개 동작 지원
-4. 병렬 동작 간 리소스 충돌 처리
+- [ ] T028 [P] Implement ConditionEvaluator for expression evaluation in `src/core/sequence/core/ConditionEvaluator.h` and `.cpp`
+- [ ] T029 [P] Enhance SequenceEngine with conditional branch support in `src/core/sequence/core/SequenceEngine.cpp`
+- [ ] T030 [P] Create ConditionEvaluator unit tests in `tests/unit/sequence/ConditionEvaluator_test.cpp`
+- [ ] T031 Create SequenceEngine conditional tests in `tests/unit/sequence/SequenceEngine_test.cpp`
 
-### 독립 테스트 기준
-- 2-4개 동작 병렬 실행
-- 모든 동작 완료 확인
-- 병렬 실행 성능 검증
+#### Phase 2B-3: Parallel Execution
 
-### 작업
+- [ ] T032 [P] Implement ParallelExecutor for parallel action execution in `src/core/sequence/core/ParallelExecutor.h` and `.cpp`
+- [ ] T033 [P] Enhance SequenceEngine with parallel execution support in `src/core/sequence/core/SequenceEngine.cpp`
+- [ ] T034 [P] Create ParallelExecutor unit tests in `tests/unit/sequence/ParallelExecutor_test.cpp`
 
-- [ ] T025 [P] [US3] Create ParallelGroup structure in `src/core/sequence/core/ParallelGroup.h`
-- [ ] T026 [P] [US3] Implement parallel execution in SequenceEngine in `src/core/sequence/core/SequenceEngine.cpp`
-- [ ] T027 [US3] Implement thread pool based execution for parallel groups in `src/core/sequence/core/ParallelExecutor.h` and `.cpp`
-- [ ] T028 [US3] Create unit tests for parallel execution in `tests/unit/sequence/SequenceEngine_test.cpp`
-- [ ] T029 [US3] Create integration test for parallel sequence in `tests/integration/sequence/SequenceIntegration_test.cpp`
+#### Phase 2B-4: Retry & Error Handling
 
----
+- [ ] T035 [P] Implement RetryHandler for retry logic in `src/core/sequence/core/RetryHandler.h` and `.cpp`
+- [ ] T036 [P] Enhance SequenceEngine with error handling in `src/core/sequence/core/SequenceEngine.cpp`
+- [ ] T037 [P] Create RetryHandler unit tests in `tests/unit/sequence/RetryHandler_test.cpp`
 
-## Phase 6: US4 - 재시도 및 에러 처리 (Retry & Error Handling)
+### Phase 2C: Sequence Engine Integration
 
-### 사용자 스토리
-동작 실패 시 자동으로 재시도할 수 있으며, 최종 실패 시 에러 핸들러를 실행합니다.
+#### 목표
+모니터링 기능 추가 및 전체 Sequence Layer 통합 테스트
 
-### 성공 기준
-1. 동작 실패 시 자동 재시도 (최대 3회)
-2. 재시도 간격 지수 백오프 (1ms, 2ms, 4ms)
-3. 최종 실패 시 에러 핸들러 실행
-4. 에러 복구 또는 안전한 종료
+#### 작업
 
-### 독립 테스트 기준
-- 실패 동작 재시도 검증
-- 지수 백오프 간격 확인
-- 재시도 횟수 제한 검증
+- [ ] T038 Implement ExecutionMonitor for progress tracking in `src/core/sequence/core/ExecutionMonitor.h` and `.cpp`
+- [ ] T039 Create ExecutionMonitor unit tests in `tests/unit/sequence/ExecutionMonitor_test.cpp`
+- [ ] T040 Create sequential execution integration test in `tests/integration/sequence_integration_test.cpp`
+- [ ] T041 Create conditional branch integration test in `tests/integration/sequence_integration_test.cpp`
+- [ ] T042 Create parallel execution integration test in `tests/integration/sequence_integration_test.cpp`
+- [ ] T043 Create retry & error handling integration test in `tests/integration/sequence_integration_test.cpp`
 
-### 작업
-
-- [ ] T030 [P] [US4] Create RetryPolicy configuration structure in `src/core/sequence/core/RetryPolicy.h`
-- [ ] T031 [P] [US4] Enhance ActionExecutor with retry support in `src/core/sequence/core/ActionExecutor.cpp`
-- [ ] T032 [US4] Create ErrorHandler interface in `src/core/sequence/interfaces/IErrorHandler.h`
-- [ ] T033 [US4] Implement error recovery in SequenceEngine in `src/core/sequence/core/SequenceEngine.cpp`
-- [ ] T034 [US4] Create unit tests for retry logic in `tests/unit/sequence/ActionExecutor_test.cpp`
-- [ ] T035 [US4] Create integration test for error handling in `tests/integration/sequence/SequenceIntegration_test.cpp`
+**Phase 2 완료 기준**: 모든 Sequence 컴포넌트 단위 테스트 통과, Sequence 실행 통합 테스트 통과, 순차/조건부/병렬 실행 검증
 
 ---
 
-## Phase 7: US5 - 시퀀스 템플릿 (Sequence Templates)
+## Phase 3: Task Layer (Task 계층)
 
-### 사용자 스토리
-공통 패턴을 템플릿으로 정의하고 다양한 파라미터로 재사용할 수 있습니다.
+### Phase 3A: Task DTOs & Interfaces
 
-### 성공 기준
-1. 템플릿 정의 및 등록 가능
-2. 다양한 파라미터로 인스턴스화 가능
-3. 각 인스턴스 독립적 실행
-4. 결과 집계 가능
+#### 목표
+Task Layer 기본 데이터 타입 및 인터페이스 정의
 
-### 독립 테스트 기준
-- "Pick and Place" 템플릿 생성 및 실행
-- 다양한 좌표 파라미터 적용
-- 템플릿 재사용성 검증
+#### 작업
 
-### 작업
+- [ ] T044 Create TaskStatus enum in `src/core/task/dto/TaskStatus.h`
+- [ ] T045 Create TaskExecutionMode enum (ONCE, PERIODIC, TRIGGERED) in `src/core/task/dto/TaskExecutionMode.h`
+- [ ] T046 Create TaskDefinition struct in `src/core/task/dto/TaskDefinition.h`
+- [ ] T047 Create TaskExecution struct in `src/core/task/dto/TaskExecution.h`
+- [ ] T048 Create ITask interface in `src/core/task/interfaces/ITask.h`
+- [ ] T049 Create ITaskExecutor interface in `src/core/task/interfaces/ITaskExecutor.h`
+- [ ] T050 Create ITriggerProvider interface in `src/core/task/interfaces/ITriggerProvider.h`
 
-- [ ] T036 [P] [US5] Create template instantiation mechanism in `src/core/sequence/core/SequenceTemplate.h`
-- [ ] T037 [US5] Implement parameter substitution in SequenceEngine in `src/core/sequence/core/SequenceEngine.cpp`
-- [ ] T038 [US5] Create template registry in SequenceRegistry in `src/core/sequence/core/SequenceRegistry.cpp`
-- [ ] T039 [US5] Create unit tests for template system in `tests/unit/sequence/SequenceTemplate_test.cpp`
-- [ ] T040 [US5] Create integration test for template instantiation in `tests/integration/sequence/SequenceIntegration_test.cpp`
+### Phase 3B: Task Core Components
 
----
+#### Phase 3B-1: Single Execution
 
-## Phase 8: US6 - 모니터링 및 제어 (Monitoring & Control)
+- [ ] T051 Implement TaskRegistry for task definition management in `src/core/task/core/TaskRegistry.h` and `.cpp`
+- [ ] T052 Implement TaskExecutor core for single execution in `src/core/task/core/TaskExecutor.h` and `.cpp`
+- [ ] T053 Create TaskRegistry unit tests in `tests/unit/task/TaskRegistry_test.cpp`
+- [ ] T054 Create TaskExecutor unit tests for single execution in `tests/unit/task/TaskExecutor_test.cpp`
 
-### 사용자 스토리
-실행 중인 시퀀스의 상태를 모니터링하고, 필요시 일시정지, 재개, 취소할 수 있습니다.
+#### Phase 3B-2: Periodic Execution
 
-### 성공 기준
-1. 실시간 진행 상황 조회
-2. 시퀀스 일시정지 및 재개
-3. 시퀀스 취소 (안전한 정리)
-4. 실행 로그 기록 및 조회
+- [ ] T055 [P] Implement PeriodicScheduler for interval-based execution in `src/core/task/core/PeriodicScheduler.h` and `.cpp`
+- [ ] T056 [P] Enhance TaskExecutor with periodic execution support in `src/core/task/core/TaskExecutor.cpp`
+- [ ] T057 [P] Create PeriodicScheduler unit tests in `tests/unit/task/PeriodicScheduler_test.cpp`
+- [ ] T058 Create TaskExecutor periodic tests in `tests/unit/task/TaskExecutor_test.cpp`
 
-### 독립 테스트 기준
-- 진행률 조회 및 검증
-- 일시정지/재개 상태 전이
-- 취소 시 안전한 정리 확인
+#### Phase 3B-3: Triggered Execution
 
-### 작업
+- [ ] T059 [P] Implement TriggerManager for event-based execution in `src/core/task/core/TriggerManager.h` and `.cpp`
+- [ ] T060 [P] Enhance TaskExecutor with triggered execution support in `src/core/task/core/TaskExecutor.cpp`
+- [ ] T061 [P] Create TriggerManager unit tests in `tests/unit/task/TriggerManager_test.cpp`
+- [ ] T062 Create TaskExecutor trigger tests in `tests/unit/task/TaskExecutor_test.cpp`
 
-- [ ] T041 [P] [US6] Enhance SequenceEngine with pause/resume support in `src/core/sequence/core/SequenceEngine.cpp`
-- [ ] T042 [P] [US6] Implement execution log in ExecutionMonitor in `src/core/sequence/core/ExecutionMonitor.cpp`
-- [ ] T043 [US6] Create progress tracking in SequenceEngine in `src/core/sequence/core/SequenceEngine.cpp`
-- [ ] T044 [US6] Create cancel operation with cleanup in SequenceEngine in `src/core/sequence/core/SequenceEngine.cpp`
-- [ ] T045 [US6] Create unit tests for monitoring in `tests/unit/sequence/ExecutionMonitor_test.cpp`
-- [ ] T046 [US6] Create integration test for pause/resume in `tests/integration/sequence/SequenceIntegration_test.cpp`
+### Phase 3C: Task Monitoring & TaskManager Integration
 
----
+#### 목표
+Task 모니터링 기능 추가 및 TaskManager 통합
 
-## Phase 9: 마무리 및 통합 (Polish & Integration)
+#### 작업
 
-### 목표
-TaskManager 통합, 성능 최적화, 문서화 완성
+- [ ] T063 Implement TaskMonitor for tracking task execution in `src/core/task/core/TaskMonitor.h` and `.cpp`
+- [ ] T064 Create TaskMonitor unit tests in `tests/unit/task/TaskMonitor_test.cpp`
+- [ ] T065 Create TaskManagerAdapter for integration in `src/core/task/integration/TaskManagerAdapter.h` and `.cpp`
+- [ ] T066 Create TaskManagerAdapter unit tests in `tests/unit/task/TaskManagerAdapter_test.cpp`
+- [ ] T067 Create single action task integration test in `tests/integration/task_integration_test.cpp`
+- [ ] T068 Create sequence-based task integration test in `tests/integration/task_integration_test.cpp`
+- [ ] T069 Create periodic task integration test in `tests/integration/task_integration_test.cpp`
+- [ ] T070 Create triggered task integration test in `tests/integration/task_integration_test.cpp`
 
-### 작업
-
-- [ ] T047 Create SequenceTaskAdapter for TaskManager integration in `src/core/sequence/integration/SequenceTaskAdapter.h` and `.cpp`
-- [ ] T048 Create integration tests with TaskManager in `tests/integration/sequence/SequenceTaskManagerIntegration_test.cpp`
-- [ ] T049 [P] Create performance test for 1000-action sequence in `tests/performance/SequencePerformance_test.cpp`
-- [ ] T050 [P] Validate memory usage and RAII compliance with valgrind in `tests/memcheck/`
-- [ ] T051 Create API documentation in `docs/api/sequence_api.md`
-- [ ] T052 Create user guide for sequence system in `docs/guides/sequence_user_guide.md`
-- [ ] T053 Add sequence module examples in `examples/sequence_examples.cpp`
-- [ ] T054 Final integration test combining all features in `tests/integration/sequence/FullSystem_test.cpp`
-- [ ] T055 Commit and push all implementation changes with detailed commit message
+**Phase 3 완료 기준**: 모든 Task 컴포넌트 단위 테스트 통과, Task 실행 모드 통합 테스트 통과, TaskManager 통합 검증
 
 ---
 
-## 병렬 실행 계획 (Parallel Execution Plan)
+## Phase 4: System Integration & Polish (시스템 통합 및 마무리)
 
-### Wave 1: Phase 3 (순차 실행 기초)
-**선행 조건**: Phase 1, 2 완료
-**시간**: 2-3일
-**담당**: 1명
+### Phase 4A: Full System Integration Tests
 
-### Wave 2: Phase 5 & 6 (병렬 + 재시도)
-**선행 조건**: Phase 2 완료, Phase 3 진행 중
-**병렬 가능**: Phase 5와 Phase 6은 완전히 독립적 (다른 컴포넌트)
-**시간**: 3-4일 (병렬로 2-3일)
-**담당**: 2명
+#### 목표
+전체 시스템 통합 테스트
 
-### Wave 3: Phase 4 (조건 분기)
-**선행 조건**: Phase 3 완료
-**시간**: 1-2일
-**담당**: 1명
+#### 작업
 
-### Wave 4: Phase 7 & 8 (템플릿 + 모니터링)
-**선행 조건**: Phase 4 완료
-**병렬 가능**: Phase 7과 Phase 8은 독립적
-**시간**: 3-4일 (병렬로 2-3일)
-**담당**: 2명
+- [ ] T071 Create full system integration test (Action → Sequence → Task) in `tests/integration/full_system_test.cpp`
+- [ ] T072 Create complex scenario test (10+ Actions, 3+ Sequences, 2+ Tasks) in `tests/integration/full_system_test.cpp`
+- [ ] T073 Test error propagation across all layers in `tests/integration/full_system_test.cpp`
 
-### Wave 5: Phase 9 (통합 및 마무리)
-**선행 조건**: 모든 Phase 완료
-**시간**: 2-3일
-**담당**: 1명
+### Phase 4B: Performance & Memory Tests
+
+#### 목표
+성능 및 메모리 검증
+
+#### 작업
+
+- [ ] T074 [P] Create performance test for 1000-action sequence in `tests/performance/performance_test.cpp`
+- [ ] T075 [P] Create performance test for periodic task overhead in `tests/performance/performance_test.cpp`
+- [ ] T076 [P] Validate memory usage and RAII compliance with valgrind in `tests/memcheck/`
+- [ ] T077 [P] Create load test for multiple concurrent tasks in `tests/performance/performance_test.cpp`
+
+### Phase 4C: Documentation
+
+#### 목표
+문서화 완성
+
+#### 작업
+
+- [ ] T078 Create Action Layer API documentation in `docs/api/action_api.md`
+- [ ] T079 Create Sequence Layer API documentation in `docs/api/sequence_api.md`
+- [ ] T080 Create Task Layer API documentation in `docs/api/task_api.md`
+- [ ] T081 Create user guide for the system in `docs/guides/user_guide.md`
+- [ ] T082 Add code examples in `examples/action_sequence_task_examples.cpp`
+- [ ] T083 Commit and push all implementation changes with detailed commit message
+
+**Phase 4 완료 기준**: 전체 시스템 통합 테스트 통과, 성능 기준 충족, 메모리 누수 없음, 문서 완성
 
 ---
 
 ## 구현 전략 (Implementation Strategy)
 
 ### MVP Scope (최소 기능 집합)
-**범위**: US1 + 기본 US2 (단순 조건)
+**범위**: Phase 1 (Action Layer) 완전 구현
 **시간**: 3-5일
-**목표**: 순차 실행과 기본 조건 분기 지원
+**목표**: Action 실행, 타임아웃, 에러 처리
 
-**포함 작업**: T001-T024
-**제외 작업**: T025-T055 (고급 기능)
+**포함 작업**: T001-T017
+**제외 작업**: T018-T083 (Sequence, Task, Integration)
 
-### Phase 1 - 증분 배포 계획
+### 증분 배포 계획
 
-**Week 1-2**: 기초 (T001-T014)
-- 빌드 설정, 레지스트리, 실행기 구현
-- 모든 기초 모듈 단위 테스트 통과
+**Week 1-2**: Phase 1 - Action Layer (T001-T017)
+- Action 인터페이스, Executor, Factory, Registry
+- 기본 Action 구현 (Delay, Move)
+- 모든 Action Layer 단위/통합 테스트 통과
 
-**Week 3-4**: US1 순차 실행 (T015-T019)
-- 기본 SequenceEngine 구현
-- 순차 실행 통합 테스트 통과
+**Week 3-5**: Phase 2 - Sequence Layer (T018-T043)
+- Sequence DTOs, 인터페이스
+- Sequential, Conditional, Parallel, Retry 실행
+- ExecutionMonitor
+- 모든 Sequence Layer 단위/통합 테스트 통과
 
-**Week 5**: US2 조건 분기 (T020-T024)
-- 조건 평가 엔진 추가
-- 분기 통합 테스트 통과
+**Week 6-8**: Phase 3 - Task Layer (T044-T070)
+- Task DTOs, 인터페이스
+- Single, Periodic, Triggered 실행
+- TaskMonitor, TaskManager 통합
+- 모든 Task Layer 단위/통합 테스트 통과
 
-**Week 6-7**: US3, US4 병렬 + 재시도 (T025-T035)
-- 병렬 실행기 구현
-- 재시도 로직 구현
-
-**Week 8-9**: US5, US6 템플릿 + 모니터링 (T036-T046)
-- 템플릿 시스템 구현
-- 모니터링 및 제어 기능
-
-**Week 10**: 통합 및 마무리 (T047-T055)
-- TaskManager 통합
-- 성능 검증 및 문서화
+**Week 9-10**: Phase 4 - Integration & Polish (T071-T083)
+- 전체 시스템 통합 테스트
+- 성능 및 메모리 검증
+- 문서화
 
 ---
 
@@ -321,21 +301,16 @@ TaskManager 통합, 성능 최적화, 문서화 완성
 - `- [ ]` 체크박스
 - `T###` 작업 ID
 - `[P]` 병렬화 가능 표시 (해당 시)
-- `[US#]` 사용자 스토리 레이블 (Phase 3+)
 - 명확한 설명 및 파일 경로
 
-✅ 작업 개수: 총 55개
-- Phase 1 (Setup): 3개
-- Phase 2 (Foundational): 11개
-- Phase 3 (US1): 5개
-- Phase 4 (US2): 5개
-- Phase 5 (US3): 5개
-- Phase 6 (US4): 6개
-- Phase 7 (US5): 5개
-- Phase 8 (US6): 6개
-- Phase 9 (Polish): 9개
+✅ 작업 개수: 총 83개
+- Phase 1 (Action Layer): 17개
+- Phase 2 (Sequence Layer): 26개
+- Phase 3 (Task Layer): 27개
+- Phase 4 (Integration & Polish): 13개
 
-✅ 병렬화 기회: 9개 작업 `[P]` 표시 가능
+✅ 병렬화 기회: 12개 작업 `[P]` 표시
 
-✅ 독립 테스트 기준: 각 사용자 스토리에 정의됨
+✅ 완료 기준: 각 Phase에 명확히 정의됨
 
+---

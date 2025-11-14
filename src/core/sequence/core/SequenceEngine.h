@@ -1,264 +1,113 @@
-#pragma once
+#ifndef MXRC_CORE_SEQUENCE_SEQUENCE_ENGINE_H
+#define MXRC_CORE_SEQUENCE_SEQUENCE_ENGINE_H
 
-#include "core/sequence/core/SequenceRegistry.h"
-#include "core/sequence/core/ActionExecutor.h"
+#include "core/sequence/interfaces/ISequenceEngine.h"
 #include "core/sequence/core/ConditionEvaluator.h"
-#include "core/sequence/core/ExecutionMonitor.h"
-#include "core/sequence/core/ExecutionContext.h"
-#include "core/sequence/core/ConditionalBranch.h"
-#include "core/sequence/core/ParallelBranch.h"
-#include "core/sequence/core/SequenceTemplate.h"
-#include "core/sequence/interfaces/IActionFactory.h"
-#include "core/sequence/dto/SequenceDto.h"
-#include <string>
+#include "core/sequence/core/RetryHandler.h"
+#include "core/action/core/ActionFactory.h"
+#include "core/action/core/ActionExecutor.h"
+#include "core/action/util/Logger.h"
 #include <map>
-#include <any>
-#include <memory>
-#include <thread>
-#include <vector>
+#include <mutex>
+#include <atomic>
+#include <set>
 
 namespace mxrc::core::sequence {
 
 /**
- * @brief 시퀀스 실행 엔진
+ * @brief Sequence 엔진 구현
  *
- * 시퀀스 정의를 로드하여 순차적, 조건부, 병렬 실행을 관리합니다.
+ * Sequence를 실행하고 관리하는 엔진입니다.
+ * Phase 2B-1에서는 순차 실행만 지원합니다.
  */
-class SequenceEngine {
+class SequenceEngine : public ISequenceEngine {
 public:
     /**
      * @brief 생성자
-     * @param registry 시퀀스 레지스트리
-     * @param actionFactory 동작 생성 팩토리
+     *
+     * @param factory Action 팩토리
+     * @param executor Action 실행자
      */
     SequenceEngine(
-        std::shared_ptr<SequenceRegistry> registry,
-        std::shared_ptr<IActionFactory> actionFactory);
+        std::shared_ptr<mxrc::core::action::ActionFactory> factory,
+        std::shared_ptr<mxrc::core::action::ActionExecutor> executor
+    );
 
     ~SequenceEngine() = default;
 
-    // Copy/Move
+    // 복사 및 이동 금지
     SequenceEngine(const SequenceEngine&) = delete;
     SequenceEngine& operator=(const SequenceEngine&) = delete;
-    SequenceEngine(SequenceEngine&&) = default;
-    SequenceEngine& operator=(SequenceEngine&&) = default;
+    SequenceEngine(SequenceEngine&&) = delete;
+    SequenceEngine& operator=(SequenceEngine&&) = delete;
 
-    /**
-     * @brief 시퀀스 실행 시작
-     * @param sequenceId 시퀀스 ID
-     * @param parameters 파라미터 맵
-     * @return 실행 ID
-     * @throw std::runtime_error 시퀀스를 찾을 수 없으면 예외
-     */
-    std::string execute(
-        const std::string& sequenceId,
-        const std::map<std::string, std::any>& parameters = {});
+    // ISequenceEngine 구현
+    SequenceResult execute(
+        const SequenceDefinition& definition,
+        mxrc::core::action::ExecutionContext& context) override;
 
-    /**
-     * @brief 실행 중인 시퀀스 일시정지
-     * @param executionId 실행 ID
-     * @return 성공 여부
-     */
-    bool pause(const std::string& executionId);
-
-    /**
-     * @brief 일시정지된 시퀀스 재개
-     * @param executionId 실행 ID
-     * @return 성공 여부
-     */
-    bool resume(const std::string& executionId);
-
-    /**
-     * @brief 실행 중인 시퀀스 취소
-     * @param executionId 실행 ID
-     * @return 성공 여부
-     */
-    bool cancel(const std::string& executionId);
-
-    /**
-     * @brief 시퀀스 실행 상태 조회
-     * @param executionId 실행 ID
-     * @return 실행 결과
-     */
-    SequenceExecutionResult getStatus(const std::string& executionId) const;
-
-    /**
-     * @brief 모든 실행 중인 시퀀스 조회
-     * @return 실행 ID 목록
-     */
-    std::vector<std::string> getRunningExecutions() const;
-
-    /**
-     * @brief 완료된 시퀀스 조회
-     * @return 완료된 실행 ID 목록
-     */
-    std::vector<std::string> getCompletedExecutions() const;
-
-    /**
-     * @brief 실행 컨텍스트 조회
-     * @param executionId 실행 ID
-     * @return 실행 컨텍스트
-     */
-    std::shared_ptr<ExecutionContext> getExecutionContext(const std::string& executionId) const;
-
-    /**
-     * @brief 조건부 분기 등록
-     * @param branch 등록할 분기
-     */
-    void registerBranch(const ConditionalBranch& branch);
-
-    /**
-     * @brief 조건부 분기 조회
-     * @param branchId 분기 ID
-     * @return 분기 정의 (없으면 nullptr)
-     */
-    const ConditionalBranch* getBranch(const std::string& branchId) const;
-
-    /**
-     * @brief 병렬 분기 등록
-     * @param branch 등록할 병렬 분기
-     */
-    void registerParallelBranch(const ParallelBranch& branch);
-
-    /**
-     * @brief 병렬 분기 조회
-     * @param branchId 분기 ID
-     * @return 분기 정의 (없으면 nullptr)
-     */
-    const ParallelBranch* getParallelBranch(const std::string& branchId) const;
-
-    /**
-     * @brief 템플릿으로부터 시퀀스 인스턴스화
-     * @param templateId 템플릿 ID
-     * @param parameters 파라미터 맵 (파라미터 이름 -> 값)
-     * @param instanceName 인스턴스 이름 (선택사항)
-     * @return 인스턴스화 결과
-     */
-    TemplateInstantiationResult instantiateTemplate(
-        const std::string& templateId,
-        const std::map<std::string, std::any>& parameters,
-        const std::string& instanceName = "");
-
-    /**
-     * @brief 템플릿 인스턴스를 바로 실행
-     * @param templateId 템플릿 ID
-     * @param parameters 파라미터 맵
-     * @param instanceName 인스턴스 이름
-     * @return 실행 ID (실패 시 빈 문자열)
-     */
-    std::string executeTemplate(
-        const std::string& templateId,
-        const std::map<std::string, std::any>& parameters,
-        const std::string& instanceName = "");
+    void cancel(const std::string& sequenceId) override;
+    void pause(const std::string& sequenceId) override;
+    void resume(const std::string& sequenceId) override;
+    SequenceStatus getStatus(const std::string& sequenceId) const override;
+    float getProgress(const std::string& sequenceId) const override;
 
 private:
-    std::shared_ptr<SequenceRegistry> registry_;
-    std::shared_ptr<IActionFactory> actionFactory_;
-    std::shared_ptr<ActionExecutor> actionExecutor_;
-    std::shared_ptr<ConditionEvaluator> conditionEvaluator_;
-    std::shared_ptr<ExecutionMonitor> monitor_;
+    struct SequenceState {
+        SequenceStatus status{SequenceStatus::PENDING};
+        std::atomic<float> progress{0.0f};
+        std::atomic<bool> cancelRequested{false};
+        std::atomic<bool> pauseRequested{false};
+        int completedSteps{0};
+        int totalSteps{0};
+    };
 
-    // 실행 추적: executionId -> ExecutionContext
-    std::map<std::string, std::shared_ptr<ExecutionContext>> executions_;
+    std::shared_ptr<mxrc::core::action::ActionFactory> factory_;
+    std::shared_ptr<mxrc::core::action::ActionExecutor> executor_;
+    std::unique_ptr<ConditionEvaluator> conditionEvaluator_;
+    std::unique_ptr<RetryHandler> retryHandler_;
 
-    // 실행 상태: executionId -> (isRunning, isPaused)
-    std::map<std::string, std::pair<bool, bool>> executionState_;
-
-    // 조건부 분기: branchId -> ConditionalBranch
-    std::map<std::string, ConditionalBranch> branches_;
-
-    // 병렬 분기: branchId -> ParallelBranch
-    std::map<std::string, ParallelBranch> parallelBranches_;
-
-    // 모니터 접근 보호 (병렬 실행 시)
-    std::mutex monitorMutex_;
+    mutable std::mutex stateMutex_;
+    std::map<std::string, SequenceState> states_;
 
     /**
-     * @brief 고유 실행 ID 생성
-     * @return 실행 ID
+     * @brief Sequence 상태 가져오기 또는 생성
      */
-    std::string generateExecutionId();
+    SequenceState& getOrCreateState(const std::string& sequenceId);
 
     /**
-     * @brief 순차 실행 로직
-     * @param definition 시퀀스 정의
+     * @brief 순차 실행
+     */
+    SequenceResult executeSequential(
+        const SequenceDefinition& definition,
+        mxrc::core::action::ExecutionContext& context,
+        SequenceState& state
+    );
+
+    /**
+     * @brief 진행률 업데이트
+     */
+    void updateProgress(SequenceState& state, int completedSteps, int totalSteps);
+
+    /**
+     * @brief 조건부 분기 처리
+     *
+     * @param actionId 실행된 Action ID
+     * @param definition Sequence 정의
      * @param context 실행 컨텍스트
-     * @param executionId 실행 ID
-     * @return 성공 여부
+     * @param executedActions 이미 실행된 Action ID 집합
+     * @param state Sequence 상태
+     * @return 분기로 인해 추가 실행된 스텝 수
      */
-    bool executeSequentially(
-        const std::shared_ptr<const SequenceDefinition>& definition,
-        std::shared_ptr<ExecutionContext> context,
-        const std::string& executionId);
-
-    /**
-     * @brief 조건부 분기 실행
-     * @param branch 분기 정의
-     * @param context 실행 컨텍스트
-     * @param executionId 실행 ID
-     * @return 성공 여부
-     */
-    bool executeBranch(
-        const ConditionalBranch& branch,
-        std::shared_ptr<ExecutionContext> context,
-        const std::string& executionId);
-
-    /**
-     * @brief 병렬 분기 실행
-     * @param branch 병렬 분기 정의
-     * @param context 실행 컨텍스트
-     * @param executionId 실행 ID
-     * @return 성공 여부
-     */
-    bool executeParallel(
-        const ParallelBranch& branch,
-        std::shared_ptr<ExecutionContext> context,
-        const std::string& executionId);
-
-    /**
-     * @brief 단일 액션 시퀀스 실행 (병렬 분기 내에서 사용)
-     * @param actionIds 액션 ID 목록
-     * @param context 실행 컨텍스트
-     * @param executionId 실행 ID
-     * @return 성공 여부
-     */
-    bool executeActionSequence(
-        const std::vector<std::string>& actionIds,
-        std::shared_ptr<ExecutionContext> context,
-        const std::string& executionId);
-
-    /**
-     * @brief 파라미터 검증 및 기본값 적용
-     * @param templatePtr 템플릿 정의
-     * @param parameters 제공된 파라미터
-     * @return 검증 결과 및 오류 메시지
-     */
-    std::pair<bool, std::vector<std::string>> validateTemplateParameters(
-        const std::shared_ptr<const SequenceTemplate>& templatePtr,
-        const std::map<std::string, std::any>& parameters);
-
-    /**
-     * @brief 파라미터 값을 문자열로 변환
-     * @param value std::any 값
-     * @return 문자열 표현
-     */
-    std::string anyToString(const std::any& value);
-
-    /**
-     * @brief 액션 ID에서 파라미터 치환
-     * @param actionId 원본 액션 ID
-     * @param parameters 파라미터 맵
-     * @return 치환된 액션 ID
-     */
-    std::string substituteParameters(
+    int handleConditionalBranch(
         const std::string& actionId,
-        const std::map<std::string, std::any>& parameters);
-
-    /**
-     * @brief 실행 ID 카운터
-     */
-    static int executionCounter_;
+        const SequenceDefinition& definition,
+        mxrc::core::action::ExecutionContext& context,
+        std::set<std::string>& executedActions,
+        SequenceState& state
+    );
 };
 
 } // namespace mxrc::core::sequence
 
+#endif // MXRC_CORE_SEQUENCE_SEQUENCE_ENGINE_H

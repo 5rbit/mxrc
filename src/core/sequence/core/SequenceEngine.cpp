@@ -484,9 +484,12 @@ bool SequenceEngine::executeActionSequence(
             if (logger) {
                 logger->error("병렬 액션 생성 실패: {}", actionId);
             }
-            monitor_->logActionExecution(
-                executionId, actionId, ActionStatus::FAILED,
-                "Failed to create action");
+            {
+                std::lock_guard<std::mutex> lock(monitorMutex_);
+                monitor_->logActionExecution(
+                    executionId, actionId, ActionStatus::FAILED,
+                    "Failed to create action");
+            }
             allSuccess = false;
             continue;
         }
@@ -500,11 +503,14 @@ bool SequenceEngine::executeActionSequence(
 
         // 로깅
         ActionStatus status = actionSuccess ? ActionStatus::COMPLETED : ActionStatus::FAILED;
-        monitor_->logActionExecution(
-            executionId,
-            actionId,
-            status,
-            actionSuccess ? "" : actionExecutor_->getLastErrorMessage());
+        {
+            std::lock_guard<std::mutex> lock(monitorMutex_);
+            monitor_->logActionExecution(
+                executionId,
+                actionId,
+                status,
+                actionSuccess ? "" : actionExecutor_->getLastErrorMessage());
+        }
 
         if (!actionSuccess) {
             allSuccess = false;

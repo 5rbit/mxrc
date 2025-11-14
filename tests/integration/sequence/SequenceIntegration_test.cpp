@@ -485,3 +485,164 @@ TEST_F(SequenceIntegrationTest, ConditionalBranchElsePathIntegration) {
     }
 }
 
+/**
+ * @brief 통합 테스트: 병렬 분기 완전 실행
+ *
+ * 시나리오:
+ * - 여러 병렬 그룹이 동시 실행
+ * - 각 그룹 내 순차 실행 확인
+ * - 모든 그룹 완료 후 계속 진행
+ */
+TEST_F(SequenceIntegrationTest, ParallelBranchIntegration) {
+    // 시퀀스: setup_parallel → final_action
+    SequenceDefinition def;
+    def.id = "parallel_workflow";
+    def.name = "Parallel Workflow";
+    def.version = "1.0.0";
+    def.actionIds = {"setup_parallel", "final_action"};
+
+    // 병렬 분기: 3개 그룹
+    ParallelBranch parallel;
+    parallel.id = "setup_parallel";
+    parallel.branches = {
+        {"init_arm", "calibrate_arm"},  // 그룹 1: 팔 설정
+        {"init_gripper"},                // 그룹 2: 그리퍼
+        {"init_sensor", "verify_sensor"} // 그룹 3: 센서
+    };
+
+    registry_->registerSequence(def);
+    engine_->registerParallelBranch(parallel);
+
+    std::string executionId = engine_->execute("parallel_workflow");
+    auto status = engine_->getStatus(executionId);
+
+    // 시퀀스 완료
+    EXPECT_EQ(status.status, SequenceStatus::COMPLETED);
+
+    // 실행된 액션: 4개 (init_arm + calibrate_arm + init_gripper + init_sensor + verify_sensor) + 1 (final) = 6
+    EXPECT_EQ(status.actionResults.size(), 6);
+
+    // 마지막이 final_action 확인
+    EXPECT_EQ(status.actionResults[5].actionId, "final_action");
+
+    // 모두 성공
+    for (const auto& actionLog : status.actionResults) {
+        EXPECT_EQ(actionLog.status, ActionStatus::COMPLETED);
+    }
+
+    // 진행률 완료
+    EXPECT_FLOAT_EQ(status.progress, 1.0f);
+}
+
+/**
+ * @brief 통합 테스트: 순차 → 병렬 → 조건부 → 순차 복합 실행
+ *
+ * 시나리오:
+ * - 여러 실행 모드 혼합
+ * - 각 모드 간 정확한 제어 흐름
+ * - 최종 상태 검증
+ */
+TEST_F(SequenceIntegrationTest, ComplexMixedExecutionFlow) {
+    // 시퀀스: begin → parallel_setup → check_status → final
+    SequenceDefinition def;
+    def.id = "complex_workflow";
+    def.name = "Complex Mixed Workflow";
+    def.version = "1.0.0";
+    def.actionIds = {"begin_action", "parallel_setup", "check_status", "final_action"};
+
+    // 병렬 분기
+    ParallelBranch parallel;
+    parallel.id = "parallel_setup";
+    parallel.branches = {
+        {"setup_1"},
+        {"setup_2", "setup_3"}
+    };
+
+    // 조건부 분기
+    ConditionalBranch conditional;
+    conditional.id = "check_status";
+    conditional.condition = "ready == 1";
+    conditional.thenActions = {"process_ready"};
+    conditional.elseActions = {"process_not_ready"};
+
+    registry_->registerSequence(def);
+    engine_->registerParallelBranch(parallel);
+    engine_->registerBranch(conditional);
+
+    // 파라미터
+    std::map<std::string, std::any> params;
+    params["ready"] = 1;
+
+    std::string executionId = engine_->execute("complex_workflow", params);
+    auto result = engine_->getStatus(executionId);
+
+    // 시퀀스 완료
+    EXPECT_EQ(result.status, SequenceStatus::COMPLETED);
+
+    // 실행 순서 검증:
+    // begin_action (1) +
+    // setup_1, setup_2, setup_3 (3) +
+    // process_ready (1) +
+    // final_action (1) = 6
+    EXPECT_EQ(result.actionResults.size(), 6);
+
+    // 첫 번째: begin_action
+    EXPECT_EQ(result.actionResults[0].actionId, "begin_action");
+
+    // 마지막: final_action
+    EXPECT_EQ(result.actionResults[5].actionId, "final_action");
+
+    // 모두 성공
+    for (const auto& actionLog : result.actionResults) {
+        EXPECT_EQ(actionLog.status, ActionStatus::COMPLETED);
+    }
+}
+
+/**
+ * @brief 통합 테스트: 대규모 병렬 실행
+ *
+ * 시나리오:
+ * - 많은 병렬 그룹 동시 실행
+ * - 메모리 및 스레드 관리 검증
+ * - 대규모 동작 실행
+ */
+TEST_F(SequenceIntegrationTest, LargeParallelExecution) {
+    // 시퀀스: large_parallel_setup
+    SequenceDefinition def;
+    def.id = "large_parallel_workflow";
+    def.name = "Large Parallel Workflow";
+    def.version = "1.0.0";
+    def.actionIds = {"large_parallel_setup"};
+
+    // 병렬 분기: 5개 그룹, 총 9개 액션 (2+1+3+1+2)
+    ParallelBranch parallel;
+    parallel.id = "large_parallel_setup";
+    parallel.branches = {
+        {"action_1_1", "action_1_2"},
+        {"action_2_1"},
+        {"action_3_1", "action_3_2", "action_3_3"},
+        {"action_4_1"},
+        {"action_5_1", "action_5_2"}
+    };
+
+    registry_->registerSequence(def);
+    engine_->registerParallelBranch(parallel);
+
+    std::string executionId = engine_->execute("large_parallel_workflow");
+    auto status = engine_->getStatus(executionId);
+
+    // 시퀀스 완료
+    EXPECT_EQ(status.status, SequenceStatus::COMPLETED);
+
+    // 9개 액션 모두 실행됨
+    EXPECT_EQ(status.actionResults.size(), 9);
+
+    // 모두 성공
+    for (const auto& actionLog : status.actionResults) {
+        EXPECT_EQ(actionLog.status, ActionStatus::COMPLETED);
+    }
+
+    // 진행률 완료
+    EXPECT_FLOAT_EQ(status.progress, 1.0f);
+}
+

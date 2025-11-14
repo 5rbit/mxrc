@@ -145,6 +145,9 @@ private:
     // 병렬 분기: branchId -> ParallelBranch
     std::map<std::string, ParallelBranch> parallelBranches_;
 
+    // 모니터 접근 보호 (병렬 실행 시)
+    std::mutex monitorMutex_;
+
     /**
      * @brief 고유 실행 ID 생성
      * @return 실행 ID

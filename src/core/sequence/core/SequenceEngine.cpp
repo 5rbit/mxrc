@@ -1,6 +1,8 @@
 #include "SequenceEngine.h"
 #include <spdlog/spdlog.h>
 #include <chrono>
+#include <thread>
+#include <mutex>
 
 namespace mxrc::core::sequence {
 
@@ -183,61 +185,74 @@ bool SequenceEngine::executeSequentially(
             logger->debug("항목 실행: {} ({}/{})", itemId, i + 1, totalActions);
         }
 
-        // 조건부 분기 확인
-        const ConditionalBranch* branch = getBranch(itemId);
-        if (branch) {
+        // 병렬 분기 확인
+        const ParallelBranch* parallelBranch = getParallelBranch(itemId);
+        if (parallelBranch) {
             if (logger) {
-                logger->debug("조건부 분기 감지: {}", itemId);
+                logger->debug("병렬 분기 감지: {}", itemId);
             }
-            // 분기 실행
-            bool branchSuccess = executeBranch(*branch, context, executionId);
-            if (!branchSuccess) {
+            // 병렬 분기 실행
+            bool parallelSuccess = executeParallel(*parallelBranch, context, executionId);
+            if (!parallelSuccess) {
                 allSuccess = false;
             }
         } else {
-            // 일반 동작 실행
-            if (logger) {
-                logger->debug("동작 실행: {} ({}/{})", itemId, i + 1, totalActions);
-            }
-
-            // 동작 생성
-            std::map<std::string, std::string> params;  // 기본 빈 파라미터
-            auto action = actionFactory_->createAction(itemId, itemId, params);
-
-            if (!action) {
+            // 조건부 분기 확인
+            const ConditionalBranch* branch = getBranch(itemId);
+            if (branch) {
                 if (logger) {
-                    logger->error("동작 생성 실패: {}", itemId);
+                    logger->debug("조건부 분기 감지: {}", itemId);
                 }
-                monitor_->logActionExecution(
-                    executionId, itemId, ActionStatus::FAILED,
-                    "Failed to create action");
-                allSuccess = false;
-                continue;
-            }
-
-            // 동작 실행
-            bool actionSuccess = actionExecutor_->execute(
-                action,
-                *context,
-                0,  // no timeout
-                RetryPolicy::noRetry());  // no retry
-
-            // 로깅
-            ActionStatus status = actionSuccess ? ActionStatus::COMPLETED : ActionStatus::FAILED;
-            monitor_->logActionExecution(
-                executionId,
-                itemId,
-                status,
-                actionSuccess ? "" : actionExecutor_->getLastErrorMessage());
-
-            if (!actionSuccess) {
-                allSuccess = false;
-                if (logger) {
-                    logger->warn("동작 실패: {}", itemId);
+                // 분기 실행
+                bool branchSuccess = executeBranch(*branch, context, executionId);
+                if (!branchSuccess) {
+                    allSuccess = false;
                 }
             } else {
+                // 일반 동작 실행
                 if (logger) {
-                    logger->info("동작 완료: {}", itemId);
+                    logger->debug("동작 실행: {} ({}/{})", itemId, i + 1, totalActions);
+                }
+
+                // 동작 생성
+                std::map<std::string, std::string> params;  // 기본 빈 파라미터
+                auto action = actionFactory_->createAction(itemId, itemId, params);
+
+                if (!action) {
+                    if (logger) {
+                        logger->error("동작 생성 실패: {}", itemId);
+                    }
+                    monitor_->logActionExecution(
+                        executionId, itemId, ActionStatus::FAILED,
+                        "Failed to create action");
+                    allSuccess = false;
+                    continue;
+                }
+
+                // 동작 실행
+                bool actionSuccess = actionExecutor_->execute(
+                    action,
+                    *context,
+                    0,  // no timeout
+                    RetryPolicy::noRetry());  // no retry
+
+                // 로깅
+                ActionStatus status = actionSuccess ? ActionStatus::COMPLETED : ActionStatus::FAILED;
+                monitor_->logActionExecution(
+                    executionId,
+                    itemId,
+                    status,
+                    actionSuccess ? "" : actionExecutor_->getLastErrorMessage());
+
+                if (!actionSuccess) {
+                    allSuccess = false;
+                    if (logger) {
+                        logger->warn("동작 실패: {}", itemId);
+                    }
+                } else {
+                    if (logger) {
+                        logger->info("동작 완료: {}", itemId);
+                    }
                 }
             }
         }
@@ -258,9 +273,25 @@ void SequenceEngine::registerBranch(const ConditionalBranch& branch) {
     branches_[branch.id] = branch;
 }
 
+void SequenceEngine::registerParallelBranch(const ParallelBranch& branch) {
+    auto logger = spdlog::get("mxrc");
+    if (logger) {
+        logger->info("병렬 분기 등록: id={}, branches.size={}", branch.id, branch.branches.size());
+    }
+    parallelBranches_[branch.id] = branch;
+}
+
 const ConditionalBranch* SequenceEngine::getBranch(const std::string& branchId) const {
     auto it = branches_.find(branchId);
     if (it != branches_.end()) {
+        return &it->second;
+    }
+    return nullptr;
+}
+
+const ParallelBranch* SequenceEngine::getParallelBranch(const std::string& branchId) const {
+    auto it = parallelBranches_.find(branchId);
+    if (it != parallelBranches_.end()) {
         return &it->second;
     }
     return nullptr;
@@ -350,6 +381,139 @@ bool SequenceEngine::executeBranch(
         } else {
             if (logger) {
                 logger->info("동작 완료: {}", actionId);
+            }
+        }
+    }
+
+    return allSuccess;
+}
+
+bool SequenceEngine::executeParallel(
+    const ParallelBranch& branch,
+    std::shared_ptr<ExecutionContext> context,
+    const std::string& executionId) {
+
+    auto logger = spdlog::get("mxrc");
+
+    if (logger) {
+        logger->info("병렬 분기 실행: id={}, branches.size={}",
+            branch.id, branch.branches.size());
+    }
+
+    // 취소 요청 확인
+    auto stateIt = executionState_.find(executionId);
+    if (stateIt != executionState_.end() && !stateIt->second.first) {
+        if (logger) {
+            logger->info("병렬 분기 실행 중단됨: {}", executionId);
+        }
+        return false;
+    }
+
+    // 각 분기를 별도 스레드에서 실행
+    std::vector<std::thread> threads;
+    std::vector<bool> branchResults(branch.branches.size(), false);
+    std::vector<std::mutex> result_mutexes(branch.branches.size());
+
+    for (size_t i = 0; i < branch.branches.size(); ++i) {
+        threads.emplace_back(
+            [this, &branch, context, executionId, i, &branchResults, &result_mutexes]() {
+                bool result = executeActionSequence(
+                    branch.branches[i], context, executionId);
+                {
+                    std::lock_guard<std::mutex> lock(result_mutexes[i]);
+                    branchResults[i] = result;
+                }
+            });
+    }
+
+    // 모든 스레드 완료 대기
+    for (auto& thread : threads) {
+        if (thread.joinable()) {
+            thread.join();
+        }
+    }
+
+    if (logger) {
+        logger->info("병렬 분기 완료: id={}", branch.id);
+    }
+
+    // 모든 분기 성공 확인
+    bool allSuccess = true;
+    for (bool result : branchResults) {
+        if (!result) {
+            allSuccess = false;
+            break;
+        }
+    }
+
+    return allSuccess;
+}
+
+bool SequenceEngine::executeActionSequence(
+    const std::vector<std::string>& actionIds,
+    std::shared_ptr<ExecutionContext> context,
+    const std::string& executionId) {
+
+    auto logger = spdlog::get("mxrc");
+
+    if (actionIds.empty()) {
+        return true;
+    }
+
+    bool allSuccess = true;
+
+    for (const auto& actionId : actionIds) {
+        // 취소 요청 확인
+        auto stateIt = executionState_.find(executionId);
+        if (stateIt != executionState_.end() && !stateIt->second.first) {
+            if (logger) {
+                logger->info("액션 시퀀스 실행 중단됨: {}", executionId);
+            }
+            return false;
+        }
+
+        if (logger) {
+            logger->debug("병렬 액션 실행: {}", actionId);
+        }
+
+        // 동작 생성
+        std::map<std::string, std::string> params;
+        auto action = actionFactory_->createAction(actionId, actionId, params);
+
+        if (!action) {
+            if (logger) {
+                logger->error("병렬 액션 생성 실패: {}", actionId);
+            }
+            monitor_->logActionExecution(
+                executionId, actionId, ActionStatus::FAILED,
+                "Failed to create action");
+            allSuccess = false;
+            continue;
+        }
+
+        // 동작 실행
+        bool actionSuccess = actionExecutor_->execute(
+            action,
+            *context,
+            0,  // no timeout
+            RetryPolicy::noRetry());
+
+        // 로깅
+        ActionStatus status = actionSuccess ? ActionStatus::COMPLETED : ActionStatus::FAILED;
+        monitor_->logActionExecution(
+            executionId,
+            actionId,
+            status,
+            actionSuccess ? "" : actionExecutor_->getLastErrorMessage());
+
+        if (!actionSuccess) {
+            allSuccess = false;
+            if (logger) {
+                logger->warn("병렬 액션 실패: {}", actionId);
+            }
+        } else {
+            if (logger) {
+                logger->info("병렬 액션 완료: {}", actionId);
             }
         }
     }

@@ -6,12 +6,15 @@
 #include "core/sequence/core/ExecutionMonitor.h"
 #include "core/sequence/core/ExecutionContext.h"
 #include "core/sequence/core/ConditionalBranch.h"
+#include "core/sequence/core/ParallelBranch.h"
 #include "core/sequence/interfaces/IActionFactory.h"
 #include "core/sequence/dto/SequenceDto.h"
 #include <string>
 #include <map>
 #include <any>
 #include <memory>
+#include <thread>
+#include <vector>
 
 namespace mxrc::core::sequence {
 
@@ -110,6 +113,19 @@ public:
      */
     const ConditionalBranch* getBranch(const std::string& branchId) const;
 
+    /**
+     * @brief 병렬 분기 등록
+     * @param branch 등록할 병렬 분기
+     */
+    void registerParallelBranch(const ParallelBranch& branch);
+
+    /**
+     * @brief 병렬 분기 조회
+     * @param branchId 분기 ID
+     * @return 분기 정의 (없으면 nullptr)
+     */
+    const ParallelBranch* getParallelBranch(const std::string& branchId) const;
+
 private:
     std::shared_ptr<SequenceRegistry> registry_;
     std::shared_ptr<IActionFactory> actionFactory_;
@@ -125,6 +141,9 @@ private:
 
     // 조건부 분기: branchId -> ConditionalBranch
     std::map<std::string, ConditionalBranch> branches_;
+
+    // 병렬 분기: branchId -> ParallelBranch
+    std::map<std::string, ParallelBranch> parallelBranches_;
 
     /**
      * @brief 고유 실행 ID 생성
@@ -153,6 +172,30 @@ private:
      */
     bool executeBranch(
         const ConditionalBranch& branch,
+        std::shared_ptr<ExecutionContext> context,
+        const std::string& executionId);
+
+    /**
+     * @brief 병렬 분기 실행
+     * @param branch 병렬 분기 정의
+     * @param context 실행 컨텍스트
+     * @param executionId 실행 ID
+     * @return 성공 여부
+     */
+    bool executeParallel(
+        const ParallelBranch& branch,
+        std::shared_ptr<ExecutionContext> context,
+        const std::string& executionId);
+
+    /**
+     * @brief 단일 액션 시퀀스 실행 (병렬 분기 내에서 사용)
+     * @param actionIds 액션 ID 목록
+     * @param context 실행 컨텍스트
+     * @param executionId 실행 ID
+     * @return 성공 여부
+     */
+    bool executeActionSequence(
+        const std::vector<std::string>& actionIds,
         std::shared_ptr<ExecutionContext> context,
         const std::string& executionId);
 

@@ -62,6 +62,7 @@ add_executable(run_tests
     tests/unit/task/TaskExecutor_test.cpp
     tests/unit/sequence/ExecutionContext_test.cpp
     tests/unit/sequence/SequenceEngine_test.cpp
+    tests/integration/sequence/SequenceIntegration_test.cpp
     src/core/taskmanager/Task.cpp
     src/core/taskmanager/TaskManager.cpp
     src/core/taskmanager/TaskDefinitionRegistry.cpp
@@ -93,6 +94,7 @@ target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/sequence/dto
     ${PROJECT_SOURCE_DIR}/src/core/sequence/integration
     ${PROJECT_SOURCE_DIR}/tests/unit/sequence
+    ${PROJECT_SOURCE_DIR}/tests/integration/sequence
 )
 
 

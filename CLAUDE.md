@@ -56,6 +56,66 @@ make
 ./run_tests --gtest_filter=TaskManagerTest.RegisterTaskDefinition
 ```
 
+## 시스템 개념 계층
+
+MXRC는 네 가지 계층으로 구성된 명확한 개념 구조를 따릅니다:
+
+### 개념 계층 정의
+
+```
+┌─────────────────────────────────────────────┐
+│        MISSION (미션)                       │
+│   상위 시스템이 지시한 작업의 큰 범주      │
+│   예: "Pick & Place", "Assembly"            │
+│   - 여러 Task들의 조합으로 구성             │
+│   - 선형 또는 조건부 실행 시퀀스            │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│        TASK (태스크)                        │
+│   로봇의 작업 단위, Sequence로 구성        │
+│   예: "PickObject", "MoveToLocation"       │
+│   - 원자적(Atomic) 작업 단위               │
+│   - 상태 관리, 재시도, 타임아웃 포함       │
+│   - TaskManager에 의해 관리                │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│    SEQUENCE (시퀀스)                        │
+│   작업 내부의 순차적 Action 조성            │
+│   예: "GripperOpen → Move → GripperClose"  │
+│   - 순차/조건부/병렬 실행 지원             │
+│   - SequenceEngine에 의해 실행             │
+│   - 진행률 추적, 모니터링 기능             │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│      ACTION (액션)                         │
+│   로봇의 단위 동작                          │
+│   예: "MoveMotor", "SetGripper", "Delay"  │
+│   - 가장 낮은 수준의 실행 단위             │
+│   - ActionExecutor에 의해 실행             │
+│   - 결과 저장, 에러 처리                   │
+└─────────────────────────────────────────────┘
+```
+
+### 계층 간 관계
+
+- **Mission → Task**: Mission은 여러 Task의 조합으로 정의됨
+- **Task → Sequence**: Task는 내부적으로 Sequence로 구성됨
+- **Sequence → Action**: Sequence는 여러 Action의 순서를 정의함
+- **Action**: 최종 실행 단위, 로봇 제어 명령으로 변환됨
+
+### 모듈 및 책임
+
+| 계층 | 모듈 | 책임 | 상태 관리 |
+|------|------|------|---------|
+| Task | `taskmanager` | Task 정의, 등록, 실행 생명주기 | TaskStatus |
+| Sequence | `sequence` | Action 순서 정의, 조건/분기/병렬 제어 | SequenceStatus |
+| Action | `sequence/executor` | 개별 Action 실행 | ActionStatus |
+
+---
+
 ## 아키텍처
 
 ### 핵심 모듈
@@ -98,6 +158,47 @@ src/core/taskmanager/
 
 tests/unit/task/        # taskmanager 모듈 단위 테스트
 specs/                  # 기능 사양 및 계획 문서
+```
+
+**Sequence 모듈** (`src/core/sequence/`)
+Action 시퀀스 오케스트레이션 시스템으로, Task 내부의 Action 실행을 관리합니다:
+
+- **SequenceRegistry**: 시퀀스 정의(순차, 조건부, 병렬 실행) 저장 및 조회
+- **SequenceEngine**: 시퀀스 정의를 로드하여 순차/조건부/병렬 실행을 조율
+- **ActionExecutor**: 개별 Action 실행, 타임아웃, 재시도 정책 관리
+- **ExecutionMonitor**: 실행 진행률, 상태, 로그 추적
+- **ExecutionContext**: Action들 간의 상태 공유를 위한 변수 및 결과 저장소
+- **ConditionalBranch**: IF-THEN-ELSE 조건부 분기 정의
+
+**주요 기능:**
+- 순차 실행: Action이 순서대로 실행, 이전 결과는 컨텍스트에 저장
+- 조건부 분기: 런타임 조건 평가 후 다른 실행 경로 선택
+- 병렬 실행: 독립적인 Action들을 병렬로 실행
+- 재시도 정책: 실패한 Action에 대한 자동 재시도
+- 진행률 추적: 전체 진행 상황 실시간 모니터링
+- 취소/일시정지: 실행 중인 시퀀스의 제어
+
+**디렉토리 구조:**
+```
+src/core/sequence/
+├── core/               # 핵심 컴포넌트
+│   ├── SequenceEngine.*
+│   ├── SequenceRegistry.*
+│   ├── ActionExecutor.*
+│   ├── ConditionEvaluator.*
+│   ├── ExecutionMonitor.*
+│   ├── ExecutionContext.*
+│   ├── ConditionalBranch.h
+│   └── RetryPolicy.h
+├── dto/                # 데이터 전송 객체
+│   └── SequenceDto.h
+├── interfaces/         # 추상 인터페이스
+│   ├── IAction.h
+│   └── IActionFactory.h
+└── ...
+
+tests/unit/sequence/    # sequence 모듈 단위 테스트
+tests/integration/sequence/ # 시퀀스 통합 테스트
 ```
 
 ## 코드 스타일 및 규칙
@@ -149,6 +250,93 @@ private:
     TaskStatus status_;
     float progress_;
 };
+```
+
+### 시퀀스 및 액션 구현
+
+**Action 구현:**
+
+새로운 액션 타입을 구현할 때:
+
+1. `IAction` 인터페이스를 상속
+2. 필수 메서드 구현: `execute()`, `cancel()`, `getStatus()`, `getId()`
+3. 결과는 ExecutionContext에 저장하여 다른 Action에서 접근 가능
+4. 에러 메시지는 ActionExecutor를 통해 캡처됨
+
+```cpp
+class MyAction : public IAction {
+public:
+    MyAction(const std::string& id) : id_(id) {}
+
+    void execute(ExecutionContext& context) override {
+        // 입력 변수 읽기
+        auto input = context.getVariable("input_value");
+        if (!input.has_value()) {
+            throw std::runtime_error("Missing input_value");
+        }
+
+        // 작업 수행
+        int value = std::any_cast<int>(input);
+        int result = value * 2;
+
+        // 결과 저장
+        context.setActionResult(id_, result);
+    }
+
+    void cancel() override {
+        // 취소 처리 (필요시)
+    }
+
+    ActionStatus getStatus() const override {
+        return status_;
+    }
+
+    std::string getId() const override {
+        return id_;
+    }
+
+private:
+    std::string id_;
+    ActionStatus status_ = ActionStatus::PENDING;
+};
+```
+
+**Sequence 정의:**
+
+시퀀스는 순차, 조건부, 병렬 실행을 지원합니다:
+
+```cpp
+// 1. 순차 실행 정의
+SequenceDefinition seq;
+seq.id = "move_and_pick";
+seq.actionIds = {"move_to_location", "gripper_open", "pick_object"};
+registry.registerSequence(seq);
+
+// 2. 조건부 분기 정의
+ConditionalBranch branch;
+branch.id = "check_weight";
+branch.condition = "weight > 5";  // 지원 연산자: ==, !=, <, >, <=, >=, AND, OR, NOT
+branch.thenActions = {"gripper_strong"};
+branch.elseActions = {"gripper_weak"};
+engine.registerBranch(branch);
+
+// 3. 병렬 실행 정의 (Phase 5)
+ParallelBranch parallel;
+parallel.id = "parallel_setup";
+parallel.branches = {{"move_arm"}, {"move_legs"}};
+engine.registerParallelBranch(parallel);
+```
+
+**Execution Context 사용:**
+
+Action들 간에 상태를 공유합니다:
+
+```cpp
+// Action 내부에서
+context.setVariable("processed_count", 10);  // 상태 저장
+auto result = context.getVariable("processed_count");  // 상태 읽기
+context.setActionResult(actionId, processedData);  // 결과 저장
+auto prevResult = context.getActionResult(prevActionId);  // 이전 결과 읽기
 ```
 
 ### 테스트 규칙

@@ -26,6 +26,7 @@ add_executable(mxrc
     src/core/sequence/core/ActionExecutor.cpp
     src/core/sequence/core/ConditionEvaluator.cpp
     src/core/sequence/core/ExecutionMonitor.cpp
+    src/core/sequence/core/SequenceEngine.cpp
 )
 
 # Link dependencies
@@ -60,6 +61,7 @@ add_executable(run_tests
     tests/unit/task/TaskDefinitionRegistry_test.cpp
     tests/unit/task/TaskExecutor_test.cpp
     tests/unit/sequence/ExecutionContext_test.cpp
+    tests/unit/sequence/SequenceEngine_test.cpp
     src/core/taskmanager/Task.cpp
     src/core/taskmanager/TaskManager.cpp
     src/core/taskmanager/TaskDefinitionRegistry.cpp
@@ -75,6 +77,7 @@ add_executable(run_tests
     src/core/sequence/core/ActionExecutor.cpp
     src/core/sequence/core/ConditionEvaluator.cpp
     src/core/sequence/core/ExecutionMonitor.cpp
+    src/core/sequence/core/SequenceEngine.cpp
 )
 
 target_include_directories(run_tests PUBLIC
@@ -89,6 +92,7 @@ target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/sequence/core
     ${PROJECT_SOURCE_DIR}/src/core/sequence/dto
     ${PROJECT_SOURCE_DIR}/src/core/sequence/integration
+    ${PROJECT_SOURCE_DIR}/tests/unit/sequence
 )
 
 

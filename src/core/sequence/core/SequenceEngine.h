@@ -5,6 +5,7 @@
 #include "core/sequence/core/ConditionEvaluator.h"
 #include "core/sequence/core/ExecutionMonitor.h"
 #include "core/sequence/core/ExecutionContext.h"
+#include "core/sequence/core/ConditionalBranch.h"
 #include "core/sequence/interfaces/IActionFactory.h"
 #include "core/sequence/dto/SequenceDto.h"
 #include <string>
@@ -96,6 +97,19 @@ public:
      */
     std::shared_ptr<ExecutionContext> getExecutionContext(const std::string& executionId) const;
 
+    /**
+     * @brief 조건부 분기 등록
+     * @param branch 등록할 분기
+     */
+    void registerBranch(const ConditionalBranch& branch);
+
+    /**
+     * @brief 조건부 분기 조회
+     * @param branchId 분기 ID
+     * @return 분기 정의 (없으면 nullptr)
+     */
+    const ConditionalBranch* getBranch(const std::string& branchId) const;
+
 private:
     std::shared_ptr<SequenceRegistry> registry_;
     std::shared_ptr<IActionFactory> actionFactory_;
@@ -108,6 +122,9 @@ private:
 
     // 실행 상태: executionId -> (isRunning, isPaused)
     std::map<std::string, std::pair<bool, bool>> executionState_;
+
+    // 조건부 분기: branchId -> ConditionalBranch
+    std::map<std::string, ConditionalBranch> branches_;
 
     /**
      * @brief 고유 실행 ID 생성
@@ -124,6 +141,18 @@ private:
      */
     bool executeSequentially(
         const std::shared_ptr<const SequenceDefinition>& definition,
+        std::shared_ptr<ExecutionContext> context,
+        const std::string& executionId);
+
+    /**
+     * @brief 조건부 분기 실행
+     * @param branch 분기 정의
+     * @param context 실행 컨텍스트
+     * @param executionId 실행 ID
+     * @return 성공 여부
+     */
+    bool executeBranch(
+        const ConditionalBranch& branch,
         std::shared_ptr<ExecutionContext> context,
         const std::string& executionId);
 

@@ -1,9 +1,10 @@
 // SequenceEngine 단위 테스트
-// 시퀀스 순차 실행 기능 검증
+// 시퀸스 순차 실행 및 조건부 분기 기능 검증
 
 #include "gtest/gtest.h"
 #include "core/sequence/core/SequenceEngine.h"
 #include "core/sequence/core/SequenceRegistry.h"
+#include "core/sequence/core/ConditionalBranch.h"
 #include "core/sequence/dto/SequenceDto.h"
 #include "MockActions.h"
 #include <spdlog/spdlog.h>
@@ -285,5 +286,164 @@ TEST_F(SequenceEngineTest, NoMemoryLeaks) {
 
     // 메모리 누수 감지는 valgrind 등으로 수행
     EXPECT_TRUE(true);
+}
+
+// Phase 4: US2 - 조건부 분기 테스트
+
+// 단순 조건 평가 테스트
+TEST_F(SequenceEngineTest, SimpleConditionalBranch) {
+    // 시퀀스 정의
+    SequenceDefinition def;
+    def.id = "conditional_seq";
+    def.name = "Conditional Sequence";
+    def.version = "1.0.0";
+    def.actionIds = {"check_weight", "action_1", "action_2"};
+
+    // 분기 등록: weight > 10이면 THEN 실행
+    ConditionalBranch branch;
+    branch.id = "check_weight";
+    branch.condition = "weight > 10";
+    branch.thenActions = {"then_action"};
+    branch.elseActions = {"else_action"};
+
+    registry_->registerSequence(def);
+    engine_->registerBranch(branch);
+
+    // 파라미터: weight = 15 (조건 충족)
+    std::map<std::string, std::any> params;
+    params["weight"] = 15;
+
+    std::string executionId = engine_->execute("conditional_seq", params);
+    auto status = engine_->getStatus(executionId);
+
+    // 시퀸스 완료 확인
+    EXPECT_EQ(status.status, SequenceStatus::COMPLETED);
+    EXPECT_FLOAT_EQ(status.progress, 1.0f);
+}
+
+// 조건 거짓 시 ELSE 실행 테스트
+TEST_F(SequenceEngineTest, ConditionalBranchElsePath) {
+    // 시퀀스 정의
+    SequenceDefinition def;
+    def.id = "conditional_else_seq";
+    def.name = "Conditional Else Sequence";
+    def.version = "1.0.0";
+    def.actionIds = {"check_pressure", "done"};
+
+    // 분기 등록: pressure <= 100이면 THEN, 아니면 ELSE
+    ConditionalBranch branch;
+    branch.id = "check_pressure";
+    branch.condition = "pressure <= 100";
+    branch.thenActions = {"action_a"};
+    branch.elseActions = {"action_b"};
+
+    registry_->registerSequence(def);
+    engine_->registerBranch(branch);
+
+    // 파라미터: pressure = 150 (조건 불충족 -> ELSE 실행)
+    std::map<std::string, std::any> params;
+    params["pressure"] = 150;
+
+    std::string executionId = engine_->execute("conditional_else_seq", params);
+    auto status = engine_->getStatus(executionId);
+
+    EXPECT_EQ(status.status, SequenceStatus::COMPLETED);
+}
+
+// 복합 조건 테스트
+TEST_F(SequenceEngineTest, ComplexCondition) {
+    // 시퀀스 정의
+    SequenceDefinition def;
+    def.id = "complex_cond_seq";
+    def.name = "Complex Condition Sequence";
+    def.version = "1.0.0";
+    def.actionIds = {"check_params", "finish"};
+
+    // 복합 조건: weight > 10 AND pressure <= 100
+    ConditionalBranch branch;
+    branch.id = "check_params";
+    branch.condition = "weight > 10 AND pressure <= 100";
+    branch.thenActions = {"action_x"};
+    branch.elseActions = {"action_y"};
+
+    registry_->registerSequence(def);
+    engine_->registerBranch(branch);
+
+    // 파라미터: 둘 다 조건 만족
+    std::map<std::string, std::any> params;
+    params["weight"] = 20;
+    params["pressure"] = 80;
+
+    std::string executionId = engine_->execute("complex_cond_seq", params);
+    auto status = engine_->getStatus(executionId);
+
+    EXPECT_EQ(status.status, SequenceStatus::COMPLETED);
+}
+
+// 분기 없는 ELSE 경로 테스트
+TEST_F(SequenceEngineTest, ConditionalBranchNoElse) {
+    // 시퀀스 정의
+    SequenceDefinition def;
+    def.id = "no_else_seq";
+    def.name = "No Else Sequence";
+    def.version = "1.0.0";
+    def.actionIds = {"check_flag", "final"};
+
+    // ELSE 없이 THEN만 정의
+    ConditionalBranch branch;
+    branch.id = "check_flag";
+    branch.condition = "flag == true";
+    branch.thenActions = {"action_when_true"};
+    // elseActions는 비어있음
+
+    registry_->registerSequence(def);
+    engine_->registerBranch(branch);
+
+    // 파라미터: flag = false (ELSE 없으므로 아무것도 실행 안 함)
+    std::map<std::string, std::any> params;
+    params["flag"] = false;
+
+    std::string executionId = engine_->execute("no_else_seq", params);
+    auto status = engine_->getStatus(executionId);
+
+    EXPECT_EQ(status.status, SequenceStatus::COMPLETED);
+}
+
+// 여러 분기 순차 실행 테스트
+TEST_F(SequenceEngineTest, MultipleBranchesSequence) {
+    // 시퀀스 정의
+    SequenceDefinition def;
+    def.id = "multi_branch_seq";
+    def.name = "Multiple Branches Sequence";
+    def.version = "1.0.0";
+    def.actionIds = {"branch_1", "branch_2", "final_action"};
+
+    // 첫 번째 분기
+    ConditionalBranch branch1;
+    branch1.id = "branch_1";
+    branch1.condition = "value > 50";
+    branch1.thenActions = {"action_1a"};
+    branch1.elseActions = {"action_1b"};
+
+    // 두 번째 분기
+    ConditionalBranch branch2;
+    branch2.id = "branch_2";
+    branch2.condition = "value < 100";
+    branch2.thenActions = {"action_2a"};
+    branch2.elseActions = {"action_2b"};
+
+    registry_->registerSequence(def);
+    engine_->registerBranch(branch1);
+    engine_->registerBranch(branch2);
+
+    // 파라미터: 두 조건 모두 만족
+    std::map<std::string, std::any> params;
+    params["value"] = 75;
+
+    std::string executionId = engine_->execute("multi_branch_seq", params);
+    auto status = engine_->getStatus(executionId);
+
+    EXPECT_EQ(status.status, SequenceStatus::COMPLETED);
+    EXPECT_EQ(status.actionResults.size(), 3);  // action_1a + action_2a + final_action
 }
 

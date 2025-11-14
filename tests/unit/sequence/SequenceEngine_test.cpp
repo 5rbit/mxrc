@@ -447,3 +447,166 @@ TEST_F(SequenceEngineTest, MultipleBranchesSequence) {
     EXPECT_EQ(status.actionResults.size(), 3);  // action_1a + action_2a + final_action
 }
 
+// 병렬 실행 테스트
+
+// 단순 병렬 분기 테스트
+TEST_F(SequenceEngineTest, SimpleParallelBranch) {
+    // 시퀀스 정의
+    SequenceDefinition def;
+    def.id = "parallel_seq";
+    def.name = "Simple Parallel";
+    def.version = "1.0.0";
+    def.actionIds = {"parallel_group"};
+
+    // 병렬 분기: 2개 그룹이 병렬로 실행
+    ParallelBranch parallel;
+    parallel.id = "parallel_group";
+    parallel.branches = {
+        {"action_a1", "action_a2"},  // 그룹 1: 순차 실행
+        {"action_b1"}                // 그룹 2: 단일 액션
+    };
+
+    registry_->registerSequence(def);
+    engine_->registerParallelBranch(parallel);
+
+    std::string executionId = engine_->execute("parallel_seq");
+    auto status = engine_->getStatus(executionId);
+
+    EXPECT_EQ(status.status, SequenceStatus::COMPLETED);
+    // 3개 액션이 실행됨 (a1, a2, b1)
+    EXPECT_EQ(status.actionResults.size(), 3);
+}
+
+// 3개 병렬 그룹 테스트
+TEST_F(SequenceEngineTest, ThreeParallelGroups) {
+    // 시퀀스 정의
+    SequenceDefinition def;
+    def.id = "three_parallel_seq";
+    def.name = "Three Parallel Groups";
+    def.version = "1.0.0";
+    def.actionIds = {"three_parallel_group"};
+
+    // 병렬 분기: 3개 그룹
+    ParallelBranch parallel;
+    parallel.id = "three_parallel_group";
+    parallel.branches = {
+        {"action_x1"},              // 그룹 1
+        {"action_y1", "action_y2"}, // 그룹 2 (2개 액션)
+        {"action_z1"}               // 그룹 3
+    };
+
+    registry_->registerSequence(def);
+    engine_->registerParallelBranch(parallel);
+
+    std::string executionId = engine_->execute("three_parallel_seq");
+    auto status = engine_->getStatus(executionId);
+
+    EXPECT_EQ(status.status, SequenceStatus::COMPLETED);
+    // 4개 액션이 실행됨 (x1, y1, y2, z1)
+    EXPECT_EQ(status.actionResults.size(), 4);
+
+    // 모든 액션이 완료되었는지 확인
+    for (const auto& actionLog : status.actionResults) {
+        EXPECT_EQ(actionLog.status, ActionStatus::COMPLETED);
+    }
+}
+
+// 병렬 분기 후 순차 실행 테스트
+TEST_F(SequenceEngineTest, ParallelThenSequential) {
+    // 시퀀스 정의: 병렬 분기 → final_action
+    SequenceDefinition def;
+    def.id = "parallel_then_seq_seq";
+    def.name = "Parallel Then Sequential";
+    def.version = "1.0.0";
+    def.actionIds = {"parallel_part", "final_sequential"};
+
+    // 병렬 분기
+    ParallelBranch parallel;
+    parallel.id = "parallel_part";
+    parallel.branches = {
+        {"parallel_action_1"},
+        {"parallel_action_2"}
+    };
+
+    registry_->registerSequence(def);
+    engine_->registerParallelBranch(parallel);
+
+    std::string executionId = engine_->execute("parallel_then_seq_seq");
+    auto status = engine_->getStatus(executionId);
+
+    EXPECT_EQ(status.status, SequenceStatus::COMPLETED);
+    // 3개 액션: parallel_action_1 + parallel_action_2 + final_sequential
+    EXPECT_EQ(status.actionResults.size(), 3);
+
+    // 마지막 액션이 final_sequential인지 확인 (병렬 후 순차 진행)
+    EXPECT_EQ(status.actionResults[2].actionId, "final_sequential");
+}
+
+// 병렬 분기와 조건부 분기 혼합 테스트
+TEST_F(SequenceEngineTest, ParallelAndConditionalMixed) {
+    // 시퀀스: parallel_group → conditional_group
+    SequenceDefinition def;
+    def.id = "mixed_seq";
+    def.name = "Mixed Parallel and Conditional";
+    def.version = "1.0.0";
+    def.actionIds = {"parallel_group", "conditional_group"};
+
+    // 병렬 분기
+    ParallelBranch parallel;
+    parallel.id = "parallel_group";
+    parallel.branches = {
+        {"setup_1"},
+        {"setup_2"}
+    };
+
+    // 조건부 분기
+    ConditionalBranch conditional;
+    conditional.id = "conditional_group";
+    conditional.condition = "status == 200";
+    conditional.thenActions = {"process_then"};
+    conditional.elseActions = {"process_else"};
+
+    registry_->registerSequence(def);
+    engine_->registerParallelBranch(parallel);
+    engine_->registerBranch(conditional);
+
+    // 파라미터
+    std::map<std::string, std::any> params;
+    params["status"] = 200;
+
+    std::string executionId = engine_->execute("mixed_seq", params);
+    auto status = engine_->getStatus(executionId);
+
+    EXPECT_EQ(status.status, SequenceStatus::COMPLETED);
+    // setup_1 + setup_2 + process_then = 3
+    EXPECT_EQ(status.actionResults.size(), 3);
+}
+
+// 빈 병렬 분기 테스트 (엣지 케이스)
+TEST_F(SequenceEngineTest, EmptyParallelGroup) {
+    // 시퀀스 정의
+    SequenceDefinition def;
+    def.id = "empty_parallel_seq";
+    def.name = "Empty Parallel";
+    def.version = "1.0.0";
+    def.actionIds = {"empty_parallel_group", "final_action"};
+
+    // 병렬 분기 (빈 그룹 포함)
+    ParallelBranch parallel;
+    parallel.id = "empty_parallel_group";
+    parallel.branches = {
+        {"action_1"},
+        {}  // 빈 그룹
+    };
+
+    registry_->registerSequence(def);
+    engine_->registerParallelBranch(parallel);
+
+    std::string executionId = engine_->execute("empty_parallel_seq");
+    auto status = engine_->getStatus(executionId);
+
+    EXPECT_EQ(status.status, SequenceStatus::COMPLETED);
+    // action_1 + final_action = 2 (빈 그룹은 액션 없음)
+    EXPECT_EQ(status.actionResults.size(), 2);
+}
+

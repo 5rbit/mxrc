@@ -54,17 +54,17 @@ Phase 9: Polish & Integration (마무리 및 통합)
 
 ### 작업
 
-- [ ] T004 Fix and enhance ActionStatus enum with all 7 states in `src/core/sequence/dto/ActionStatus.h`
-- [ ] T005 Create RetryPolicy struct for retry configuration in `src/core/sequence/core/RetryPolicy.h`
-- [ ] T006 Implement RetryHandler for managing retry logic in `src/core/sequence/core/RetryHandler.h` and `.cpp`
-- [ ] T007 Implement SequenceRegistry for sequence definition management in `src/core/sequence/core/SequenceRegistry.h` and `.cpp`
-- [ ] T008 Create SequenceRegistry unit tests in `tests/unit/sequence/SequenceRegistry_test.cpp`
-- [ ] T009 Implement ActionExecutor for individual action execution in `src/core/sequence/core/ActionExecutor.h` and `.cpp`
-- [ ] T010 Create ActionExecutor unit tests in `tests/unit/sequence/ActionExecutor_test.cpp`
-- [ ] T011 Implement ConditionEvaluator for condition expression evaluation in `src/core/sequence/core/ConditionEvaluator.h` and `.cpp`
-- [ ] T012 Create ConditionEvaluator unit tests in `tests/unit/sequence/ConditionEvaluator_test.cpp`
-- [ ] T013 Implement ExecutionMonitor for tracking sequence execution progress in `src/core/sequence/core/ExecutionMonitor.h` and `.cpp`
-- [ ] T014 Create ExecutionMonitor unit tests in `tests/unit/sequence/ExecutionMonitor_test.cpp`
+- [x] T004 Fix and enhance ActionStatus enum with all 7 states in `src/core/sequence/dto/ActionStatus.h`
+- [x] T005 Create RetryPolicy struct for retry configuration in `src/core/sequence/core/RetryPolicy.h`
+- [x] T006 Implement RetryHandler for managing retry logic in `src/core/sequence/core/RetryHandler.h` and `.cpp`
+- [x] T007 Implement SequenceRegistry for sequence definition management in `src/core/sequence/core/SequenceRegistry.h` and `.cpp`
+- [x] T008 Create SequenceRegistry unit tests in `tests/unit/sequence/SequenceRegistry_test.cpp`
+- [x] T009 Implement ActionExecutor for individual action execution in `src/core/sequence/core/ActionExecutor.h` and `.cpp`
+- [x] T010 Create ActionExecutor unit tests in `tests/unit/sequence/ActionExecutor_test.cpp`
+- [x] T011 Implement ConditionEvaluator for condition expression evaluation in `src/core/sequence/core/ConditionEvaluator.h` and `.cpp`
+- [x] T012 Create ConditionEvaluator unit tests in `tests/unit/sequence/ConditionEvaluator_test.cpp`
+- [x] T013 Implement ExecutionMonitor for tracking sequence execution progress in `src/core/sequence/core/ExecutionMonitor.h` and `.cpp`
+- [x] T014 Create ExecutionMonitor unit tests in `tests/unit/sequence/ExecutionMonitor_test.cpp`
 
 ---
 

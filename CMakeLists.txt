@@ -20,6 +20,12 @@ add_executable(mxrc
     src/core/taskmanager/commands/CancelTaskCommand.cpp
     src/core/taskmanager/commands/PauseTaskCommand.cpp
     src/core/taskmanager/TaskManagerInit.cpp
+    src/core/sequence/core/ExecutionContext.cpp
+    src/core/sequence/core/SequenceRegistry.cpp
+    src/core/sequence/core/RetryHandler.cpp
+    src/core/sequence/core/ActionExecutor.cpp
+    src/core/sequence/core/ConditionEvaluator.cpp
+    src/core/sequence/core/ExecutionMonitor.cpp
 )
 
 # Link dependencies
@@ -37,6 +43,11 @@ target_include_directories(mxrc PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/taskmanager/operator_interface
     ${PROJECT_SOURCE_DIR}/src/core/taskmanager/commands
     ${PROJECT_SOURCE_DIR}/src/core/taskmanager/tasks
+    ${PROJECT_SOURCE_DIR}/src/core/sequence
+    ${PROJECT_SOURCE_DIR}/src/core/sequence/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/sequence/core
+    ${PROJECT_SOURCE_DIR}/src/core/sequence/dto
+    ${PROJECT_SOURCE_DIR}/src/core/sequence/integration
 )
 
 # Enable testing
@@ -48,6 +59,7 @@ add_executable(run_tests
     tests/unit/task/OperatorInterface_test.cpp
     tests/unit/task/TaskDefinitionRegistry_test.cpp
     tests/unit/task/TaskExecutor_test.cpp
+    tests/unit/sequence/ExecutionContext_test.cpp
     src/core/taskmanager/Task.cpp
     src/core/taskmanager/TaskManager.cpp
     src/core/taskmanager/TaskDefinitionRegistry.cpp
@@ -57,21 +69,33 @@ add_executable(run_tests
     src/core/taskmanager/commands/CancelTaskCommand.cpp
     src/core/taskmanager/commands/PauseTaskCommand.cpp
     src/core/taskmanager/TaskManagerInit.cpp
+    src/core/sequence/core/ExecutionContext.cpp
+    src/core/sequence/core/SequenceRegistry.cpp
+    src/core/sequence/core/RetryHandler.cpp
+    src/core/sequence/core/ActionExecutor.cpp
+    src/core/sequence/core/ConditionEvaluator.cpp
+    src/core/sequence/core/ExecutionMonitor.cpp
 )
 
-target_include_directories(run_tests PUBLIC 
+target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/src
     ${PROJECT_SOURCE_DIR}/src/core/taskmanager
     ${PROJECT_SOURCE_DIR}/src/core/taskmanager/interfaces
     ${PROJECT_SOURCE_DIR}/src/core/taskmanager/operator_interface
     ${PROJECT_SOURCE_DIR}/src/core/taskmanager/commands
     ${PROJECT_SOURCE_DIR}/src/core/taskmanager/tasks
+    ${PROJECT_SOURCE_DIR}/src/core/sequence
+    ${PROJECT_SOURCE_DIR}/src/core/sequence/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/sequence/core
+    ${PROJECT_SOURCE_DIR}/src/core/sequence/dto
+    ${PROJECT_SOURCE_DIR}/src/core/sequence/integration
 )
 
 
 # Link dependencies for tests
-target_link_libraries(run_tests PRIVATE 
-    GTest::GTest 
+target_link_libraries(run_tests PRIVATE
+    spdlog::spdlog
+    GTest::GTest
     GTest::Main
 )
 

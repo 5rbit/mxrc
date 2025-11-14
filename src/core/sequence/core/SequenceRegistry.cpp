@@ -165,5 +165,134 @@ bool SequenceRegistry::isVersionGreater(const std::string& v1, const std::string
     return v1 > v2;
 }
 
+void SequenceRegistry::registerTemplate(const SequenceTemplate& templateDef) {
+    // 템플릿 유효성 검증
+    if (templateDef.id.empty()) {
+        throw std::invalid_argument("Template ID cannot be empty");
+    }
+
+    if (templateDef.name.empty()) {
+        throw std::invalid_argument("Template name cannot be empty");
+    }
+
+    if (templateDef.actionIds.empty()) {
+        throw std::invalid_argument("Template must contain at least one action");
+    }
+
+    auto logger = spdlog::get("mxrc");
+
+    // 동일 ID가 이미 등록되어 있는지 확인
+    if (templates_.find(templateDef.id) != templates_.end()) {
+        if (logger) {
+            logger->error("템플릿 이미 등록됨: id={}", templateDef.id);
+        }
+        throw std::runtime_error("Template already registered: " + templateDef.id);
+    }
+
+    // 템플릿 등록
+    templates_[templateDef.id] = templateDef;
+    templateInstanceMap_[templateDef.id] = {};  // 빈 인스턴스 목록
+
+    if (logger) {
+        logger->info(
+            "템플릿 등록됨: id={}, name={}, parameters={}, actions={}",
+            templateDef.id, templateDef.name, templateDef.parameters.size(),
+            templateDef.actionIds.size());
+    }
+}
+
+std::shared_ptr<const SequenceTemplate> SequenceRegistry::getTemplate(
+    const std::string& templateId) const {
+    auto it = templates_.find(templateId);
+    if (it == templates_.end()) {
+        return nullptr;
+    }
+    return std::make_shared<const SequenceTemplate>(it->second);
+}
+
+bool SequenceRegistry::hasTemplate(const std::string& templateId) const {
+    return templates_.find(templateId) != templates_.end();
+}
+
+std::vector<std::string> SequenceRegistry::getAllTemplateIds() const {
+    std::vector<std::string> ids;
+    for (const auto& pair : templates_) {
+        ids.push_back(pair.first);
+    }
+    return ids;
+}
+
+void SequenceRegistry::saveTemplateInstance(const SequenceTemplateInstance& instance) {
+    if (instance.instanceId.empty()) {
+        throw std::invalid_argument("Instance ID cannot be empty");
+    }
+
+    if (instance.templateId.empty()) {
+        throw std::invalid_argument("Template ID cannot be empty");
+    }
+
+    auto logger = spdlog::get("mxrc");
+
+    // 템플릿이 존재하는지 확인
+    if (templates_.find(instance.templateId) == templates_.end()) {
+        if (logger) {
+            logger->error("템플릿을 찾을 수 없음: id={}", instance.templateId);
+        }
+        throw std::runtime_error("Template not found: " + instance.templateId);
+    }
+
+    // 인스턴스 저장
+    templateInstances_[instance.instanceId] = instance;
+    templateInstanceMap_[instance.templateId].push_back(instance.instanceId);
+
+    if (logger) {
+        logger->info(
+            "템플릿 인스턴스 저장됨: id={}, template={}, name={}",
+            instance.instanceId, instance.templateId, instance.instanceName);
+    }
+}
+
+std::shared_ptr<const SequenceTemplateInstance> SequenceRegistry::getTemplateInstance(
+    const std::string& instanceId) const {
+    auto it = templateInstances_.find(instanceId);
+    if (it == templateInstances_.end()) {
+        return nullptr;
+    }
+    return std::make_shared<const SequenceTemplateInstance>(it->second);
+}
+
+std::vector<std::string> SequenceRegistry::getTemplateInstances(
+    const std::string& templateId) const {
+    auto it = templateInstanceMap_.find(templateId);
+    if (it == templateInstanceMap_.end()) {
+        return {};
+    }
+    return it->second;
+}
+
+bool SequenceRegistry::removeTemplate(const std::string& templateId) {
+    auto it = templates_.find(templateId);
+    if (it == templates_.end()) {
+        return false;
+    }
+
+    auto logger = spdlog::get("mxrc");
+
+    // 템플릿으로부터 생성된 모든 인스턴스 삭제
+    auto instancesIt = templateInstanceMap_.find(templateId);
+    if (instancesIt != templateInstanceMap_.end()) {
+        for (const auto& instanceId : instancesIt->second) {
+            templateInstances_.erase(instanceId);
+        }
+        templateInstanceMap_.erase(instancesIt);
+    }
+
+    templates_.erase(it);
+    if (logger) {
+        logger->info("템플릿 삭제됨: id={}", templateId);
+    }
+    return true;
+}
+
 } // namespace mxrc::core::sequence
 

@@ -3,6 +3,8 @@
 #include <chrono>
 #include <thread>
 #include <mutex>
+#include <algorithm>
+#include <ctime>
 
 namespace mxrc::core::sequence {
 
@@ -525,6 +527,196 @@ bool SequenceEngine::executeActionSequence(
     }
 
     return allSuccess;
+}
+
+TemplateInstantiationResult SequenceEngine::instantiateTemplate(
+    const std::string& templateId,
+    const std::map<std::string, std::any>& parameters,
+    const std::string& instanceName) {
+
+    auto logger = spdlog::get("mxrc");
+
+    // 템플릿 조회
+    auto templatePtr = registry_->getTemplate(templateId);
+    if (!templatePtr) {
+        if (logger) {
+            logger->error("템플릿을 찾을 수 없음: id={}", templateId);
+        }
+        return {false, "", "Template not found: " + templateId, {}};
+    }
+
+    // 파라미터 검증
+    auto [valid, errors] = validateTemplateParameters(templatePtr, parameters);
+    if (!valid) {
+        if (logger) {
+            logger->error("템플릿 파라미터 검증 실패: template={}, errors={}", templateId, errors.size());
+        }
+        return {false, "", "Parameter validation failed", errors};
+    }
+
+    // 인스턴스 ID 생성
+    std::string instanceId = "inst_" + std::to_string(std::time(nullptr)) + "_" +
+                            std::to_string(++executionCounter_);
+
+    // 인스턴스 이름 (미제공 시 기본값)
+    std::string finalInstanceName = instanceName.empty() ?
+        templatePtr->name + "_" + instanceId : instanceName;
+
+    // 파라미터 치환하여 액션 ID 생성
+    std::vector<std::string> instantiatedActionIds;
+    for (const auto& actionId : templatePtr->actionIds) {
+        std::string substituted = substituteParameters(actionId, parameters);
+        instantiatedActionIds.push_back(substituted);
+    }
+
+    // 새 시퀀스 정의 생성
+    auto sequenceDef = std::make_shared<SequenceDefinition>();
+    sequenceDef->id = instanceId;
+    sequenceDef->name = finalInstanceName;
+    sequenceDef->version = "1.0.0";
+    sequenceDef->description = "Instantiated from template: " + templateId;
+    sequenceDef->actionIds = instantiatedActionIds;
+    sequenceDef->metadata = templatePtr->metadata;
+
+    // 템플릿 인스턴스 생성 및 저장
+    SequenceTemplateInstance instance;
+    instance.templateId = templateId;
+    instance.instanceId = instanceId;
+    instance.instanceName = finalInstanceName;
+    instance.parameters = parameters;
+    instance.sequenceDefinition = sequenceDef;
+    instance.createdAtMs = std::chrono::system_clock::now().time_since_epoch().count() / 1000000;
+
+    try {
+        registry_->saveTemplateInstance(instance);
+        registry_->registerSequence(*sequenceDef);
+
+        if (logger) {
+            logger->info(
+                "템플릿 인스턴스화 완료: template={}, instance={}, actions={}",
+                templateId, instanceId, instantiatedActionIds.size());
+        }
+
+        return {true, instanceId, "", {}};
+    } catch (const std::exception& ex) {
+        if (logger) {
+            logger->error("템플릿 인스턴스화 중 오류: template={}, error={}",
+                templateId, ex.what());
+        }
+        return {false, "", std::string(ex.what()), {}};
+    }
+}
+
+std::string SequenceEngine::executeTemplate(
+    const std::string& templateId,
+    const std::map<std::string, std::any>& parameters,
+    const std::string& instanceName) {
+
+    // 템플릿 인스턴스화
+    auto result = instantiateTemplate(templateId, parameters, instanceName);
+    if (!result.success) {
+        auto logger = spdlog::get("mxrc");
+        if (logger) {
+            logger->error("템플릿 실행 실패: template={}, error={}", templateId, result.errorMessage);
+        }
+        return "";
+    }
+
+    // 인스턴스 ID로 시퀀스 실행
+    try {
+        return execute(result.instanceId, parameters);
+    } catch (const std::exception& ex) {
+        auto logger = spdlog::get("mxrc");
+        if (logger) {
+            logger->error("템플릿 시퀀스 실행 실패: instance={}, error={}",
+                result.instanceId, ex.what());
+        }
+        return "";
+    }
+}
+
+std::pair<bool, std::vector<std::string>> SequenceEngine::validateTemplateParameters(
+    const std::shared_ptr<const SequenceTemplate>& templatePtr,
+    const std::map<std::string, std::any>& parameters) {
+
+    std::vector<std::string> errors;
+
+    if (!templatePtr) {
+        errors.push_back("Template is null");
+        return {false, errors};
+    }
+
+    // 필수 파라미터 확인
+    for (const auto& param : templatePtr->parameters) {
+        if (param.required) {
+            auto it = parameters.find(param.name);
+            if (it == parameters.end()) {
+                errors.push_back("Required parameter missing: " + param.name);
+            }
+        }
+    }
+
+    // 알려지지 않은 파라미터 확인 (경고 수준, 에러 아님)
+    std::vector<std::string> validParamNames;
+    for (const auto& param : templatePtr->parameters) {
+        validParamNames.push_back(param.name);
+    }
+
+    for (const auto& [paramName, _] : parameters) {
+        auto it = std::find(validParamNames.begin(), validParamNames.end(), paramName);
+        if (it == validParamNames.end()) {
+            // 알려지지 않은 파라미터는 무시 (경고만 발생)
+            auto logger = spdlog::get("mxrc");
+            if (logger) {
+                logger->warn("Unknown template parameter: {}", paramName);
+            }
+        }
+    }
+
+    return {errors.empty(), errors};
+}
+
+std::string SequenceEngine::anyToString(const std::any& value) {
+    try {
+        if (value.type() == typeid(int)) {
+            return std::to_string(std::any_cast<int>(value));
+        } else if (value.type() == typeid(float)) {
+            return std::to_string(std::any_cast<float>(value));
+        } else if (value.type() == typeid(double)) {
+            return std::to_string(std::any_cast<double>(value));
+        } else if (value.type() == typeid(bool)) {
+            return std::any_cast<bool>(value) ? "true" : "false";
+        } else if (value.type() == typeid(std::string)) {
+            return std::any_cast<std::string>(value);
+        } else if (value.type() == typeid(const char*)) {
+            return std::string(std::any_cast<const char*>(value));
+        }
+    } catch (...) {
+        return "";
+    }
+    return "";
+}
+
+std::string SequenceEngine::substituteParameters(
+    const std::string& actionId,
+    const std::map<std::string, std::any>& parameters) {
+
+    std::string result = actionId;
+
+    // 파라미터 치환: ${paramName} -> 파라미터 값
+    for (const auto& [paramName, paramValue] : parameters) {
+        std::string placeholder = "${" + paramName + "}";
+        std::string valueStr = anyToString(paramValue);
+
+        // 모든 ${paramName} 발생을 값으로 치환
+        size_t pos = 0;
+        while ((pos = result.find(placeholder, pos)) != std::string::npos) {
+            result.replace(pos, placeholder.length(), valueStr);
+            pos += valueStr.length();
+        }
+    }
+
+    return result;
 }
 
 } // namespace mxrc::core::sequence

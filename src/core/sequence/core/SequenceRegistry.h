@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 #include "core/sequence/dto/SequenceDto.h"
+#include "SequenceTemplate.h"
 
 namespace mxrc::core::sequence {
 
@@ -96,6 +97,62 @@ public:
      */
     size_t getSequenceCount() const;
 
+    /**
+     * @brief 시퀀스 템플릿 등록
+     * @param templateDef 등록할 템플릿 정의
+     * @throw std::invalid_argument 템플릿이 유효하지 않으면 예외
+     * @throw std::runtime_error 동일 ID 존재 시 예외
+     */
+    void registerTemplate(const SequenceTemplate& templateDef);
+
+    /**
+     * @brief 시퀀스 템플릿 조회
+     * @param templateId 템플릿 ID
+     * @return 찾은 경우 템플릿, 없으면 nullptr
+     */
+    std::shared_ptr<const SequenceTemplate> getTemplate(const std::string& templateId) const;
+
+    /**
+     * @brief 시퀀스 템플릿 존재 여부 확인
+     * @param templateId 템플릿 ID
+     * @return 존재 여부
+     */
+    bool hasTemplate(const std::string& templateId) const;
+
+    /**
+     * @brief 등록된 모든 템플릿 ID 조회
+     * @return 템플릿 ID 목록
+     */
+    std::vector<std::string> getAllTemplateIds() const;
+
+    /**
+     * @brief 템플릿 인스턴스 저장
+     * @param instance 저장할 템플릿 인스턴스
+     */
+    void saveTemplateInstance(const SequenceTemplateInstance& instance);
+
+    /**
+     * @brief 템플릿 인스턴스 조회
+     * @param instanceId 인스턴스 ID
+     * @return 찾은 경우 인스턴스, 없으면 nullptr
+     */
+    std::shared_ptr<const SequenceTemplateInstance> getTemplateInstance(
+        const std::string& instanceId) const;
+
+    /**
+     * @brief 특정 템플릿으로부터 생성된 모든 인스턴스 조회
+     * @param templateId 템플릿 ID
+     * @return 인스턴스 ID 목록
+     */
+    std::vector<std::string> getTemplateInstances(const std::string& templateId) const;
+
+    /**
+     * @brief 템플릿 삭제
+     * @param templateId 템플릿 ID
+     * @return 삭제 여부
+     */
+    bool removeTemplate(const std::string& templateId);
+
 private:
     /**
      * @brief 정의 유효성 검증
@@ -114,6 +171,18 @@ private:
 
     // Key: sequenceId, Value: <Version, SequenceDefinition>
     std::map<std::string, std::map<std::string, SequenceDefinition>> sequences_;
+
+    // 템플릿 저장소
+    // Key: templateId, Value: SequenceTemplate
+    std::map<std::string, SequenceTemplate> templates_;
+
+    // 템플릿 인스턴스 저장소
+    // Key: instanceId, Value: SequenceTemplateInstance
+    std::map<std::string, SequenceTemplateInstance> templateInstances_;
+
+    // 템플릿별 인스턴스 맵핑
+    // Key: templateId, Value: 인스턴스 ID 목록
+    std::map<std::string, std::vector<std::string>> templateInstanceMap_;
 };
 
 } // namespace mxrc::core::sequence

@@ -7,6 +7,7 @@
 #include "core/sequence/core/ExecutionContext.h"
 #include "core/sequence/core/ConditionalBranch.h"
 #include "core/sequence/core/ParallelBranch.h"
+#include "core/sequence/core/SequenceTemplate.h"
 #include "core/sequence/interfaces/IActionFactory.h"
 #include "core/sequence/dto/SequenceDto.h"
 #include <string>
@@ -126,6 +127,30 @@ public:
      */
     const ParallelBranch* getParallelBranch(const std::string& branchId) const;
 
+    /**
+     * @brief 템플릿으로부터 시퀀스 인스턴스화
+     * @param templateId 템플릿 ID
+     * @param parameters 파라미터 맵 (파라미터 이름 -> 값)
+     * @param instanceName 인스턴스 이름 (선택사항)
+     * @return 인스턴스화 결과
+     */
+    TemplateInstantiationResult instantiateTemplate(
+        const std::string& templateId,
+        const std::map<std::string, std::any>& parameters,
+        const std::string& instanceName = "");
+
+    /**
+     * @brief 템플릿 인스턴스를 바로 실행
+     * @param templateId 템플릿 ID
+     * @param parameters 파라미터 맵
+     * @param instanceName 인스턴스 이름
+     * @return 실행 ID (실패 시 빈 문자열)
+     */
+    std::string executeTemplate(
+        const std::string& templateId,
+        const std::map<std::string, std::any>& parameters,
+        const std::string& instanceName = "");
+
 private:
     std::shared_ptr<SequenceRegistry> registry_;
     std::shared_ptr<IActionFactory> actionFactory_;
@@ -201,6 +226,33 @@ private:
         const std::vector<std::string>& actionIds,
         std::shared_ptr<ExecutionContext> context,
         const std::string& executionId);
+
+    /**
+     * @brief 파라미터 검증 및 기본값 적용
+     * @param templatePtr 템플릿 정의
+     * @param parameters 제공된 파라미터
+     * @return 검증 결과 및 오류 메시지
+     */
+    std::pair<bool, std::vector<std::string>> validateTemplateParameters(
+        const std::shared_ptr<const SequenceTemplate>& templatePtr,
+        const std::map<std::string, std::any>& parameters);
+
+    /**
+     * @brief 파라미터 값을 문자열로 변환
+     * @param value std::any 값
+     * @return 문자열 표현
+     */
+    std::string anyToString(const std::any& value);
+
+    /**
+     * @brief 액션 ID에서 파라미터 치환
+     * @param actionId 원본 액션 ID
+     * @param parameters 파라미터 맵
+     * @return 치환된 액션 ID
+     */
+    std::string substituteParameters(
+        const std::string& actionId,
+        const std::map<std::string, std::any>& parameters);
 
     /**
      * @brief 실행 ID 카운터

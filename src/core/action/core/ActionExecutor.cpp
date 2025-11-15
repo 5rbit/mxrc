@@ -21,16 +21,47 @@ ExecutionResult ActionExecutor::execute(
                   action->getId(), static_cast<int>(action->getStatus()));
 
     try {
-        // Action 실행
-        action->execute(context);
+        // 타임아웃이 설정된 경우 비동기 실행
+        if (timeout.count() > 0) {
+            // 비동기로 액션 실행
+            auto future = std::async(std::launch::async, [&action, &context]() {
+                action->execute(context);
+            });
 
-        // 타임아웃 체크 (실행 완료 후)
-        if (timeout.count() > 0 && checkTimeout(action, startTime, timeout)) {
-            result.status = ActionStatus::TIMEOUT;
-            result.errorMessage = "Action exceeded timeout";
-            logger->warn("[ActionExecutor] TIMEOUT - Action {} exceeded timeout of {}ms",
-                        action->getId(), timeout.count());
+            // 타임아웃 동안 대기하며 주기적으로 체크
+            auto waitResult = future.wait_for(timeout);
+
+            if (waitResult == std::future_status::timeout) {
+                // 타임아웃 발생 - 액션 취소 시도
+                logger->warn("[ActionExecutor] TIMEOUT - Action {} exceeded timeout of {}ms, cancelling",
+                            action->getId(), timeout.count());
+                action->cancel();
+
+                // 취소 후 액션 스레드가 완전히 종료될 때까지 대기
+                future.wait();
+
+                result.status = ActionStatus::TIMEOUT;
+                result.errorMessage = "Action exceeded timeout";
+            } else {
+                // 정상 완료
+                future.get();  // 예외 발생 시 여기서 던져짐
+                result.status = action->getStatus();
+                result.progress = action->getProgress();
+
+                if (result.status == ActionStatus::COMPLETED) {
+                    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::steady_clock::now() - startTime);
+                    logger->info("[ActionExecutor] SUCCESS - Action {} completed in {}ms (progress: {:.1f}%)",
+                                action->getId(), elapsed.count(), result.progress * 100.0f);
+                } else {
+                    logger->warn("[ActionExecutor] Action {} finished with status: {}",
+                                action->getId(), static_cast<int>(result.status));
+                }
+            }
         } else {
+            // 타임아웃이 없는 경우 동기 실행
+            action->execute(context);
+
             result.status = action->getStatus();
             result.progress = action->getProgress();
 

@@ -78,7 +78,16 @@ SequenceResult SequenceEngine::executeSequential(
         }
 
         const auto& step = definition.steps[i];
-        
+
+        // 이미 실행된 액션인지 확인 (조건부 분기에서 실행되었을 수 있음)
+        if (executedActions.find(step.actionId) != executedActions.end()) {
+            Logger::get()->debug(
+                "Sequence {}: Skipping step {}/{} - {} (already executed in conditional branch)",
+                definition.id, i + 1, definition.steps.size(), step.actionId
+            );
+            continue;
+        }
+
         Logger::get()->info(
             "Sequence {}: Executing step {}/{} - {} (type: {})",
             definition.id, i + 1, definition.steps.size(),
@@ -99,8 +108,20 @@ SequenceResult SequenceEngine::executeSequential(
                 // Action 생성
                 auto action = factory_->createAction(step.actionType, params);
 
-                // Action 실행
-                actionResult = executor_->execute(action, context);
+                // 현재 실행 중인 액션 추적
+                {
+                    std::lock_guard<std::mutex> actionLock(state.currentActionMutex);
+                    state.currentAction = action;
+                }
+
+                // Action 실행 (타임아웃 적용)
+                actionResult = executor_->execute(action, context, step.timeout);
+
+                // 실행 완료 후 추적 해제
+                {
+                    std::lock_guard<std::mutex> actionLock(state.currentActionMutex);
+                    state.currentAction = nullptr;
+                }
 
                 if (actionResult.isSuccessful()) {
                     actionSucceeded = true;
@@ -179,11 +200,29 @@ SequenceResult SequenceEngine::executeSequential(
 }
 
 void SequenceEngine::cancel(const std::string& sequenceId) {
-    std::lock_guard<std::mutex> lock(stateMutex_);
-    auto it = states_.find(sequenceId);
-    if (it != states_.end()) {
-        it->second.cancelRequested = true;
-        Logger::get()->info("Cancel requested for sequence: {}", sequenceId);
+    // 취소할 액션을 임시 변수에 복사 (데드락 방지)
+    std::shared_ptr<mxrc::core::action::IAction> actionToCancel;
+
+    {
+        std::lock_guard<std::mutex> lock(stateMutex_);
+        auto it = states_.find(sequenceId);
+        if (it != states_.end()) {
+            it->second.cancelRequested = true;
+
+            // 현재 실행 중인 액션이 있다면 복사
+            {
+                std::lock_guard<std::mutex> actionLock(it->second.currentActionMutex);
+                actionToCancel = it->second.currentAction;
+            }
+
+            Logger::get()->info("Cancel requested for sequence: {}", sequenceId);
+        }
+    } // 여기서 모든 락 해제
+
+    // 락을 모두 푼 상태에서 cancel 호출 (데드락 방지)
+    if (actionToCancel) {
+        Logger::get()->info("Cancelling currently executing action in sequence: {}", sequenceId);
+        executor_->cancel(actionToCancel);
     }
 }
 
@@ -310,9 +349,21 @@ int SequenceEngine::handleConditionalBranch(
 
             // Action 생성
             auto action = factory_->createAction(stepPtr->actionType, params);
-            
-            // Action 실행
-            auto actionResult = executor_->execute(action, context);
+
+            // 현재 실행 중인 액션 추적
+            {
+                std::lock_guard<std::mutex> actionLock(state.currentActionMutex);
+                state.currentAction = action;
+            }
+
+            // Action 실행 (타임아웃 적용)
+            auto actionResult = executor_->execute(action, context, stepPtr->timeout);
+
+            // 실행 완료 후 추적 해제
+            {
+                std::lock_guard<std::mutex> actionLock(state.currentActionMutex);
+                state.currentAction = nullptr;
+            }
 
             // Action 결과 저장
             context.setActionResult(stepPtr->actionId, actionResult);

@@ -60,6 +60,8 @@ private:
         std::atomic<bool> pauseRequested{false};
         int completedSteps{0};
         int totalSteps{0};
+        std::shared_ptr<mxrc::core::action::IAction> currentAction{nullptr};
+        std::mutex currentActionMutex;
     };
 
     std::shared_ptr<mxrc::core::action::ActionFactory> factory_;

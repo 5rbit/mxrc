@@ -20,12 +20,18 @@ struct ActionStep {
     std::string actionId;                           // Action ID (unique within sequence)
     std::string actionType;                         // Action type
     std::map<std::string, std::string> parameters;  // Action parameters
+    std::chrono::milliseconds timeout{0};           // Action 타임아웃 (0 = 무제한)
 
     ActionStep(const std::string& id, const std::string& type)
         : actionId(id), actionType(type) {}
 
     ActionStep& addParameter(const std::string& key, const std::string& value) {
         parameters[key] = value;
+        return *this;
+    }
+
+    ActionStep& setTimeout(std::chrono::milliseconds ms) {
+        timeout = ms;
         return *this;
     }
 };

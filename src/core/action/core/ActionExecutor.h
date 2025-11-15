@@ -6,6 +6,8 @@
 #include "core/action/util/ExecutionContext.h"
 #include <memory>
 #include <chrono>
+#include <future>
+#include <atomic>
 
 namespace mxrc::core::action {
 
@@ -13,6 +15,7 @@ namespace mxrc::core::action {
  * @brief Action 실행기
  *
  * 개별 Action의 실행, 타임아웃 관리, 결과 수집을 담당합니다.
+ * 비동기 실행 및 실시간 타임아웃/취소를 지원합니다.
  */
 class ActionExecutor {
 public:
@@ -20,7 +23,7 @@ public:
     ~ActionExecutor() = default;
 
     /**
-     * @brief Action 실행
+     * @brief Action 실행 (비동기, 타임아웃 및 취소 지원)
      *
      * @param action 실행할 Action
      * @param context 실행 컨텍스트

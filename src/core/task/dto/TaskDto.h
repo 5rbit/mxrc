@@ -37,6 +37,21 @@ enum class TaskStatus {
 };
 
 /**
+ * @brief TaskStatus를 문자열로 변환
+ */
+inline std::string taskStatusToString(TaskStatus status) {
+    switch (status) {
+        case TaskStatus::PENDING:   return "PENDING";
+        case TaskStatus::RUNNING:   return "RUNNING";
+        case TaskStatus::PAUSED:    return "PAUSED";
+        case TaskStatus::COMPLETED: return "COMPLETED";
+        case TaskStatus::FAILED:    return "FAILED";
+        case TaskStatus::CANCELLED: return "CANCELLED";
+        default:                    return "UNKNOWN";
+    }
+}
+
+/**
  * @brief Task 정의 DTO
  */
 struct TaskDefinition {

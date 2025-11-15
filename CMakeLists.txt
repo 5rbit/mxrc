@@ -33,6 +33,7 @@ add_executable(mxrc
     src/core/task/core/TaskExecutor.cpp
     src/core/task/core/PeriodicScheduler.cpp
     src/core/task/core/TriggerManager.cpp
+    src/core/task/core/TaskMonitor.cpp
 )
 
 # Link dependencies
@@ -79,6 +80,7 @@ add_executable(run_tests
     tests/unit/task/TaskCoreExecutor_test.cpp
     tests/unit/task/PeriodicScheduler_test.cpp
     tests/unit/task/TriggerManager_test.cpp
+    tests/unit/task/TaskMonitor_test.cpp
     tests/unit/action/ActionExecutor_test.cpp
     tests/unit/action/ActionFactory_test.cpp
     tests/unit/action/ActionRegistry_test.cpp
@@ -107,6 +109,7 @@ add_executable(run_tests
     src/core/sequence/core/RetryHandler.cpp
     src/core/task/core/PeriodicScheduler.cpp
     src/core/task/core/TriggerManager.cpp
+    src/core/task/core/TaskMonitor.cpp
 )
 
 target_include_directories(run_tests PUBLIC

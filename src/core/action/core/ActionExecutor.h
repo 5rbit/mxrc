@@ -8,6 +8,9 @@
 #include <chrono>
 #include <future>
 #include <atomic>
+#include <map>
+#include <mutex>
+#include <string>
 
 namespace mxrc::core::action {
 
@@ -43,6 +46,33 @@ public:
     void cancel(std::shared_ptr<IAction> action);
 
 private:
+    /**
+     * @brief 실행 중인 액션의 상태
+     */
+    struct ExecutionState {
+        std::shared_ptr<IAction> action;
+        std::future<void> future;
+        std::chrono::steady_clock::time_point startTime;
+        std::chrono::milliseconds timeout;
+        std::atomic<bool> cancelRequested{false};
+        ExecutionResult result;
+
+        ExecutionState() = default;
+        ExecutionState(std::shared_ptr<IAction> act,
+                      std::future<void> fut,
+                      std::chrono::steady_clock::time_point start,
+                      std::chrono::milliseconds to)
+            : action(std::move(act))
+            , future(std::move(fut))
+            , startTime(start)
+            , timeout(to)
+            , cancelRequested(false) {}
+    };
+
+    // 실행 중인 액션 관리
+    std::map<std::string, ExecutionState> runningActions_;
+    mutable std::mutex actionsMutex_;
+
     /**
      * @brief 타임아웃 체크
      *

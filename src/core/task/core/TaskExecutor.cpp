@@ -22,29 +22,48 @@ TaskExecution TaskExecutor::execute(
     ExecutionContext& context
 ) {
     Logger::get()->info(
-        "Executing task: {} (name: {}, mode: {}, workType: {})",
+        "[TaskExecutor] START - Task: {} (name: '{}', mode: {}, workType: {}, work: '{}')",
         definition.id, definition.name,
         taskExecutionModeToString(definition.executionMode),
-        definition.workType == TaskWorkType::ACTION ? "ACTION" : "SEQUENCE"
+        definition.workType == TaskWorkType::ACTION ? "ACTION" : "SEQUENCE",
+        definition.workId
     );
 
     auto& state = getOrCreateState(definition.id);
+    auto prevStatus = state.status;
     state.status = TaskStatus::RUNNING;
     state.cancelRequested = false;
     state.pauseRequested = false;
 
+    Logger::get()->debug("[TaskExecutor] Task {} state transition: {} -> RUNNING",
+                        definition.id, taskStatusToString(prevStatus));
+
     TaskExecution result;
+    auto startTime = std::chrono::steady_clock::now();
 
     if (definition.workType == TaskWorkType::ACTION) {
+        Logger::get()->debug("[TaskExecutor] Task {} executing ACTION: {}",
+                            definition.id, definition.workId);
         result = executeAction(definition, context, state);
     } else {
+        Logger::get()->debug("[TaskExecutor] Task {} executing SEQUENCE: {}",
+                            definition.id, definition.workId);
         result = executeSequence(definition, context, state);
     }
 
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - startTime);
+
     Logger::get()->info(
-        "Task {} finished with status: {}",
-        definition.id, taskStatusToString(result.status)
+        "[TaskExecutor] {} - Task {} finished in {}ms (status: {}, progress: {:.1f}%)",
+        result.isSuccessful() ? "SUCCESS" : "FAILED",
+        definition.id, elapsed.count(),
+        taskStatusToString(result.status), result.progress * 100.0f
     );
+
+    if (result.isFailed()) {
+        Logger::get()->error("[TaskExecutor] Task {} error: {}", definition.id, result.errorMessage);
+    }
 
     return result;
 }
@@ -143,8 +162,15 @@ void TaskExecutor::cancel(const std::string& taskId) {
     std::lock_guard<std::mutex> lock(stateMutex_);
     auto it = states_.find(taskId);
     if (it != states_.end()) {
-        it->second.cancelRequested = true;
-        Logger::get()->info("Cancel requested for task: {}", taskId);
+        auto& taskState = it->second;
+        auto prevStatus = taskState.status;
+        taskState.cancelRequested = true;
+        Logger::get()->info("[TaskExecutor] CANCEL - Task: {} (current status: {})",
+                           taskId, taskStatusToString(prevStatus));
+        Logger::get()->debug("[TaskExecutor] Task {} cancel flag set, waiting for task to acknowledge",
+                            taskId);
+    } else {
+        Logger::get()->warn("[TaskExecutor] CANCEL - Task not found: {}", taskId);
     }
 }
 
@@ -152,9 +178,14 @@ void TaskExecutor::pause(const std::string& taskId) {
     std::lock_guard<std::mutex> lock(stateMutex_);
     auto it = states_.find(taskId);
     if (it != states_.end()) {
-        it->second.pauseRequested = true;
-        it->second.status = TaskStatus::PAUSED;
-        Logger::get()->info("Pause requested for task: {}", taskId);
+        auto& taskState = it->second;
+        auto prevStatus = taskState.status;
+        taskState.pauseRequested = true;
+        taskState.status = TaskStatus::PAUSED;
+        Logger::get()->info("[TaskExecutor] PAUSE - Task: {} (state transition: {} -> PAUSED)",
+                           taskId, taskStatusToString(prevStatus));
+    } else {
+        Logger::get()->warn("[TaskExecutor] PAUSE - Task not found: {}", taskId);
     }
 }
 
@@ -162,9 +193,14 @@ void TaskExecutor::resume(const std::string& taskId) {
     std::lock_guard<std::mutex> lock(stateMutex_);
     auto it = states_.find(taskId);
     if (it != states_.end()) {
-        it->second.pauseRequested = false;
-        it->second.status = TaskStatus::RUNNING;
-        Logger::get()->info("Resume requested for task: {}", taskId);
+        auto& taskState = it->second;
+        auto prevStatus = taskState.status;
+        taskState.pauseRequested = false;
+        taskState.status = TaskStatus::RUNNING;
+        Logger::get()->info("[TaskExecutor] RESUME - Task: {} (state transition: {} -> RUNNING)",
+                           taskId, taskStatusToString(prevStatus));
+    } else {
+        Logger::get()->warn("[TaskExecutor] RESUME - Task not found: {}", taskId);
     }
 }
 

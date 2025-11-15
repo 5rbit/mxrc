@@ -31,6 +31,8 @@ add_executable(mxrc
     src/core/sequence/core/RetryHandler.cpp
     src/core/task/core/TaskRegistry.cpp
     src/core/task/core/TaskExecutor.cpp
+    src/core/task/core/PeriodicScheduler.cpp
+    src/core/task/core/TriggerManager.cpp
 )
 
 # Link dependencies
@@ -59,6 +61,9 @@ target_include_directories(mxrc PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/sequence/core
     ${PROJECT_SOURCE_DIR}/src/core/sequence/dto
     ${PROJECT_SOURCE_DIR}/src/core/sequence/integration
+    ${PROJECT_SOURCE_DIR}/src/core/task
+    ${PROJECT_SOURCE_DIR}/src/core/task/core
+    ${PROJECT_SOURCE_DIR}/src/core/task/dto
 )
 
 # Enable testing
@@ -70,6 +75,10 @@ add_executable(run_tests
     tests/unit/task/OperatorInterface_test.cpp
     tests/unit/task/TaskDefinitionRegistry_test.cpp
     tests/unit/task/TaskExecutor_test.cpp
+    tests/unit/task/TaskRegistry_test.cpp
+    tests/unit/task/TaskCoreExecutor_test.cpp
+    tests/unit/task/PeriodicScheduler_test.cpp
+    tests/unit/task/TriggerManager_test.cpp
     tests/unit/action/ActionExecutor_test.cpp
     tests/unit/action/ActionFactory_test.cpp
     tests/unit/action/ActionRegistry_test.cpp
@@ -85,6 +94,8 @@ add_executable(run_tests
     src/core/taskmanager/commands/CancelTaskCommand.cpp
     src/core/taskmanager/commands/PauseTaskCommand.cpp
     src/core/taskmanager/TaskManagerInit.cpp
+    src/core/task/core/TaskRegistry.cpp
+    src/core/task/core/TaskExecutor.cpp
     src/core/action/core/ActionExecutor.cpp
     src/core/action/core/ActionFactory.cpp
     src/core/action/core/ActionRegistry.cpp
@@ -94,6 +105,8 @@ add_executable(run_tests
     src/core/sequence/core/SequenceEngine.cpp
     src/core/sequence/core/ConditionEvaluator.cpp
     src/core/sequence/core/RetryHandler.cpp
+    src/core/task/core/PeriodicScheduler.cpp
+    src/core/task/core/TriggerManager.cpp
 )
 
 target_include_directories(run_tests PUBLIC
@@ -114,7 +127,11 @@ target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/sequence/core
     ${PROJECT_SOURCE_DIR}/src/core/sequence/dto
     ${PROJECT_SOURCE_DIR}/src/core/sequence/integration
+    ${PROJECT_SOURCE_DIR}/src/core/task
+    ${PROJECT_SOURCE_DIR}/src/core/task/core
+    ${PROJECT_SOURCE_DIR}/src/core/task/dto
     ${PROJECT_SOURCE_DIR}/tests/unit/action
+    ${PROJECT_SOURCE_DIR}/tests/unit/task
     ${PROJECT_SOURCE_DIR}/tests/unit/sequence
     ${PROJECT_SOURCE_DIR}/tests/integration
 )

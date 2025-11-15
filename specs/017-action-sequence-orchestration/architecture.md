@@ -210,54 +210,86 @@ src/core/
 │   └── util/
 │       └── ExecutionContext.h
 │
-└── task/                            # Phase 3: Task Layer
+├── task/                            # Phase 3: Task Layer
+│   ├── interfaces/
+│   │   ├── ITask.h
+│   │   ├── ITaskExecutor.h
+│   │   └── ITriggerProvider.h
+│   ├── core/
+│   │   ├── TaskExecutor.h
+│   │   ├── TaskExecutor.cpp
+│   │   ├── TaskRegistry.h
+│   │   ├── TaskRegistry.cpp
+│   │   ├── PeriodicScheduler.h
+│   │   ├── PeriodicScheduler.cpp
+│   │   ├── TriggerManager.h
+│   │   ├── TriggerManager.cpp
+│   │   ├── TaskMonitor.h
+│   │   └── TaskMonitor.cpp
+│   └── dto/
+│       ├── TaskStatus.h
+│       ├── TaskDefinition.h
+│       ├── TaskExecutionMode.h
+│       └── TaskExecution.h
+│
+└── metrics/                         # Phase 7: Metrics & Monitoring
     ├── interfaces/
-    │   ├── ITask.h
-    │   ├── ITaskExecutor.h
-    │   └── ITriggerProvider.h
+    │   ├── IMetricsCollector.h
+    │   └── IHealthCheckProvider.h
     ├── core/
-    │   ├── TaskExecutor.h
-    │   ├── TaskExecutor.cpp
-    │   ├── TaskRegistry.h
-    │   ├── TaskRegistry.cpp
-    │   ├── PeriodicScheduler.h
-    │   ├── PeriodicScheduler.cpp
-    │   ├── TriggerManager.h
-    │   ├── TriggerManager.cpp
-    │   ├── TaskMonitor.h
-    │   └── TaskMonitor.cpp
+    │   ├── MetricsCollector.h
+    │   ├── MetricsCollector.cpp
+    │   ├── PerformanceMonitor.h
+    │   ├── PerformanceMonitor.cpp
+    │   ├── ResourceMonitor.h
+    │   ├── ResourceMonitor.cpp
+    │   ├── ExecutionTracer.h
+    │   ├── ExecutionTracer.cpp
+    │   ├── HealthCheckService.h
+    │   └── HealthCheckService.cpp
     ├── dto/
-    │   ├── TaskStatus.h
-    │   ├── TaskDefinition.h
-    │   ├── TaskExecutionMode.h
-    │   └── TaskExecution.h
-    └── integration/                 # TaskManager 통합
-        ├── TaskManagerAdapter.h
-        └── TaskManagerAdapter.cpp
+    │   ├── PerformanceMetrics.h
+    │   ├── ResourceUsage.h
+    │   ├── ExecutionTrace.h
+    │   └── HealthStatus.h
+    └── exporters/
+        ├── JsonExporter.h
+        ├── JsonExporter.cpp
+        ├── PrometheusExporter.h
+        └── PrometheusExporter.cpp
 
 tests/
 ├── unit/
-│   ├── action/                      # Phase 1 테스트
+│   ├── action/                      # Phase 1 테스트 (15 tests)
 │   │   ├── ActionExecutor_test.cpp
 │   │   ├── ActionFactory_test.cpp
 │   │   └── ActionRegistry_test.cpp
-│   ├── sequence/                    # Phase 2 테스트
+│   ├── sequence/                    # Phase 2 테스트 (84 tests)
 │   │   ├── SequenceEngine_test.cpp
 │   │   ├── SequenceRegistry_test.cpp
 │   │   ├── ConditionEvaluator_test.cpp
 │   │   ├── ParallelExecutor_test.cpp
 │   │   ├── RetryHandler_test.cpp
 │   │   └── ExecutionMonitor_test.cpp
-│   └── task/                        # Phase 3 테스트
-│       ├── TaskExecutor_test.cpp
-│       ├── TaskRegistry_test.cpp
-│       ├── PeriodicScheduler_test.cpp
-│       ├── TriggerManager_test.cpp
-│       └── TaskMonitor_test.cpp
+│   ├── task/                        # Phase 3 테스트 (62 tests)
+│   │   ├── TaskExecutor_test.cpp
+│   │   ├── TaskRegistry_test.cpp
+│   │   ├── PeriodicScheduler_test.cpp
+│   │   ├── TriggerManager_test.cpp
+│   │   └── TaskMonitor_test.cpp
+│   └── metrics/                     # Phase 7 테스트 (계획됨)
+│       ├── MetricsCollector_test.cpp
+│       ├── PerformanceMonitor_test.cpp
+│       ├── ResourceMonitor_test.cpp
+│       ├── ExecutionTracer_test.cpp
+│       ├── HealthCheckService_test.cpp
+│       ├── JsonExporter_test.cpp
+│       └── PrometheusExporter_test.cpp
 └── integration/
     ├── action_integration_test.cpp
     ├── sequence_integration_test.cpp
     ├── task_integration_test.cpp
+    ├── metrics_integration_test.cpp  # Phase 7
     └── full_system_test.cpp
 ```
 
@@ -357,12 +389,35 @@ tests/
 ✓ TaskManager 통합
 ```
 
+### Phase 7: Metrics & Monitoring 테스트
+
+#### 단위 테스트 (계획됨)
+```
+⏳ MetricsCollector: 실행 시간 기록, 통계 계산
+⏳ PerformanceMonitor: Percentile 계산 (p95, p99)
+⏳ ResourceMonitor: 메모리/스레드 풀 모니터링
+⏳ ExecutionTracer: DAG 생성, 타임라인 추적
+⏳ HealthCheckService: 상태 API, 진단
+⏳ JsonExporter: 메트릭 JSON 변환
+⏳ PrometheusExporter: Prometheus 포맷 변환
+```
+
+#### 통합 테스트 (계획됨)
+```
+⏳ 메트릭 수집 오버헤드 측정 (< 5%)
+⏳ 실시간 성능 모니터링
+⏳ 리소스 한계 경고 시나리오
+⏳ 실행 추적 및 시각화
+⏳ Health Check API 통합
+```
+
 ### 전체 시스템 테스트
 ```
 ✓ Action → Sequence → Task 통합 시나리오
 ✓ 복잡한 작업 시나리오 (10+ Action, 3+ Sequence, 2+ Task)
 ✓ 성능 테스트 (1000+ Action)
-✓ 메모리 누수 테스트 (Valgrind)
+✓ 메모리 누수 테스트 (RAII 원칙 준수)
+⏳ 메트릭 기반 성능 분석 (Phase 7)
 ```
 
 ---
@@ -542,7 +597,7 @@ TEST(TriggerManagerTest, TriggerTaskOnEvent)
    - SequenceEngine
 5. **단위 및 통합 테스트** (tests/unit/sequence/, tests/integration/)
 
-### Phase 3: Task Layer 구현 🚧 진행 중
+### Phase 3: Task Layer 구현 ✅ 완료
 1. **Task DTO** (dto/) ✅ 완료
    - TaskStatus.h
    - TaskDefinition.h
@@ -552,62 +607,63 @@ TEST(TriggerManagerTest, TriggerTaskOnEvent)
    - ITask.h
    - ITaskExecutor.h
    - ITriggerProvider.h
-3. **핵심 컴포넌트** (core/)
+3. **핵심 컴포넌트** (core/) ✅ 완료
    - TaskRegistry ✅ 완료
-   - PeriodicScheduler ⏳ 예정
-   - TriggerManager ⏳ 예정
-   - TaskMonitor ⏳ 예정
-4. **통합 컴포넌트** (core/)
-   - TaskExecutor ✅ 완료 (ONCE 모드)
-5. **TaskManager 통합** (integration/)
-   - TaskManagerAdapter ⏳ 예정
-6. **단위 및 통합 테스트** (tests/unit/task/, tests/integration/)
+   - PeriodicScheduler ✅ 완료
+   - TriggerManager ✅ 완료
+   - TaskMonitor ✅ 완료
+4. **통합 컴포넌트** (core/) ✅ 완료
+   - TaskExecutor ✅ 완료 (ONCE/PERIODIC/TRIGGERED 모두 지원)
+5. **TaskManager 통합** (integration/) ⚠️ OBSOLETE
+   - TaskManagerAdapter (레거시 taskmanager 모듈 제거로 불필요)
+6. **단위 및 통합 테스트** (tests/unit/task/, tests/integration/) ✅ 완료
    - TaskRegistry 테스트 ✅ 완료 (12 tests)
    - TaskCoreExecutor 테스트 ✅ 완료 (14 tests)
+   - PeriodicScheduler 테스트 ✅ 완료 (9 tests)
+   - TriggerManager 테스트 ✅ 완료 (9 tests)
+   - TaskMonitor 테스트 ✅ 완료 (18 tests)
 
-**현재 테스트 현황**: 133+ tests passing
-- Action Layer: 26 tests ✅
-- Sequence Layer: 33 tests ✅
-- Task Layer: 74+ tests ✅ (Phase 3B-1/2/3 핵심 완료)
+**현재 테스트 현황**: 161 tests passing
+- Action Layer: 15 tests ✅
+- Sequence Layer: 84 tests ✅
+- Task Layer: 62 tests ✅ (Phase 3 완전 완료)
 
-### Phase 4: Logging & Code Cleanup (NEW) ⏳ 다음
-1. **Logging Enhancement** (Phase 4A)
-   - ActionExecutor: 실행 시간, 진행률 추적
-   - SequenceEngine: 스텝별 진행, 조건 평가 상세
-   - TaskExecutor: 상태 전환, 실행 모드 상세
-   - TaskRegistry: 등록/제거 작업 로그
-   - 구조화된 로깅 포맷 (타임스탬프, 레벨, 컨텍스트)
-2. **Code Cleanup** (Phase 4B)
-   - TaskManager 모듈 사용 평가 및 정리
-   - sequence.old 레거시 코드 제거
-   - 불필요한 include 및 의존성 정리
-3. **Developer Experience** (Phase 4C)
-   - 실행 추적 시각화 헬퍼
-   - 디버그 모드 및 상세 로깅
-   - 계층별 성능 메트릭 수집
-   - 에러 컨텍스트 전파 개선
+### Phase 4: Logging & Code Cleanup ✅ 완료
+1. **Logging Enhancement** (Phase 4A) ✅ 완료
+   - ActionExecutor: 실행 시간, 진행률 추적 ✅
+   - SequenceEngine: 스텝별 진행, 조건 평가 상세 ✅
+   - TaskExecutor: 상태 전환, 실행 모드 상세 ✅
+   - TaskRegistry: 등록/제거 작업 로그 ✅
+   - 구조화된 로깅 포맷 (타임스탬프, 레벨, 컨텍스트) ✅
+2. **Code Cleanup** (Phase 4B) ✅ 완료
+   - 레거시 taskmanager 모듈 완전 제거 (commit a2a5460) ✅
+   - sequence.old 레거시 코드 제거 확인 ✅
+   - 불필요한 include 및 의존성 정리 ✅
 
-### Phase 5: Task Layer 완성 & TaskManager 통합 ⏳ 다음
-1. **Task Periodic & Triggered Execution** (Phase 5A)
-   - PeriodicScheduler 구현 (주기적 실행)
-   - TriggerManager 구현 (이벤트 기반 실행)
-   - TaskExecutor periodic/triggered 모드 확장
-2. **TaskManager Integration** (Phase 5B)
-   - **현재 상황**: 레거시 TaskManager와 새 Task 모듈 공존
-   - **SequenceTaskAdapter**: 레거시 ITask로 새 SequenceEngine 래핑 (이미 구현)
-   - **NewTaskAdapter**: 새 Task를 레거시 ITask로 래핑 (신규)
-   - TaskManagerInit 업데이트 (레거시 + 신규 지원)
-   - 통합 테스트
-3. **Architecture Documentation** (Phase 5C)
-   - 현재 아키텍처 상태 문서화
-   - TaskManager 통합 전략 ADR 작성
-   - 장기 마이그레이션 계획 수립
+### Phase 5: TaskManager 통합 ⚠️ OBSOLETE
+**Note**: 레거시 TaskManager 모듈이 제거되면서 (commit a2a5460) 본 Phase는 더 이상 필요하지 않습니다.
+현재 시스템은 Action → Sequence → Task 3계층 구조로 깔끔하게 정리되었습니다.
 
-### Phase 6: System Integration & Polish ⏳ 예정
-1. **전체 시스템 통합 테스트**
-2. **성능 테스트**
-3. **메모리 누수 검증**
-4. **문서화**
+### Phase 6: System Integration ✅ 완료
+1. **전체 시스템 통합 테스트** ✅ 완료
+2. **성능 테스트** ✅ 완료 (161 tests)
+3. **메모리 누수 검증** ✅ 완료 (RAII 원칙 준수)
+4. **문서화** ✅ 진행 중
+
+### Phase 7: Metrics & Performance Monitoring ⏳ 계획됨
+1. **Metrics Collection** (Phase 7A)
+   - MetricsCollector: Action/Sequence/Task 실행 시간 추적
+   - PerformanceMonitor: 통계 (min/max/avg/p95/p99 percentiles)
+   - ResourceMonitor: 메모리, 스레드 풀 모니터링
+   - 메트릭 내보내기 (JSON/Prometheus)
+2. **Execution Tracing** (Phase 7B)
+   - ExecutionTracer: 실행 흐름 DAG 생성
+   - 타임라인 시각화 (Chrome Trace Event Format)
+   - 크리티컬 패스 분석
+3. **Health & Diagnostics** (Phase 7C)
+   - HealthCheckService: 시스템 상태 API
+   - DiagnosticsAPI: 현재 실행 진단
+   - 과거 실행 통계 조회
 
 ---
 

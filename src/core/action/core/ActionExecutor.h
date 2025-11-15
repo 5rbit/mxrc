@@ -39,11 +39,54 @@ public:
         std::chrono::milliseconds timeout = std::chrono::milliseconds(0));
 
     /**
-     * @brief Action 취소
+     * @brief Action 비동기 실행 (새로운 Stateful API)
+     *
+     * @param action 실행할 Action
+     * @param context 실행 컨텍스트
+     * @param timeout 타임아웃 (0 = 무제한)
+     * @return actionId 실행 중인 액션의 고유 ID
+     */
+    std::string executeAsync(
+        std::shared_ptr<IAction> action,
+        ExecutionContext& context,
+        std::chrono::milliseconds timeout = std::chrono::milliseconds(0));
+
+    /**
+     * @brief actionId로 액션 취소 (새로운 Stateful API)
+     *
+     * @param actionId 취소할 액션의 ID
+     */
+    void cancel(const std::string& actionId);
+
+    /**
+     * @brief Action 취소 (기존 API - 하위 호환성)
      *
      * @param action 취소할 Action
      */
     void cancel(std::shared_ptr<IAction> action);
+
+    /**
+     * @brief 액션이 실행 중인지 확인
+     *
+     * @param actionId 확인할 액션의 ID
+     * @return 실행 중이면 true
+     */
+    bool isRunning(const std::string& actionId) const;
+
+    /**
+     * @brief 액션의 실행 결과 조회
+     *
+     * @param actionId 조회할 액션의 ID
+     * @return 실행 결과
+     */
+    ExecutionResult getResult(const std::string& actionId);
+
+    /**
+     * @brief 액션 완료 대기
+     *
+     * @param actionId 대기할 액션의 ID
+     */
+    void waitForCompletion(const std::string& actionId);
 
 private:
     /**

@@ -11,15 +11,6 @@ find_package(GTest REQUIRED)
 # Add executable
 add_executable(mxrc
     src/main.cpp
-    src/core/taskmanager/Task.cpp
-    src/core/taskmanager/TaskManager.cpp
-    src/core/taskmanager/TaskDefinitionRegistry.cpp
-    src/core/taskmanager/TaskExecutor.cpp
-    src/core/taskmanager/operator_interface/OperatorInterface.cpp
-    src/core/taskmanager/commands/StartTaskCommand.cpp
-    src/core/taskmanager/commands/CancelTaskCommand.cpp
-    src/core/taskmanager/commands/PauseTaskCommand.cpp
-    src/core/taskmanager/TaskManagerInit.cpp
     src/core/action/core/ActionExecutor.cpp
     src/core/action/core/ActionFactory.cpp
     src/core/action/core/ActionRegistry.cpp
@@ -46,11 +37,6 @@ target_link_libraries(mxrc PRIVATE
 # Include directories
 target_include_directories(mxrc PUBLIC
     ${PROJECT_SOURCE_DIR}/src
-    ${PROJECT_SOURCE_DIR}/src/core/taskmanager
-    ${PROJECT_SOURCE_DIR}/src/core/taskmanager/interfaces
-    ${PROJECT_SOURCE_DIR}/src/core/taskmanager/operator_interface
-    ${PROJECT_SOURCE_DIR}/src/core/taskmanager/commands
-    ${PROJECT_SOURCE_DIR}/src/core/taskmanager/tasks
     ${PROJECT_SOURCE_DIR}/src/core/action
     ${PROJECT_SOURCE_DIR}/src/core/action/interfaces
     ${PROJECT_SOURCE_DIR}/src/core/action/core
@@ -65,6 +51,7 @@ target_include_directories(mxrc PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/task
     ${PROJECT_SOURCE_DIR}/src/core/task/core
     ${PROJECT_SOURCE_DIR}/src/core/task/dto
+    ${PROJECT_SOURCE_DIR}/src/core/task/interfaces
 )
 
 # Enable testing
@@ -72,10 +59,6 @@ enable_testing()
 
 # Add tests
 add_executable(run_tests
-    tests/unit/task/TaskManager_test.cpp
-    tests/unit/task/OperatorInterface_test.cpp
-    tests/unit/task/TaskDefinitionRegistry_test.cpp
-    tests/unit/task/TaskExecutor_test.cpp
     tests/unit/task/TaskRegistry_test.cpp
     tests/unit/task/TaskCoreExecutor_test.cpp
     tests/unit/task/PeriodicScheduler_test.cpp
@@ -87,17 +70,11 @@ add_executable(run_tests
     tests/integration/action_integration_test.cpp
     tests/unit/sequence/SequenceRegistry_test.cpp
     tests/unit/sequence/SequenceEngine_test.cpp
-    src/core/taskmanager/Task.cpp
-    src/core/taskmanager/TaskManager.cpp
-    src/core/taskmanager/TaskDefinitionRegistry.cpp
-    src/core/taskmanager/TaskExecutor.cpp
-    src/core/taskmanager/operator_interface/OperatorInterface.cpp
-    src/core/taskmanager/commands/StartTaskCommand.cpp
-    src/core/taskmanager/commands/CancelTaskCommand.cpp
-    src/core/taskmanager/commands/PauseTaskCommand.cpp
-    src/core/taskmanager/TaskManagerInit.cpp
     src/core/task/core/TaskRegistry.cpp
     src/core/task/core/TaskExecutor.cpp
+    src/core/task/core/PeriodicScheduler.cpp
+    src/core/task/core/TriggerManager.cpp
+    src/core/task/core/TaskMonitor.cpp
     src/core/action/core/ActionExecutor.cpp
     src/core/action/core/ActionFactory.cpp
     src/core/action/core/ActionRegistry.cpp
@@ -107,18 +84,10 @@ add_executable(run_tests
     src/core/sequence/core/SequenceEngine.cpp
     src/core/sequence/core/ConditionEvaluator.cpp
     src/core/sequence/core/RetryHandler.cpp
-    src/core/task/core/PeriodicScheduler.cpp
-    src/core/task/core/TriggerManager.cpp
-    src/core/task/core/TaskMonitor.cpp
 )
 
 target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/src
-    ${PROJECT_SOURCE_DIR}/src/core/taskmanager
-    ${PROJECT_SOURCE_DIR}/src/core/taskmanager/interfaces
-    ${PROJECT_SOURCE_DIR}/src/core/taskmanager/operator_interface
-    ${PROJECT_SOURCE_DIR}/src/core/taskmanager/commands
-    ${PROJECT_SOURCE_DIR}/src/core/taskmanager/tasks
     ${PROJECT_SOURCE_DIR}/src/core/action
     ${PROJECT_SOURCE_DIR}/src/core/action/interfaces
     ${PROJECT_SOURCE_DIR}/src/core/action/core
@@ -133,6 +102,7 @@ target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/task
     ${PROJECT_SOURCE_DIR}/src/core/task/core
     ${PROJECT_SOURCE_DIR}/src/core/task/dto
+    ${PROJECT_SOURCE_DIR}/src/core/task/interfaces
     ${PROJECT_SOURCE_DIR}/tests/unit/action
     ${PROJECT_SOURCE_DIR}/tests/unit/task
     ${PROJECT_SOURCE_DIR}/tests/unit/sequence

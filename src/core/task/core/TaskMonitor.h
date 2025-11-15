@@ -1,7 +1,7 @@
 #ifndef MXRC_CORE_TASK_MONITOR_H
 #define MXRC_CORE_TASK_MONITOR_H
 
-#include "core/task/dto/TaskDto.h"
+#include "core/task/dto/TaskStatus.h"
 #include "core/action/util/Logger.h"
 #include <string>
 #include <map>
@@ -35,7 +35,7 @@ public:
          * @brief 실행 시간 계산 (밀리초)
          */
         int64_t getElapsedMs() const {
-            auto end = (status == TaskStatus::RUNNING || status == TaskStatus::PENDING)
+            auto end = (status == TaskStatus::RUNNING || status == TaskStatus::IDLE)
                        ? std::chrono::steady_clock::now()
                        : endTime;
             return std::chrono::duration_cast<std::chrono::milliseconds>(end - startTime).count();

@@ -86,6 +86,9 @@ add_executable(run_tests
     tests/unit/event/EventBus_test.cpp
     tests/unit/event/DataStoreEventAdapter_test.cpp
     tests/integration/event/event_flow_test.cpp
+    tests/integration/event/monitoring_extension_test.cpp
+    examples/event_monitoring/ExecutionTimeCollector.cpp
+    examples/event_monitoring/StateTransitionLogger.cpp
     src/core/task/core/TaskRegistry.cpp
     src/core/task/core/TaskExecutor.cpp
     src/core/task/core/PeriodicScheduler.cpp
@@ -135,6 +138,8 @@ target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/tests/unit/event
     ${PROJECT_SOURCE_DIR}/tests/integration
     ${PROJECT_SOURCE_DIR}/tests/integration/event
+    ${PROJECT_SOURCE_DIR}/examples
+    ${PROJECT_SOURCE_DIR}/examples/event_monitoring
 )
 
 

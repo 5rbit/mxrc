@@ -34,7 +34,7 @@ TEST_F(TaskMonitorTest, StartTaskAndGetInfo) {
     auto info = monitor->getTaskInfo("task1");
     ASSERT_TRUE(info.has_value());
     EXPECT_EQ(info->taskId, "task1");
-    EXPECT_EQ(info->status, TaskStatus::IDLE);  // Starts as IDLE
+    EXPECT_EQ(info->status, TaskStatus::RUNNING);  // Starts as RUNNING
     EXPECT_FLOAT_EQ(info->progress, 0.0f);
     EXPECT_EQ(info->retryCount, 0);
 }
@@ -262,13 +262,8 @@ TEST_F(TaskMonitorTest, TaskLifecycleScenario) {
 
     auto info = monitor->getTaskInfo("lifecycle_task");
     ASSERT_TRUE(info.has_value());
-    EXPECT_EQ(info->status, TaskStatus::IDLE);
+    EXPECT_EQ(info->status, TaskStatus::RUNNING);  // Starts as RUNNING
     EXPECT_FLOAT_EQ(info->progress, 0.0f);
-
-    // RUNNING으로 상태 변경
-    monitor->updateStatus("lifecycle_task", TaskStatus::RUNNING);
-    info = monitor->getTaskInfo("lifecycle_task");
-    EXPECT_EQ(info->status, TaskStatus::RUNNING);
 
     // 진행률 업데이트
     monitor->updateProgress("lifecycle_task", 0.25f);

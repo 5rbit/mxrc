@@ -646,3 +646,133 @@ TEST_F(SequenceIntegrationTest, LargeParallelExecution) {
     EXPECT_FLOAT_EQ(status.progress, 1.0f);
 }
 
+/**
+ * @brief 통합 테스트: 비동기 실행 및 취소
+ *
+ * 시나리오:
+ * - 긴 지연 시간을 가진 액션을 포함하는 시퀀스 실행
+ * - 시퀀스 실행 중 취소 요청
+ * - 시퀀스 및 액션이 취소 상태로 전환되는지 확인
+ */
+TEST_F(SequenceIntegrationTest, AsyncExecutionWithCancellation) {
+    // 시퀀스 정의: 500ms 지연 액션
+    SequenceDefinition def;
+    def.id = "async_cancellable_workflow";
+    def.name = "Async Cancellable Workflow";
+    def.version = "1.0.0";
+    def.actionIds = {"long_delay_action"};
+
+    // 액션 파라미터 설정 (duration_ms)
+    ActionStep delayStep;
+    delayStep.actionId = "long_delay_action";
+    delayStep.actionType = "cancellable_delay";
+    delayStep.parameters["duration_ms"] = "500";
+    def.steps.push_back(delayStep);
+
+    registry_->registerSequence(def);
+
+    // 시퀀스 비동기 실행
+    std::string executionId = engine_->execute("async_cancellable_workflow");
+
+    // 짧은 지연 후 취소 요청
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    engine_->cancel(executionId);
+
+    // 시퀀스 완료 대기 (취소되었으므로 빠르게 완료될 것)
+    // Note: 현재 SequenceEngine::execute는 동기적으로 동작하므로,
+    // 이 테스트는 SequenceEngine::execute가 내부적으로 ActionExecutor의 비동기 API를
+    // 사용하더라도, SequenceEngine 자체는 블로킹 방식으로 동작함을 전제로 합니다.
+    // 따라서, cancel 호출 후 execute가 반환될 때까지 기다려야 합니다.
+    // 실제 비동기 SequenceEngine이 구현되면 이 부분은 변경될 수 있습니다.
+
+    // 상태 확인
+    auto status = engine_->getStatus(executionId);
+    EXPECT_EQ(status.status, SequenceStatus::CANCELLED);
+    EXPECT_EQ(status.actionResults.size(), 1);
+    EXPECT_EQ(status.actionResults[0].actionId, "long_delay_action");
+    EXPECT_EQ(status.actionResults[0].status, ActionStatus::CANCELLED);
+}
+
+/**
+ * @brief 통합 테스트: 여러 비동기 액션 관리
+ *
+ * 시나리오:
+ * - 여러 개의 비동기 액션을 포함하는 시퀀스 실행
+ * - 각 액션이 올바르게 시작되고 완료되는지 확인
+ * - SequenceEngine이 모든 액션의 생명주기를 관리하는지 확인
+ */
+TEST_F(SequenceIntegrationTest, MultipleAsyncActionsManagement) {
+    // 시퀀스 정의: 2개의 지연 액션
+    SequenceDefinition def;
+    def.id = "multiple_async_workflow";
+    def.name = "Multiple Async Workflow";
+    def.version = "1.0.0";
+    def.actionIds = {"delay_action_1", "delay_action_2"};
+
+    ActionStep delayStep1;
+    delayStep1.actionId = "delay_action_1";
+    delayStep1.actionType = "cancellable_delay";
+    delayStep1.parameters["duration_ms"] = "100";
+    def.steps.push_back(delayStep1);
+
+    ActionStep delayStep2;
+    delayStep2.actionId = "delay_action_2";
+    delayStep2.actionType = "cancellable_delay";
+    delayStep2.parameters["duration_ms"] = "150";
+    def.steps.push_back(delayStep2);
+
+    registry_->registerSequence(def);
+
+    // 시퀀스 실행
+    std::string executionId = engine_->execute("multiple_async_workflow");
+
+    // 상태 확인
+    auto status = engine_->getStatus(executionId);
+    EXPECT_EQ(status.status, SequenceStatus::COMPLETED);
+    EXPECT_EQ(status.actionResults.size(), 2);
+    EXPECT_EQ(status.actionResults[0].actionId, "delay_action_1");
+    EXPECT_EQ(status.actionResults[0].status, ActionStatus::COMPLETED);
+    EXPECT_EQ(status.actionResults[1].actionId, "delay_action_2");
+    EXPECT_EQ(status.actionResults[1].status, ActionStatus::COMPLETED);
+}
+
+/**
+ * @brief 통합 테스트: 비동기 액션이 포함된 시퀀스 완료 대기
+ *
+ * 시나리오:
+ * - 비동기 액션을 포함하는 시퀀스 실행
+ * - SequenceEngine이 액션 완료를 기다린 후 시퀀스를 완료하는지 확인
+ */
+TEST_F(SequenceIntegrationTest, SequenceWithAsyncActions) {
+    // 시퀀스 정의: 200ms 지연 액션
+    SequenceDefinition def;
+    def.id = "wait_for_async_workflow";
+    def.name = "Wait For Async Workflow";
+    def.version = "1.0.0";
+    def.actionIds = {"short_delay_action"};
+
+    ActionStep delayStep;
+    delayStep.actionId = "short_delay_action";
+    delayStep.actionType = "cancellable_delay";
+    delayStep.parameters["duration_ms"] = "200";
+    def.steps.push_back(delayStep);
+
+    registry_->registerSequence(def);
+
+    // 시퀀스 실행
+    auto start_time = std::chrono::steady_clock::now();
+    std::string executionId = engine_->execute("wait_for_async_workflow");
+    auto end_time = std::chrono::steady_clock::now();
+
+    // 실행 시간 검증 (최소 지연 시간 이상이어야 함)
+    auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+    EXPECT_GE(elapsed_time.count(), 200);
+
+    // 상태 확인
+    auto status = engine_->getStatus(executionId);
+    EXPECT_EQ(status.status, SequenceStatus::COMPLETED);
+    EXPECT_EQ(status.actionResults.size(), 1);
+    EXPECT_EQ(status.actionResults[0].actionId, "short_delay_action");
+    EXPECT_EQ(status.actionResults[0].status, ActionStatus::COMPLETED);
+}
+

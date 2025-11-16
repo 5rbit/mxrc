@@ -13,14 +13,14 @@ void TaskMonitor::startTask(const std::string& taskId) {
 
     TaskExecutionInfo info;
     info.taskId = taskId;
-    info.status = TaskStatus::IDLE;  // Start as IDLE, will be set to RUNNING when execution begins
+    info.status = TaskStatus::RUNNING;  // Task starts in RUNNING state
     info.progress = 0.0f;
     info.startTime = std::chrono::steady_clock::now();
     info.retryCount = 0;
 
     tasks_[taskId] = info;
 
-    Logger::get()->info("[TaskMonitor] START - Task: {} (status: IDLE)", taskId);
+    Logger::get()->info("[TaskMonitor] START - Task: {} (status: RUNNING)", taskId);
 }
 
 void TaskMonitor::updateProgress(const std::string& taskId, float progress) {

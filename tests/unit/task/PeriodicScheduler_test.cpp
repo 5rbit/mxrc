@@ -137,7 +137,7 @@ TEST_F(PeriodicSchedulerTest, ExecutionContextUsage) {
         int current = 0;
         auto prev = ctx.getVariable("prev_value");
         if (prev.has_value()) {
-            current = std::any_cast<int>(prev) + 1;
+            current = std::any_cast<int>(prev.value()) + 1;
         }
         ctx.setVariable("prev_value", current);
         sum += current;

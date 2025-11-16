@@ -23,7 +23,7 @@ namespace mxrc::core::action {
 class ActionExecutor {
 public:
     ActionExecutor() = default;
-    ~ActionExecutor() = default;
+    ~ActionExecutor();
 
     /**
      * @brief Action 실행 (비동기, 타임아웃 및 취소 지원)
@@ -88,6 +88,14 @@ public:
      */
     void waitForCompletion(const std::string& actionId);
 
+    /**
+     * @brief 완료된 액션 상태 정리
+     *
+     * 완료, 실패, 취소된 액션의 상태를 메모리에서 제거합니다.
+     * @return 정리된 액션 개수
+     */
+    int clearCompletedActions();
+
 private:
     /**
      * @brief 실행 중인 액션의 상태
@@ -98,6 +106,8 @@ private:
         std::chrono::steady_clock::time_point startTime;
         std::chrono::milliseconds timeout;
         std::atomic<bool> cancelRequested{false};
+        std::atomic<bool> shouldStopMonitoring{false};  // 타임아웃 모니터링 중지 플래그
+        std::unique_ptr<std::thread> timeoutThread;      // 타임아웃 모니터링 스레드
         ExecutionResult result;
 
         ExecutionState() = default;
@@ -109,7 +119,8 @@ private:
             , future(std::move(fut))
             , startTime(start)
             , timeout(to)
-            , cancelRequested(false) {}
+            , cancelRequested(false)
+            , shouldStopMonitoring(false) {}
     };
 
     // 실행 중인 액션 관리

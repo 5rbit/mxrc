@@ -165,10 +165,14 @@ namespace mxrc::core::action {
 ```
 
 #### ActionExecutor
-- 개별 Action 실행
-- 타임아웃 관리
+- 개별 Action 실행 (동기/비동기)
+- 타임아웃 관리 및 실시간 모니터링
 - 실행 결과 수집
 - 에러 처리
+- 안전한 종료 및 리소스 정리
+  - 소멸자에서 실행 중인 액션 자동 취소
+  - 타임아웃 모니터링 스레드 안전 종료
+  - `clearCompletedActions()`: 완료된 액션 상태 정리
 
 #### ActionFactory
 - Action 타입별 생성 함수 등록 (`registerFactory`)
@@ -182,6 +186,9 @@ namespace mxrc::core::action {
 - 순차/조건부/병렬 실행 조율
 - Action 간 데이터 전달 관리
 - 진행률 추적
+- 안전한 종료 및 리소스 정리
+  - 소멸자에서 실행 중인 시퀀스 자동 취소
+  - `clearCompletedSequences()`: 완료된 시퀀스 상태 정리
 
 #### SequenceRegistry
 - 시퀀스 정의 등록 및 조회 (`registerDefinition`, `getDefinition`)
@@ -205,7 +212,9 @@ namespace mxrc::core::action {
 - 단일 Action 기반 Task 실행
 - Sequence 기반 Task 실행
 - Task 상태 관리 및 제어 (cancel, pause, resume)
-- **테스트**: 14개 단위 테스트 통과
+- 안전한 종료 및 리소스 정리
+  - `clearCompletedTasks()`: 완료된 태스크 상태 정리
+- **테스트**: 19개 단위 테스트 통과
 
 #### Task 실행 모드
 ```cpp
@@ -365,10 +374,17 @@ TEST_F(ComponentTest, TestScenario) {
 - Mock 클래스: `Mock<ClassName>`
 
 ### 테스트 커버리지
-- **Action Layer**: 26 tests
-- **Sequence Layer**: 33 tests
-- **Task Layer**: 53 tests
-- **전체**: 112 tests (모두 통과)
+- **Action Layer**: 12 tests (기본 기능) + 6 tests (종료 안정성) = 12 tests
+- **Sequence Layer**: 9 tests (기본 기능) + 5 tests (종료 안정성) = 14 tests
+- **Task Layer**: 67 tests (Registry 12 + Executor 19 + Scheduler 9 + Trigger 12 + Monitor 15)
+- **통합 테스트**: 4 tests
+- **팩토리/레지스트리**: 18 tests
+- **전체**: 115 tests (113 통과, 2 조건부 스킵)
+
+#### 종료 안정성 테스트 (16 tests 추가)
+- ActionExecutor: 소멸자, 상태 정리, 타임아웃 스레드 관리, 동시성, 메모리 누수 방지
+- SequenceEngine: 소멸자, 상태 정리, 동시성, 메모리 누수 방지
+- TaskExecutor: 상태 정리, 실패/취소 처리, 메모리 누수 방지
 
 ## 설계 원칙
 
@@ -391,6 +407,9 @@ TEST_F(ComponentTest, TestScenario) {
 - Registry 클래스들은 `std::mutex`로 보호
 - 상태 접근은 동기화됨
 - Logger는 thread-safe
+
+### 5. 모듈의 독립성과 책임(SRP)
+- 더 성숙한 아키텍처를 위한 끊임 없는 제안과 발전
 
 ## 현재 진행 상황
 

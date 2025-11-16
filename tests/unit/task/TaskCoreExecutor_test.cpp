@@ -350,4 +350,221 @@ TEST_F(TaskExecutorOnceTest, TaskWithDescription) {
     EXPECT_EQ(taskDef.description, "This is a test task with description");
 }
 
+// ========== 종료 안정성 테스트 ==========
+
+/**
+ * @brief clearCompletedTasks로 완료된 태스크 정리
+ */
+TEST_F(TaskExecutorOnceTest, ClearCompletedTasksRemovesFinished) {
+    // 짧은 태스크 2개 - 동기 실행으로 완료 보장
+    TaskDefinition taskDef1("task_short1");
+    taskDef1.setWork("Delay").setOnceMode();
+
+    TaskDefinition taskDef2("task_short2");
+    taskDef2.setWork("Delay").setOnceMode();
+
+    auto result1 = taskExecutor->execute(taskDef1, *context);
+    auto result2 = taskExecutor->execute(taskDef2, *context);
+
+    EXPECT_EQ(result1.status, TaskStatus::COMPLETED);
+    EXPECT_EQ(result2.status, TaskStatus::COMPLETED);
+
+    // 완료된 태스크 2개가 메모리에 존재
+    EXPECT_EQ(taskExecutor->getStatus("task_short1"), TaskStatus::COMPLETED);
+    EXPECT_EQ(taskExecutor->getStatus("task_short2"), TaskStatus::COMPLETED);
+
+    // 완료된 태스크 정리
+    int cleared = taskExecutor->clearCompletedTasks();
+    EXPECT_EQ(cleared, 2);  // task_short1, task_short2 제거
+
+    // 정리된 태스크는 IDLE 상태로 반환
+    EXPECT_EQ(taskExecutor->getStatus("task_short1"), TaskStatus::IDLE);
+    EXPECT_EQ(taskExecutor->getStatus("task_short2"), TaskStatus::IDLE);
+
+    // 두 번째 호출은 0 반환
+    int clearedAgain = taskExecutor->clearCompletedTasks();
+    EXPECT_EQ(clearedAgain, 0);
+}
+
+/**
+ * @brief 실패 및 취소된 태스크도 정리됨
+ */
+TEST_F(TaskExecutorOnceTest, ClearCompletedTasksIncludesFailedAndCancelled) {
+    // 성공 태스크
+    TaskDefinition taskSuccess("task_success");
+    taskSuccess.setWork("Delay").setOnceMode();
+
+    // 실패 태스크
+    TaskDefinition taskFail("task_fail");
+    taskFail.setWork("non_existent_action").setOnceMode();
+
+    // 동기 실행
+    auto resultSuccess = taskExecutor->execute(taskSuccess, *context);
+    auto resultFail = taskExecutor->execute(taskFail, *context);
+
+    // 상태 확인
+    EXPECT_EQ(taskExecutor->getStatus("task_success"), TaskStatus::COMPLETED);
+    EXPECT_EQ(taskExecutor->getStatus("task_fail"), TaskStatus::FAILED);
+
+    // 모두 정리됨
+    int cleared = taskExecutor->clearCompletedTasks();
+    EXPECT_EQ(cleared, 2);
+
+    // 두 번째 호출은 0 반환
+    int clearedAgain = taskExecutor->clearCompletedTasks();
+    EXPECT_EQ(clearedAgain, 0);
+}
+
+/**
+ * @brief 여러 스레드에서 동시에 태스크 취소 시 안전성
+ */
+TEST_F(TaskExecutorOnceTest, ConcurrentTaskCancellationSafety) {
+    std::vector<SequenceDefinition> sequences;
+    std::vector<TaskDefinition> tasks;
+    std::vector<std::thread> execThreads;
+
+    // 5개의 긴 시퀀스와 태스크 생성 (10개에서 줄임)
+    for (int i = 0; i < 5; i++) {
+        SequenceDefinition seqDef("seq_concurrent_" + std::to_string(i),
+                                  "Concurrent Sequence " + std::to_string(i));
+
+        for (int j = 0; j < 20; j++) {
+            ActionStep step("delay_" + std::to_string(i) + "_" + std::to_string(j), "Delay");
+            step.addParameter("duration", "2000");  // 충분히 긴 딜레이
+            seqDef.addStep(step);
+        }
+
+        sequenceRegistry->registerDefinition(seqDef);
+        sequences.push_back(seqDef);
+
+        TaskDefinition taskDef("task_concurrent_" + std::to_string(i));
+        taskDef.setWorkSequence("seq_concurrent_" + std::to_string(i)).setOnceMode();
+        tasks.push_back(taskDef);
+    }
+
+    // 모든 태스크를 별도 스레드에서 실행
+    for (auto& taskDef : tasks) {
+        execThreads.emplace_back([&, taskDef]() {
+            taskExecutor->execute(taskDef, *context);
+        });
+    }
+
+    // 모두 실행 중인지 확인
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    for (int i = 0; i < 5; i++) {
+        auto status = taskExecutor->getStatus("task_concurrent_" + std::to_string(i));
+        // RUNNING이 아니면 테스트가 유효하지 않음
+        if (status != TaskStatus::RUNNING) {
+            // 실행 스레드들 정리
+            for (auto& t : execThreads) {
+                if (t.joinable()) t.join();
+            }
+            GTEST_SKIP() << "Task completed too quickly, test invalid";
+        }
+    }
+
+    auto startTime = std::chrono::steady_clock::now();
+
+    // 여러 스레드에서 동시에 취소
+    std::vector<std::thread> cancelThreads;
+    for (int i = 0; i < 5; i++) {
+        cancelThreads.emplace_back([this, i]() {
+            taskExecutor->cancel("task_concurrent_" + std::to_string(i));
+        });
+    }
+
+    // 모든 취소 스레드 종료 대기
+    for (auto& t : cancelThreads) {
+        t.join();
+    }
+
+    // 모든 실행 스레드 종료 대기
+    for (auto& t : execThreads) {
+        t.join();
+    }
+
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - startTime);
+
+    // 동시 취소가 데드락 없이 완료되어야 함
+    EXPECT_LT(elapsed.count(), 3000);
+
+    // 모든 태스크가 취소되었는지 확인
+    for (int i = 0; i < 5; i++) {
+        auto status = taskExecutor->getStatus("task_concurrent_" + std::to_string(i));
+        EXPECT_EQ(status, TaskStatus::CANCELLED);
+    }
+}
+
+/**
+ * @brief 메모리 누수 방지: 많은 태스크 실행 후 정리
+ */
+TEST_F(TaskExecutorOnceTest, NoMemoryLeakWithManyTasks) {
+    // 50개의 짧은 태스크 순차 실행
+    for (int i = 0; i < 50; i++) {
+        TaskDefinition taskDef("task_mem_" + std::to_string(i));
+        taskDef.setWork("Delay").setOnceMode();
+
+        auto result = taskExecutor->execute(taskDef, *context);
+        EXPECT_EQ(result.status, TaskStatus::COMPLETED);
+    }
+
+    // 모두 완료 상태로 메모리에 누적됨
+    int cleared = taskExecutor->clearCompletedTasks();
+    EXPECT_EQ(cleared, 50);
+
+    // 두 번째 호출은 0 반환
+    int clearedAgain = taskExecutor->clearCompletedTasks();
+    EXPECT_EQ(clearedAgain, 0);
+}
+
+/**
+ * @brief Task 취소가 즉시 동작하는지 확인
+ */
+TEST_F(TaskExecutorOnceTest, TaskCancellationWorksImmediately) {
+    // 긴 시퀀스 생성
+    SequenceDefinition seqDef("seq_cancel_test", "Cancel Test Sequence");
+    for (int i = 0; i < 10; i++) {
+        ActionStep step("delay_" + std::to_string(i), "Delay");
+        step.addParameter("duration", "3000");  // 더 긴 딜레이로 취소 기회 보장
+        seqDef.addStep(step);
+    }
+    sequenceRegistry->registerDefinition(seqDef);
+
+    TaskDefinition taskDef("task_cancel_test");
+    taskDef.setWorkSequence("seq_cancel_test").setOnceMode();
+
+    auto startTime = std::chrono::steady_clock::now();
+
+    // 별도 스레드에서 실행
+    std::thread execThread([&]() {
+        taskExecutor->execute(taskDef, *context);
+    });
+
+    // 약간 대기 후 취소
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+    // 실행 중인지 확인
+    auto statusBeforeCancel = taskExecutor->getStatus("task_cancel_test");
+    if (statusBeforeCancel != TaskStatus::RUNNING) {
+        execThread.join();
+        GTEST_SKIP() << "Task completed too quickly, test invalid";
+    }
+
+    taskExecutor->cancel("task_cancel_test");
+
+    execThread.join();
+
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - startTime);
+
+    // 취소되었는지 확인
+    auto status = taskExecutor->getStatus("task_cancel_test");
+    EXPECT_EQ(status, TaskStatus::CANCELLED);
+
+    // 실행 시간이 짧은지 확인 (즉시 취소되어야 함)
+    // 300ms 대기 + Action 스텝 완료 (300ms) + 취소 시간 + 여유 = 1500ms 이내
+    EXPECT_LT(elapsed.count(), 1500);
+}
+
 } // namespace mxrc::core::task

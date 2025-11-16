@@ -48,6 +48,14 @@ public:
     TaskStatus getStatus(const std::string& taskId) const override;
     float getProgress(const std::string& taskId) const override;
 
+    /**
+     * @brief 완료된 태스크 상태 정리
+     *
+     * 완료, 실패, 취소된 태스크의 상태를 메모리에서 제거합니다.
+     * @return 정리된 태스크 개수
+     */
+    int clearCompletedTasks();
+
 private:
     struct TaskState {
         TaskStatus status{TaskStatus::IDLE};

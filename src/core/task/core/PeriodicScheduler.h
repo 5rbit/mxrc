@@ -83,6 +83,13 @@ private:
      * @brief 스케줄 실행 루프
      */
     void runSchedule(ScheduleInfo* info);
+
+    /**
+     * @brief 주기적 실행 중지 (내부용, 잠금 없음)
+     * @param taskId Task 식별자
+     * @return 중지된 스케줄 정보. 해당 taskId가 없으면 nullptr.
+     */
+    std::unique_ptr<ScheduleInfo> stopInternal(const std::string& taskId);
 };
 
 } // namespace mxrc::core::task

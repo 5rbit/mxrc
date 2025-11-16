@@ -10,6 +10,12 @@
 #include <mutex>
 #include <atomic>
 
+// Forward declaration for EventBus (optional dependency)
+namespace mxrc::core::event {
+    class IEventBus;
+    class IEvent;
+}
+
 namespace mxrc::core::task {
 
 /**
@@ -22,11 +28,17 @@ class TaskExecutor : public ITaskExecutor {
 public:
     /**
      * @brief 생성자
+     *
+     * @param actionFactory Action 팩토리
+     * @param actionExecutor Action 실행자
+     * @param sequenceEngine Sequence 엔진
+     * @param eventBus 이벤트 버스 (nullptr이면 이벤트 발행하지 않음)
      */
     TaskExecutor(
         std::shared_ptr<mxrc::core::action::ActionFactory> actionFactory,
         std::shared_ptr<mxrc::core::action::ActionExecutor> actionExecutor,
-        std::shared_ptr<mxrc::core::sequence::SequenceEngine> sequenceEngine
+        std::shared_ptr<mxrc::core::sequence::SequenceEngine> sequenceEngine,
+        std::shared_ptr<mxrc::core::event::IEventBus> eventBus = nullptr
     );
 
     ~TaskExecutor() = default;
@@ -62,11 +74,23 @@ private:
         std::atomic<float> progress{0.0f};
         std::atomic<bool> cancelRequested{false};
         std::atomic<bool> pauseRequested{false};
+        std::chrono::steady_clock::time_point startTime;  // 태스크 시작 시간
+        float lastReportedProgress{0.0f};  // 마지막 보고된 진행률 (5% 임계값)
     };
 
     std::shared_ptr<mxrc::core::action::ActionFactory> actionFactory_;
     std::shared_ptr<mxrc::core::action::ActionExecutor> actionExecutor_;
     std::shared_ptr<mxrc::core::sequence::SequenceEngine> sequenceEngine_;
+    std::shared_ptr<mxrc::core::event::IEventBus> eventBus_;
+
+    /**
+     * @brief 이벤트 발행 헬퍼 (non-blocking)
+     *
+     * @tparam EventType 이벤트 타입
+     * @param event 발행할 이벤트
+     */
+    template<typename EventType>
+    void publishEvent(std::shared_ptr<EventType> event);
 
     mutable std::mutex stateMutex_;
     std::map<std::string, TaskState> states_;

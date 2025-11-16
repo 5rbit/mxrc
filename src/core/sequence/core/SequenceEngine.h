@@ -12,6 +12,12 @@
 #include <atomic>
 #include <set>
 
+// Forward declaration for EventBus (optional dependency)
+namespace mxrc::core::event {
+    class IEventBus;
+    class IEvent;
+}
+
 namespace mxrc::core::sequence {
 
 /**
@@ -27,10 +33,12 @@ public:
      *
      * @param factory Action 팩토리
      * @param executor Action 실행자
+     * @param eventBus 이벤트 버스 (nullptr이면 이벤트 발행하지 않음)
      */
     SequenceEngine(
         std::shared_ptr<mxrc::core::action::ActionFactory> factory,
-        std::shared_ptr<mxrc::core::action::ActionExecutor> executor
+        std::shared_ptr<mxrc::core::action::ActionExecutor> executor,
+        std::shared_ptr<mxrc::core::event::IEventBus> eventBus = nullptr
     );
 
     ~SequenceEngine();
@@ -70,12 +78,24 @@ private:
         int totalSteps{0};
         std::string currentActionId;  // 현재 실행 중인 액션의 ID (actionId 기반)
         std::mutex currentActionMutex;  // currentActionId 보호용
+        std::chrono::steady_clock::time_point startTime;  // 시퀀스 시작 시간
+        float lastReportedProgress{0.0f};  // 마지막 보고된 진행률 (5% 임계값)
     };
 
     std::shared_ptr<mxrc::core::action::ActionFactory> factory_;
     std::shared_ptr<mxrc::core::action::ActionExecutor> executor_;
+    std::shared_ptr<mxrc::core::event::IEventBus> eventBus_;
     std::unique_ptr<ConditionEvaluator> conditionEvaluator_;
     std::unique_ptr<RetryHandler> retryHandler_;
+
+    /**
+     * @brief 이벤트 발행 헬퍼 (non-blocking)
+     *
+     * @tparam EventType 이벤트 타입
+     * @param event 발행할 이벤트
+     */
+    template<typename EventType>
+    void publishEvent(std::shared_ptr<EventType> event);
 
     mutable std::mutex stateMutex_;
     std::map<std::string, SequenceState> states_;

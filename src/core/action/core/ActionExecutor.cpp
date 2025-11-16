@@ -1,8 +1,22 @@
 #include "ActionExecutor.h"
 #include "core/action/util/Logger.h"
+#include "interfaces/IEventBus.h"
+#include "dto/ActionEvents.h"
 #include <thread>
 
 namespace mxrc::core::action {
+
+ActionExecutor::ActionExecutor(std::shared_ptr<mxrc::core::event::IEventBus> eventBus)
+    : eventBus_(eventBus) {
+    // EventBus는 optional이므로 nullptr 허용
+}
+
+template<typename EventType>
+void ActionExecutor::publishEvent(std::shared_ptr<EventType> event) {
+    if (eventBus_ && event) {
+        eventBus_->publish(event);
+    }
+}
 
 ActionExecutor::~ActionExecutor() {
     auto logger = Logger::get();
@@ -102,13 +116,40 @@ std::string ActionExecutor::executeAsync(
     logger->info("[ActionExecutor] ASYNC START - Action: {} (type: {}, timeout: {}ms)",
                  actionId, action->getType(), timeout.count());
 
+    // 이벤트 발행: ACTION_STARTED
+    publishEvent(std::make_shared<mxrc::core::event::ActionStartedEvent>(
+        actionId, action->getType()));
+
     // 비동기로 액션 실행
-    auto future = std::async(std::launch::async, [action, &context, actionId, logger]() {
+    auto future = std::async(std::launch::async, [action, &context, actionId, logger, this, startTime]() {
         try {
             action->execute(context);
             logger->info("[ActionExecutor] ASYNC COMPLETE - Action {} finished successfully", actionId);
+
+            // 이벤트 발행: ACTION_COMPLETED
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - startTime);
+            publishEvent(std::make_shared<mxrc::core::event::ActionCompletedEvent>(
+                actionId, action->getType(), elapsed.count()));
+
         } catch (const std::exception& e) {
             logger->error("[ActionExecutor] ASYNC FAILED - Action {} threw exception: {}", actionId, e.what());
+
+            // 상태에 오류 정보 저장
+            {
+                std::lock_guard<std::mutex> lock(actionsMutex_);
+                auto it = runningActions_.find(actionId);
+                if (it != runningActions_.end()) {
+                    it->second.exceptionOccurred = true;
+                    it->second.exceptionMessage = e.what();
+                }
+            }
+
+            // 이벤트 발행: ACTION_FAILED
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - startTime);
+            publishEvent(std::make_shared<mxrc::core::event::ActionFailedEvent>(
+                actionId, action->getType(), e.what(), elapsed.count()));
         }
     });
 
@@ -161,6 +202,13 @@ std::string ActionExecutor::executeAsync(
                         if (shouldTimeout) {
                             logger->warn("[ActionExecutor] TIMEOUT - Action {} exceeded timeout of {}ms, cancelling",
                                         actionId, timeout.count());
+
+                            // 이벤트 발행: ACTION_TIMEOUT
+                            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::steady_clock::now() - startTime);
+                            publishEvent(std::make_shared<mxrc::core::event::ActionTimeoutEvent>(
+                                actionId, "", timeout.count(), elapsed.count()));
+
                             cancel(actionId);
                             return;
                         }
@@ -196,6 +244,10 @@ void ActionExecutor::cancel(const std::string& actionId) {
     if (actionToCancel) {
         actionToCancel->cancel();
         logger->info("[ActionExecutor] Action {} cancel request processed", actionId);
+
+        // 이벤트 발행: ACTION_CANCELLED
+        publishEvent(std::make_shared<mxrc::core::event::ActionCancelledEvent>(
+            actionId, actionToCancel->getType(), 0));
     }
 }
 
@@ -223,6 +275,20 @@ ExecutionResult ActionExecutor::getResult(const std::string& actionId) {
     if (it->second.future.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
         // 완료됨 - 결과 수집
         auto& state = it->second;
+
+        // 예외가 발생한 경우 FAILED 상태 반환
+        if (state.exceptionOccurred) {
+            ExecutionResult result(actionId, ActionStatus::FAILED);
+            result.errorMessage = state.exceptionMessage;
+            result.progress = state.action->getProgress();
+
+            auto endTime = std::chrono::steady_clock::now();
+            result.executionTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+                endTime - state.startTime);
+
+            return result;
+        }
+
         ExecutionResult result(actionId, state.action->getStatus());
         result.progress = state.action->getProgress();
 

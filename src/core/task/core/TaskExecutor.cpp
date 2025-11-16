@@ -1,5 +1,7 @@
 #include "core/task/core/TaskExecutor.h"
 #include "core/sequence/dto/SequenceDefinition.h"
+#include "interfaces/IEventBus.h"
+#include "dto/TaskEvents.h"
 #include <chrono>
 #include <sstream>
 #include <thread>
@@ -12,11 +14,21 @@ using namespace mxrc::core::action;
 TaskExecutor::TaskExecutor(
     std::shared_ptr<ActionFactory> actionFactory,
     std::shared_ptr<ActionExecutor> actionExecutor,
-    std::shared_ptr<mxrc::core::sequence::SequenceEngine> sequenceEngine
+    std::shared_ptr<mxrc::core::sequence::SequenceEngine> sequenceEngine,
+    std::shared_ptr<mxrc::core::event::IEventBus> eventBus
 ) : actionFactory_(actionFactory),
     actionExecutor_(actionExecutor),
-    sequenceEngine_(sequenceEngine) {
+    sequenceEngine_(sequenceEngine),
+    eventBus_(eventBus) {
+    // EventBus는 optional이므로 nullptr 허용
     Logger::get()->info("TaskExecutor initialized");
+}
+
+template<typename EventType>
+void TaskExecutor::publishEvent(std::shared_ptr<EventType> event) {
+    if (eventBus_ && event) {
+        eventBus_->publish(event);
+    }
 }
 
 TaskExecution TaskExecutor::execute(
@@ -36,9 +48,18 @@ TaskExecution TaskExecutor::execute(
     state.status = TaskStatus::RUNNING;
     state.cancelRequested = false;
     state.pauseRequested = false;
+    state.startTime = std::chrono::steady_clock::now();
 
     Logger::get()->debug("[TaskExecutor] Task {} state transition: {} -> RUNNING",
                         definition.id, taskStatusToString(prevStatus));
+
+    // 이벤트 발행: TASK_STARTED
+    publishEvent(std::make_shared<mxrc::core::event::TaskStartedEvent>(
+        definition.id,
+        definition.name,
+        taskExecutionModeToString(definition.executionMode),
+        definition.workType == TaskWorkType::ACTION ? "ACTION" : "SEQUENCE"
+    ));
 
     TaskExecution result;
     auto startTime = std::chrono::steady_clock::now();
@@ -65,6 +86,31 @@ TaskExecution TaskExecutor::execute(
 
     if (result.isFailed()) {
         Logger::get()->error("[TaskExecutor] Task {} error: {}", definition.id, result.errorMessage);
+    }
+
+    // 이벤트 발행: Task 완료 상태
+    if (result.status == TaskStatus::COMPLETED) {
+        publishEvent(std::make_shared<mxrc::core::event::TaskCompletedEvent>(
+            definition.id,
+            definition.name,
+            elapsed.count(),
+            result.progress * 100.0  // progressPercent
+        ));
+    } else if (result.status == TaskStatus::FAILED) {
+        publishEvent(std::make_shared<mxrc::core::event::TaskFailedEvent>(
+            definition.id,
+            definition.name,
+            result.errorMessage,
+            elapsed.count(),
+            result.progress * 100.0  // progressPercent
+        ));
+    } else if (result.status == TaskStatus::CANCELLED) {
+        publishEvent(std::make_shared<mxrc::core::event::TaskCancelledEvent>(
+            definition.id,
+            definition.name,
+            elapsed.count(),
+            result.progress * 100.0  // progressPercent
+        ));
     }
 
     return result;

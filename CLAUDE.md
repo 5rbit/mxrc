@@ -119,30 +119,64 @@ src/core/
 │       ├── ConditionalBranch.h
 │       └── RetryPolicy.h
 │
-└── task/                            # Task Layer
-    ├── interfaces/
-    │   ├── ITask.h
-    │   ├── ITaskExecutor.h
-    │   └── ITriggerProvider.h
-    ├── core/
-    │   ├── TaskExecutor.{h,cpp}
-    │   ├── TaskRegistry.{h,cpp}
-    │   ├── PeriodicScheduler.{h,cpp}
-    │   └── TriggerManager.{h,cpp}
-    └── dto/
-        ├── TaskDefinition.h
-        ├── TaskExecution.h
-        ├── TaskStatus.h
-        └── TaskExecutionMode.h
+├── task/                            # Task Layer
+│   ├── interfaces/
+│   │   ├── ITask.h
+│   │   ├── ITaskExecutor.h
+│   │   └── ITriggerProvider.h
+│   ├── core/
+│   │   ├── TaskExecutor.{h,cpp}
+│   │   ├── TaskRegistry.{h,cpp}
+│   │   ├── PeriodicScheduler.{h,cpp}
+│   │   ├── TriggerManager.{h,cpp}
+│   │   └── TaskMonitor.{h,cpp}
+│   └── dto/
+│       ├── TaskDefinition.h
+│       ├── TaskExecution.h
+│       ├── TaskStatus.h
+│       └── TaskExecutionMode.h
+│
+├── event/                          # Event Layer (NEW - Phase 019)
+│   ├── interfaces/
+│   │   ├── IEvent.h
+│   │   └── IEventBus.h
+│   ├── core/
+│   │   ├── EventBus.{h,cpp}
+│   │   └── SubscriptionManager.{h,cpp}
+│   ├── dto/
+│   │   ├── EventType.h
+│   │   ├── EventBase.h
+│   │   ├── ActionEvents.h
+│   │   ├── SequenceEvents.h
+│   │   ├── TaskEvents.h
+│   │   └── DataStoreEvents.h
+│   ├── util/
+│   │   ├── EventFilter.h
+│   │   ├── EventStats.h
+│   │   ├── LockFreeQueue.h (SPSC)
+│   │   └── MPSCLockFreeQueue.h (향후 최적화용)
+│   └── adapters/
+│       └── DataStoreEventAdapter.{h,cpp}
+│
+└── datastore/
+    └── DataStore.{h,cpp}
 
 tests/
 ├── unit/                           # 단위 테스트
-│   ├── action/                     # 26 tests
-│   ├── sequence/                   # 33 tests
-│   └── task/                       # 53 tests (TaskRegistry, TaskCoreExecutor 포함)
+│   ├── action/                     # 12 tests
+│   ├── sequence/                   # 14 tests
+│   ├── task/                       # 67 tests (Registry, Executor, Scheduler, Trigger, Monitor)
+│   └── event/                      # 42+ tests (NEW)
+│       ├── LockFreeQueue_test.cpp
+│       ├── MPSCLockFreeQueue_test.cpp
+│       ├── SubscriptionManager_test.cpp
+│       ├── EventBus_test.cpp
+│       └── DataStoreEventAdapter_test.cpp
 └── integration/                    # 통합 테스트
     ├── action_integration_test.cpp
-    └── sequence_integration_test.cpp
+    ├── sequence_integration_test.cpp
+    └── event/
+        └── event_flow_test.cpp
 ```
 
 ## 핵심 컴포넌트
@@ -225,6 +259,94 @@ enum class TaskExecutionMode {
 };
 ```
 
+### Event Layer (Phase 019 - Phase 1-4 완료)
+
+**목표**: 실시간 실행 상태 모니터링 및 DataStore 연동
+
+#### EventBus
+- 비동기 이벤트 처리 시스템 (SPSC Lock-Free Queue + Mutex)
+- publish/subscribe/unsubscribe 기능
+- 타입 기반 및 predicate 기반 필터링
+- 구독자 예외 격리
+- 큐 오버플로우 처리 (드롭 정책)
+- **테스트**: 14개 단위 테스트 통과
+- **동시성**: Mutex로 보호된 multi-producer 지원
+
+#### SubscriptionManager
+- 구독 등록/해제 관리
+- 이벤트 타입별 구독자 조회
+- 스레드 안전성 보장 (mutex)
+- **테스트**: 5개 단위 테스트 통과
+
+#### Lock-Free Queue
+- SPSC(Single-Producer Single-Consumer) 패턴
+- Ring buffer 기반 고성능 큐
+- 10,000+ ops/sec 처리량
+- **테스트**: 8개 단위 테스트 (성능 벤치마크 포함)
+
+#### DataStoreEventAdapter
+- DataStore ↔ EventBus 양방향 연동
+- DataStore 변경 → EventBus 이벤트 발행
+- EventBus 이벤트 → DataStore 자동 저장
+- 순환 업데이트 방지 메커니즘
+- **테스트**: 16+ 단위 테스트
+
+#### 이벤트 타입
+```cpp
+namespace mxrc::core::event {
+    // Action 이벤트
+    - ActionStarted, ActionCompleted, ActionFailed, ActionCancelled, ActionTimeout
+
+    // Sequence 이벤트
+    - SequenceStarted, SequenceStepStarted, SequenceStepCompleted,
+      SequenceCompleted, SequenceFailed, SequenceCancelled,
+      SequencePaused, SequenceResumed, SequenceProgressUpdated
+
+    // Task 이벤트
+    - TaskStarted, TaskCompleted, TaskFailed, TaskCancelled,
+      TaskScheduled, TaskProgressUpdated
+
+    // DataStore 이벤트
+    - DataStoreValueChanged
+}
+```
+
+#### 이벤트 시스템 사용 예시
+```cpp
+// 1. EventBus 생성 및 시작
+auto eventBus = std::make_shared<EventBus>(10000);  // 큐 용량 10,000
+eventBus->start();
+
+// 2. 이벤트 구독
+auto subId = eventBus->subscribe(
+    [](auto e) { return e->getType() == EventType::ACTION_COMPLETED; },
+    [](std::shared_ptr<IEvent> event) {
+        auto actionEvent = std::static_pointer_cast<ActionCompletedEvent>(event);
+        spdlog::info("Action {} completed in {}ms",
+                     actionEvent->actionId, actionEvent->duration);
+    });
+
+// 3. Executor에 EventBus 주입
+auto executor = std::make_shared<ActionExecutor>(eventBus);
+
+// 4. Action 실행 시 자동으로 이벤트 발행
+auto action = std::make_shared<DelayAction>("test", 100);
+executor->executeAsync(action, context);  // → ActionStarted 이벤트 발행
+executor->waitForCompletion("test");       // → ActionCompleted 이벤트 발행
+
+// 5. 구독 해제
+eventBus->unsubscribe(subId);
+
+// 6. EventBus 정지
+eventBus->stop();
+```
+
+**중요 노트**:
+- EventBus는 선택적 의존성: `eventBus=nullptr`이면 이벤트 발행 안 함
+- publish는 논블로킹: 큐가 가득 차면 이벤트 드롭 (통계에 기록)
+- 동시성 안전성: 여러 스레드에서 publish 가능 (mutex로 보호)
+- **알려진 이슈**: `TROUBLESHOOTING.md` 참조 (SPSC→Mutex 전환 이력)
+
 ## 코드 작성 가이드
 
 ### 네임스페이스
@@ -242,6 +364,10 @@ namespace mxrc::core::sequence {
 
 namespace mxrc::core::task {
     // Task 계층 코드
+}
+
+namespace mxrc::core::event {
+    // Event 계층 코드
 }
 ```
 
@@ -374,17 +500,25 @@ TEST_F(ComponentTest, TestScenario) {
 - Mock 클래스: `Mock<ClassName>`
 
 ### 테스트 커버리지
-- **Action Layer**: 12 tests (기본 기능) + 6 tests (종료 안정성) = 12 tests
-- **Sequence Layer**: 9 tests (기본 기능) + 5 tests (종료 안정성) = 14 tests
+- **Action Layer**: 12 tests (기본 기능 + 종료 안정성)
+- **Sequence Layer**: 14 tests (기본 기능 + 종료 안정성)
 - **Task Layer**: 67 tests (Registry 12 + Executor 19 + Scheduler 9 + Trigger 12 + Monitor 15)
-- **통합 테스트**: 4 tests
+- **Event Layer**: 42+ tests (NEW - Phase 019)
+  - LockFreeQueue: 8 tests (성능 벤치마크 포함)
+  - MPSCLockFreeQueue: 3 tests (향후 최적화용)
+  - SubscriptionManager: 5 tests
+  - EventBus: 14 tests
+  - DataStoreEventAdapter: 16+ tests
+  - 통합 테스트: 5+ tests (event_flow_test.cpp)
+- **통합 테스트**: 4 tests (action, sequence)
 - **팩토리/레지스트리**: 18 tests
-- **전체**: 115 tests (113 통과, 2 조건부 스킵)
+- **전체**: 157+ tests
 
-#### 종료 안정성 테스트 (16 tests 추가)
+#### 종료 안정성 테스트
 - ActionExecutor: 소멸자, 상태 정리, 타임아웃 스레드 관리, 동시성, 메모리 누수 방지
 - SequenceEngine: 소멸자, 상태 정리, 동시성, 메모리 누수 방지
 - TaskExecutor: 상태 정리, 실패/취소 처리, 메모리 누수 방지
+- EventBus: 디스패치 스레드 안전 종료, 남은 이벤트 처리
 
 ## 설계 원칙
 
@@ -414,19 +548,43 @@ TEST_F(ComponentTest, TestScenario) {
 ## 현재 진행 상황
 
 ### 완료된 Phase
-- ✅ **Phase 1**: Action Layer 완료 (26 tests)
-- ✅ **Phase 2A-2G**: Sequence Layer 완료 (33 tests)
-- ✅ **Phase 3B-1**: Task Core Components - Single Execution (26 tests)
-  - TaskRegistry 구현 및 테스트 (12 tests)
-  - TaskExecutor ONCE 모드 구현 및 테스트 (14 tests)
+- ✅ **Phase 017**: Action & Sequence & Task Layer 완료
+  - Action Layer (12 tests)
+  - Sequence Layer (14 tests)
+  - Task Layer (67 tests)
 
-### 다음 단계
-- **Phase 3B-2**: Periodic Execution (주기적 실행)
-  - PeriodicScheduler 구현
-  - TaskExecutor periodic 모드 확장
-- **Phase 3B-3**: Triggered Execution (트리거 기반 실행)
-  - TriggerManager 구현
-  - TaskExecutor triggered 모드 확장
+- ✅ **Phase 019**: Event-Enhanced Hybrid Architecture (진행 중)
+  - **Phase 1**: 프로젝트 Setup ✅
+  - **Phase 2**: 기반 인프라 구축 (EventBus 핵심) ✅
+    - Lock-Free Queue (SPSC) 구현
+    - SubscriptionManager 구현
+    - EventBus 구현 (14 tests)
+  - **Phase 3**: User Story 1 - 실시간 실행 상태 모니터링 ✅
+    - Action/Sequence/Task 이벤트 DTO 정의
+    - Executor들에 EventBus 통합
+    - 통합 테스트 (event_flow_test.cpp)
+  - **Phase 4**: User Story 2 - DataStore와 EventBus 연동 ✅
+    - DataStoreEventAdapter 구현
+    - 양방향 연동 (DataStore ↔ EventBus)
+    - 순환 업데이트 방지
+    - 단위 테스트 16+ tests
+
+### 다음 단계 (Phase 019 계속)
+- **Phase 5**: User Story 3 - 확장 가능한 모니터링 컴포넌트 (P2)
+  - ExecutionTimeCollector 예제
+  - StateTransitionLogger 예제
+  - 외부 모니터링 시스템 통합 예제
+
+- **Phase 6**: Polish & 최적화
+  - MPSC Lock-Free Queue 완성 (현재 SPSC + Mutex)
+  - 성능 벤치마크 (오버헤드 <5%, 지연 <10ms)
+  - 메모리 프로파일링
+  - API 문서화
+
+### 알려진 이슈
+- ⚠️ **SPSC→Mutex 전환**: `TROUBLESHOOTING.md` 이슈 #001 참조
+  - Multi-producer 환경에서 SPSC 큐 사용으로 인한 크래시 해결
+  - 향후 MPSC Lock-Free Queue로 최적화 예정
 
 ## 의존성
 

@@ -4,54 +4,283 @@
 
 namespace mxrc::core::action {
 
+ActionExecutor::~ActionExecutor() {
+    auto logger = Logger::get();
+    logger->info("[ActionExecutor] Destructor called, cleaning up running actions");
+
+    std::vector<std::string> runningIds;
+
+    // 실행 중인 모든 액션 ID 수집
+    {
+        std::lock_guard<std::mutex> lock(actionsMutex_);
+        for (const auto& [id, state] : runningActions_) {
+            runningIds.push_back(id);
+            // 타임아웃 모니터링 스레드 중지 요청
+            if (state.timeoutThread) {
+                const_cast<ExecutionState&>(state).shouldStopMonitoring = true;
+            }
+        }
+    }
+
+    // 모든 실행 중인 액션 취소
+    for (const auto& id : runningIds) {
+        logger->debug("[ActionExecutor] Cancelling action {} during cleanup", id);
+        cancel(id);
+    }
+
+    // 모든 타임아웃 스레드 종료 대기
+    {
+        std::lock_guard<std::mutex> lock(actionsMutex_);
+        for (auto& [id, state] : runningActions_) {
+            if (state.timeoutThread && state.timeoutThread->joinable()) {
+                logger->debug("[ActionExecutor] Joining timeout thread for action {}", id);
+                // 뮤텍스를 잠시 해제하고 join (데드락 방지)
+                actionsMutex_.unlock();
+                state.timeoutThread->join();
+                actionsMutex_.lock();
+            }
+        }
+        runningActions_.clear();
+    }
+
+    logger->info("[ActionExecutor] Destructor completed");
+}
+
 ExecutionResult ActionExecutor::execute(
     std::shared_ptr<IAction> action,
     ExecutionContext& context,
     std::chrono::milliseconds timeout) {
 
     auto logger = Logger::get();
-    auto startTime = std::chrono::steady_clock::now();
+    logger->info("[ActionExecutor] SYNC START - Action: {} (type: {}, timeout: {}ms)",
+                 action->getId(), action->getType(), timeout.count());
 
-    ExecutionResult result(action->getId(), ActionStatus::PENDING);
+    // 내부적으로 executeAsync() 사용
+    std::string actionId = executeAsync(action, context, timeout);
 
-    try {
-        logger->info("Executing action: {} (type: {})", action->getId(), action->getType());
+    // 완료 대기
+    waitForCompletion(actionId);
 
-        // Action 실행
-        action->execute(context);
+    // 결과 반환
+    ExecutionResult result = getResult(actionId);
 
-        // 타임아웃 체크 (실행 완료 후)
-        if (timeout.count() > 0 && checkTimeout(action, startTime, timeout)) {
-            result.status = ActionStatus::TIMEOUT;
-            result.errorMessage = "Action exceeded timeout";
-            logger->warn("Action {} timed out", action->getId());
-        } else {
-            result.status = action->getStatus();
-            result.progress = action->getProgress();
-
-            if (result.status == ActionStatus::COMPLETED) {
-                logger->info("Action {} completed successfully", action->getId());
+    // 맵에서 제거 (정리)
+    {
+        std::lock_guard<std::mutex> lock(actionsMutex_);
+        auto it = runningActions_.find(actionId);
+        if (it != runningActions_.end()) {
+            // 타임아웃 모니터링 스레드 중지 및 정리
+            if (it->second.timeoutThread) {
+                it->second.shouldStopMonitoring = true;
+                if (it->second.timeoutThread->joinable()) {
+                    // 뮤텍스를 해제하고 join (데드락 방지)
+                    actionsMutex_.unlock();
+                    it->second.timeoutThread->join();
+                    actionsMutex_.lock();
+                }
             }
+            runningActions_.erase(actionId);
+            logger->debug("[ActionExecutor] Action {} removed from runningActions_ map", actionId);
         }
-
-    } catch (const std::exception& e) {
-        result.status = ActionStatus::FAILED;
-        result.errorMessage = e.what();
-        logger->error("Action {} failed: {}", action->getId(), e.what());
     }
 
-    // 실행 시간 계산
-    auto endTime = std::chrono::steady_clock::now();
-    result.executionTime = std::chrono::duration_cast<std::chrono::milliseconds>(
-        endTime - startTime);
+    logger->debug("[ActionExecutor] SYNC END - Action {} execution time: {}ms, status: {}",
+                 actionId, result.executionTime.count(), static_cast<int>(result.status));
 
     return result;
 }
 
+std::string ActionExecutor::executeAsync(
+    std::shared_ptr<IAction> action,
+    ExecutionContext& context,
+    std::chrono::milliseconds timeout) {
+
+    auto logger = Logger::get();
+    std::string actionId = action->getId();
+    auto startTime = std::chrono::steady_clock::now();
+
+    logger->info("[ActionExecutor] ASYNC START - Action: {} (type: {}, timeout: {}ms)",
+                 actionId, action->getType(), timeout.count());
+
+    // 비동기로 액션 실행
+    auto future = std::async(std::launch::async, [action, &context, actionId, logger]() {
+        try {
+            action->execute(context);
+            logger->info("[ActionExecutor] ASYNC COMPLETE - Action {} finished successfully", actionId);
+        } catch (const std::exception& e) {
+            logger->error("[ActionExecutor] ASYNC FAILED - Action {} threw exception: {}", actionId, e.what());
+        }
+    });
+
+    // ExecutionState 생성 및 저장
+    {
+        std::lock_guard<std::mutex> lock(actionsMutex_);
+        runningActions_.emplace(
+            std::piecewise_construct,
+            std::forward_as_tuple(actionId),
+            std::forward_as_tuple(action, std::move(future), startTime, timeout)
+        );
+        logger->debug("[ActionExecutor] Action {} registered in runningActions_ map", actionId);
+    }
+
+    // 타임아웃이 설정된 경우 백그라운드 모니터링 시작
+    if (timeout.count() > 0) {
+        // 타임아웃 모니터링 스레드를 관리 가능하게 생성
+        std::lock_guard<std::mutex> lock(actionsMutex_);
+        auto it = runningActions_.find(actionId);
+        if (it != runningActions_.end()) {
+            it->second.timeoutThread = std::make_unique<std::thread>(
+                [this, actionId, timeout, startTime, logger]() {
+                    while (true) {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+                        bool shouldTimeout = false;
+                        bool shouldStop = false;
+                        {
+                            std::lock_guard<std::mutex> lock(actionsMutex_);
+                            auto it = runningActions_.find(actionId);
+                            if (it == runningActions_.end()) {
+                                // 액션이 이미 완료되어 제거됨
+                                return;
+                            }
+
+                            // 모니터링 중지 요청 확인
+                            if (it->second.shouldStopMonitoring) {
+                                return;
+                            }
+
+                            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::steady_clock::now() - startTime);
+
+                            if (elapsed > timeout && !it->second.cancelRequested) {
+                                shouldTimeout = true;
+                                it->second.cancelRequested = true;
+                            }
+                        }
+
+                        if (shouldTimeout) {
+                            logger->warn("[ActionExecutor] TIMEOUT - Action {} exceeded timeout of {}ms, cancelling",
+                                        actionId, timeout.count());
+                            cancel(actionId);
+                            return;
+                        }
+                    }
+                }
+            );
+        }
+    }
+
+    return actionId;
+}
+
+void ActionExecutor::cancel(const std::string& actionId) {
+    auto logger = Logger::get();
+    std::shared_ptr<IAction> actionToCancel;
+
+    // 뮤텍스 안전성: 락 보유 중 액션 포인터 추출
+    {
+        std::lock_guard<std::mutex> lock(actionsMutex_);
+        auto it = runningActions_.find(actionId);
+        if (it != runningActions_.end()) {
+            it->second.cancelRequested = true;
+            actionToCancel = it->second.action;
+            logger->info("[ActionExecutor] CANCEL - Requesting cancellation for action: {} (type: {})",
+                        actionId, actionToCancel->getType());
+        } else {
+            logger->warn("[ActionExecutor] CANCEL - Action {} not found in running actions", actionId);
+            return;
+        }
+    }
+
+    // 데드락 방지: 중첩 락을 피하기 위해 뮤텍스 외부에서 cancel 호출
+    if (actionToCancel) {
+        actionToCancel->cancel();
+        logger->info("[ActionExecutor] Action {} cancel request processed", actionId);
+    }
+}
+
+bool ActionExecutor::isRunning(const std::string& actionId) const {
+    std::lock_guard<std::mutex> lock(actionsMutex_);
+    auto it = runningActions_.find(actionId);
+    if (it == runningActions_.end()) {
+        return false;
+    }
+
+    // future의 상태 확인
+    return it->second.future.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready;
+}
+
+ExecutionResult ActionExecutor::getResult(const std::string& actionId) {
+    std::lock_guard<std::mutex> lock(actionsMutex_);
+    auto it = runningActions_.find(actionId);
+    if (it == runningActions_.end()) {
+        ExecutionResult result(actionId, ActionStatus::FAILED);
+        result.errorMessage = "Action not found";
+        return result;
+    }
+
+    // future가 완료되었는지 확인
+    if (it->second.future.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
+        // 완료됨 - 결과 수집
+        auto& state = it->second;
+        ExecutionResult result(actionId, state.action->getStatus());
+        result.progress = state.action->getProgress();
+
+        auto endTime = std::chrono::steady_clock::now();
+        result.executionTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+            endTime - state.startTime);
+
+        // 타임아웃으로 인한 취소인 경우 상태를 TIMEOUT으로 변경
+        if (state.cancelRequested && result.status == ActionStatus::CANCELLED) {
+            result.status = ActionStatus::TIMEOUT;
+            result.errorMessage = "Action exceeded timeout";
+        }
+
+        return result;
+    } else {
+        // 아직 실행 중
+        ExecutionResult result(actionId, ActionStatus::RUNNING);
+        result.progress = it->second.action->getProgress();
+        return result;
+    }
+}
+
+void ActionExecutor::waitForCompletion(const std::string& actionId) {
+    auto logger = Logger::get();
+    std::future<void>* futurePtr = nullptr;
+
+    // 뮤텍스 안전성: 락 보유 중 future 포인터 획득
+    // runningActions_ 항목이 명시적으로 제거될 때까지 존재하므로 future는 유효함
+    {
+        std::lock_guard<std::mutex> lock(actionsMutex_);
+        auto it = runningActions_.find(actionId);
+        if (it == runningActions_.end()) {
+            logger->warn("[ActionExecutor] WAIT - Action {} not found", actionId);
+            return;
+        }
+        // future는 move-only이므로 포인터로 접근
+        futurePtr = &(it->second.future);
+    }
+
+    // 데드락 방지: 다른 작업을 허용하기 위해 뮤텍스 외부에서 대기 수행
+    if (futurePtr) {
+        logger->debug("[ActionExecutor] WAIT - Waiting for action {} to complete", actionId);
+        futurePtr->wait();
+        logger->info("[ActionExecutor] WAIT - Action {} completed", actionId);
+    }
+}
+
 void ActionExecutor::cancel(std::shared_ptr<IAction> action) {
     auto logger = Logger::get();
-    logger->info("Cancelling action: {}", action->getId());
+    logger->info("[ActionExecutor] CANCEL - Requesting cancellation for action: {} (type: {})",
+                action->getId(), action->getType());
+    logger->debug("[ActionExecutor] Action {} status before cancel: {}",
+                 action->getId(), static_cast<int>(action->getStatus()));
+
     action->cancel();
+
+    logger->info("[ActionExecutor] Action {} cancel request processed, new status: {}",
+                action->getId(), static_cast<int>(action->getStatus()));
 }
 
 bool ActionExecutor::checkTimeout(
@@ -63,6 +292,68 @@ bool ActionExecutor::checkTimeout(
         std::chrono::steady_clock::now() - startTime);
 
     return elapsed > timeout;
+}
+
+int ActionExecutor::clearCompletedActions() {
+    auto logger = Logger::get();
+
+    // Phase 1: 정리할 액션 ID와 타임아웃 스레드 수집 (뮤텍스 안)
+    std::vector<std::string> idsToRemove;
+    std::vector<std::unique_ptr<std::thread>> threadsToJoin;
+
+    {
+        std::lock_guard<std::mutex> lock(actionsMutex_);
+
+        for (auto it = runningActions_.begin(); it != runningActions_.end(); ++it) {
+            // future가 완료되었는지 확인
+            if (it->second.future.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
+                auto status = it->second.action->getStatus();
+                if (status == ActionStatus::COMPLETED ||
+                    status == ActionStatus::FAILED ||
+                    status == ActionStatus::CANCELLED ||
+                    status == ActionStatus::TIMEOUT) {
+
+                    idsToRemove.push_back(it->first);
+
+                    // 타임아웃 스레드가 있으면 중지 요청하고 수집
+                    if (it->second.timeoutThread) {
+                        it->second.shouldStopMonitoring = true;
+                        if (it->second.timeoutThread->joinable()) {
+                            threadsToJoin.push_back(std::move(it->second.timeoutThread));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Phase 2: 타임아웃 스레드 종료 대기 (뮤텍스 밖 - 데드락 방지)
+    for (auto& thread : threadsToJoin) {
+        if (thread && thread->joinable()) {
+            thread->join();
+        }
+    }
+
+    // Phase 3: 맵에서 제거 (뮤텍스 안)
+    int count = 0;
+    {
+        std::lock_guard<std::mutex> lock(actionsMutex_);
+
+        for (const auto& id : idsToRemove) {
+            auto it = runningActions_.find(id);
+            if (it != runningActions_.end()) {
+                logger->debug("[ActionExecutor] Clearing completed action: {} (status: {})",
+                             id, static_cast<int>(it->second.action->getStatus()));
+                runningActions_.erase(it);
+                count++;
+            }
+        }
+    }
+
+    if (count > 0) {
+        logger->info("[ActionExecutor] Cleared {} completed actions", count);
+    }
+    return count;
 }
 
 } // namespace mxrc::core::action

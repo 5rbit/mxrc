@@ -33,7 +33,7 @@ public:
         std::shared_ptr<mxrc::core::action::ActionExecutor> executor
     );
 
-    ~SequenceEngine() = default;
+    ~SequenceEngine();
 
     // 복사 및 이동 금지
     SequenceEngine(const SequenceEngine&) = delete;
@@ -52,6 +52,14 @@ public:
     SequenceStatus getStatus(const std::string& sequenceId) const override;
     float getProgress(const std::string& sequenceId) const override;
 
+    /**
+     * @brief 완료된 시퀀스 상태 정리
+     *
+     * 완료, 실패, 취소된 시퀀스의 상태를 메모리에서 제거합니다.
+     * @return 정리된 시퀀스 개수
+     */
+    int clearCompletedSequences();
+
 private:
     struct SequenceState {
         SequenceStatus status{SequenceStatus::PENDING};
@@ -60,6 +68,8 @@ private:
         std::atomic<bool> pauseRequested{false};
         int completedSteps{0};
         int totalSteps{0};
+        std::string currentActionId;  // 현재 실행 중인 액션의 ID (actionId 기반)
+        std::mutex currentActionMutex;  // currentActionId 보호용
     };
 
     std::shared_ptr<mxrc::core::action::ActionFactory> factory_;

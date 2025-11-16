@@ -16,6 +16,31 @@ SequenceEngine::SequenceEngine(
     Logger::get()->info("SequenceEngine initialized");
 }
 
+SequenceEngine::~SequenceEngine() {
+    auto logger = Logger::get();
+    logger->info("[SequenceEngine] Destructor called, cancelling running sequences");
+
+    std::vector<std::string> runningSequences;
+
+    // 실행 중인 모든 시퀀스 ID 수집
+    {
+        std::lock_guard<std::mutex> lock(stateMutex_);
+        for (const auto& [id, state] : states_) {
+            if (state.status == SequenceStatus::RUNNING) {
+                runningSequences.push_back(id);
+            }
+        }
+    }
+
+    // 모든 실행 중인 시퀀스 취소
+    for (const auto& id : runningSequences) {
+        logger->debug("[SequenceEngine] Cancelling sequence {} during cleanup", id);
+        cancel(id);
+    }
+
+    logger->info("[SequenceEngine] Destructor completed");
+}
+
 SequenceResult SequenceEngine::execute(
     const SequenceDefinition& definition,
     ExecutionContext& context
@@ -78,7 +103,16 @@ SequenceResult SequenceEngine::executeSequential(
         }
 
         const auto& step = definition.steps[i];
-        
+
+        // 이미 실행된 액션인지 확인 (조건부 분기에서 실행되었을 수 있음)
+        if (executedActions.find(step.actionId) != executedActions.end()) {
+            Logger::get()->debug(
+                "Sequence {}: Skipping step {}/{} - {} (already executed in conditional branch)",
+                definition.id, i + 1, definition.steps.size(), step.actionId
+            );
+            continue;
+        }
+
         Logger::get()->info(
             "Sequence {}: Executing step {}/{} - {} (type: {})",
             definition.id, i + 1, definition.steps.size(),
@@ -99,8 +133,26 @@ SequenceResult SequenceEngine::executeSequential(
                 // Action 생성
                 auto action = factory_->createAction(step.actionType, params);
 
-                // Action 실행
-                actionResult = executor_->execute(action, context);
+                // Action 비동기 실행
+                std::string actionId = executor_->executeAsync(action, context, step.timeout);
+
+                // 현재 실행 중인 액션 ID 추적
+                {
+                    std::lock_guard<std::mutex> lock(state.currentActionMutex);
+                    state.currentActionId = actionId;
+                }
+
+                // Action 완료 대기
+                executor_->waitForCompletion(actionId);
+
+                // 실행 완료 후 추적 해제
+                {
+                    std::lock_guard<std::mutex> lock(state.currentActionMutex);
+                    state.currentActionId.clear();
+                }
+
+                // 결과 가져오기
+                actionResult = executor_->getResult(actionId);
 
                 if (actionResult.isSuccessful()) {
                     actionSucceeded = true;
@@ -127,6 +179,18 @@ SequenceResult SequenceEngine::executeSequential(
 
             // Action 결과 저장
             context.setActionResult(step.actionId, actionResult);
+
+            // Action 취소 확인 (cancel로 인한 timeout도 포함)
+            if (actionResult.isCancelled() ||
+                (actionResult.status == ActionStatus::TIMEOUT && state.cancelRequested)) {
+                Logger::get()->info(
+                    "Sequence {}: Step {} ({}) was cancelled",
+                    definition.id, i + 1, step.actionId
+                );
+                result.status = SequenceStatus::CANCELLED;
+                state.status = SequenceStatus::CANCELLED;
+                return result;
+            }
 
             // Action 실패 시 (재시도 후에도)
             if (actionResult.isFailed()) {
@@ -179,11 +243,30 @@ SequenceResult SequenceEngine::executeSequential(
 }
 
 void SequenceEngine::cancel(const std::string& sequenceId) {
-    std::lock_guard<std::mutex> lock(stateMutex_);
-    auto it = states_.find(sequenceId);
-    if (it != states_.end()) {
-        it->second.cancelRequested = true;
-        Logger::get()->info("Cancel requested for sequence: {}", sequenceId);
+    std::string actionIdToCancel;
+
+    // 뮤텍스 안전성: 데드락 방지를 위해 일관된 순서로 중첩 락 획득
+    // 락 순서: stateMutex_ -> currentActionMutex
+    {
+        std::lock_guard<std::mutex> lock(stateMutex_);
+        auto it = states_.find(sequenceId);
+        if (it != states_.end()) {
+            it->second.cancelRequested = true;
+
+            // 현재 실행 중인 액션 ID 복사
+            {
+                std::lock_guard<std::mutex> actionLock(it->second.currentActionMutex);
+                actionIdToCancel = it->second.currentActionId;
+            }
+
+            Logger::get()->info("Cancel requested for sequence: {}", sequenceId);
+        }
+    }
+
+    // 데드락 방지: 모든 뮤텍스 외부에서 executor cancel 호출
+    if (!actionIdToCancel.empty()) {
+        Logger::get()->info("Cancelling currently executing action {} in sequence: {}", actionIdToCancel, sequenceId);
+        executor_->cancel(actionIdToCancel);
     }
 }
 
@@ -310,9 +393,27 @@ int SequenceEngine::handleConditionalBranch(
 
             // Action 생성
             auto action = factory_->createAction(stepPtr->actionType, params);
-            
-            // Action 실행
-            auto actionResult = executor_->execute(action, context);
+
+            // Action 비동기 실행
+            std::string actionId = executor_->executeAsync(action, context, stepPtr->timeout);
+
+            // 현재 실행 중인 액션 ID 추적
+            {
+                std::lock_guard<std::mutex> lock(state.currentActionMutex);
+                state.currentActionId = actionId;
+            }
+
+            // Action 완료 대기
+            executor_->waitForCompletion(actionId);
+
+            // 실행 완료 후 추적 해제
+            {
+                std::lock_guard<std::mutex> lock(state.currentActionMutex);
+                state.currentActionId.clear();
+            }
+
+            // 결과 가져오기
+            auto actionResult = executor_->getResult(actionId);
 
             // Action 결과 저장
             context.setActionResult(stepPtr->actionId, actionResult);
@@ -340,6 +441,30 @@ int SequenceEngine::handleConditionalBranch(
     }
 
     return additionalSteps;
+}
+
+int SequenceEngine::clearCompletedSequences() {
+    auto logger = Logger::get();
+    std::lock_guard<std::mutex> lock(stateMutex_);
+
+    int count = 0;
+    for (auto it = states_.begin(); it != states_.end(); ) {
+        if (it->second.status == SequenceStatus::COMPLETED ||
+            it->second.status == SequenceStatus::FAILED ||
+            it->second.status == SequenceStatus::CANCELLED) {
+            logger->debug("[SequenceEngine] Clearing completed sequence: {} (status: {})",
+                         it->first, sequenceStatusToString(it->second.status));
+            it = states_.erase(it);
+            count++;
+        } else {
+            ++it;
+        }
+    }
+
+    if (count > 0) {
+        logger->info("[SequenceEngine] Cleared {} completed sequences", count);
+    }
+    return count;
 }
 
 } // namespace mxrc::core::sequence

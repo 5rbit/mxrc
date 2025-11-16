@@ -2,11 +2,14 @@
 
 #include "core/sequence/interfaces/IAction.h"
 #include "core/sequence/interfaces/IActionFactory.h"
-#include "core/sequence/core/ExecutionContext.h"
+#include "core/action/util/ExecutionContext.h" // Changed from core/sequence/core/ExecutionContext.h
 #include <string>
 #include <map>
 #include <any>
 #include <memory>
+#include <chrono>
+#include <thread>
+#include <atomic>
 
 namespace mxrc::core::sequence::testing {
 
@@ -21,7 +24,7 @@ public:
     std::string getId() const override { return id_; }
     std::string getType() const override { return "SuccessAction"; }
 
-    void execute(ExecutionContext& context) override {
+    void execute(mxrc::core::action::ExecutionContext& context) override { // Changed ExecutionContext namespace
         status_ = ActionStatus::RUNNING;
         progress_ = 0.5f;
 
@@ -59,7 +62,7 @@ public:
     std::string getId() const override { return id_; }
     std::string getType() const override { return "FailureAction"; }
 
-    void execute(ExecutionContext& context) override {
+    void execute(mxrc::core::action::ExecutionContext& context) override { // Changed ExecutionContext namespace
         status_ = ActionStatus::RUNNING;
         progress_ = 0.5f;
         progress_ = 1.0f;
@@ -93,7 +96,7 @@ public:
     std::string getId() const override { return id_; }
     std::string getType() const override { return "ResultStoringAction"; }
 
-    void execute(ExecutionContext& context) override {
+    void execute(mxrc::core::action::ExecutionContext& context) override { // Changed ExecutionContext namespace
         status_ = ActionStatus::RUNNING;
         progress_ = 0.5f;
 
@@ -132,7 +135,7 @@ public:
     std::string getId() const override { return id_; }
     std::string getType() const override { return "ContextModifyingAction"; }
 
-    void execute(ExecutionContext& context) override {
+    void execute(mxrc::core::action::ExecutionContext& context) override { // Changed ExecutionContext namespace
         status_ = ActionStatus::RUNNING;
         progress_ = 0.5f;
 
@@ -179,7 +182,7 @@ public:
     std::string getId() const override { return id_; }
     std::string getType() const override { return "ExceptionThrowingAction"; }
 
-    void execute(ExecutionContext& context) override {
+    void execute(mxrc::core::action::ExecutionContext& context) override { // Changed ExecutionContext namespace
         status_ = ActionStatus::RUNNING;
         progress_ = 0.5f;
 
@@ -204,6 +207,59 @@ private:
 };
 
 /**
+ * @brief 취소 가능한 지연 동작
+ */
+class CancellableDelayAction : public IAction {
+public:
+    explicit CancellableDelayAction(const std::string& id, std::chrono::milliseconds duration)
+        : id_(id), duration_(duration), status_(ActionStatus::PENDING), progress_(0.0f), cancel_requested_(false) {}
+
+    std::string getId() const override { return id_; }
+    std::string getType() const override { return "CancellableDelayAction"; }
+
+    void execute(mxrc::core::action::ExecutionContext& context) override { // Changed ExecutionContext namespace
+        status_ = ActionStatus::RUNNING;
+        progress_ = 0.0f;
+
+        auto start_time = std::chrono::steady_clock::now();
+        auto end_time = start_time + duration_;
+        
+        while (std::chrono::steady_clock::now() < end_time) {
+            if (cancel_requested_) {
+                status_ = ActionStatus::CANCELLED;
+                return;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(10)); // 짧게 슬립하며 취소 요청 확인
+            progress_ = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_time).count()) / duration_.count();
+            if (progress_ > 1.0f) progress_ = 1.0f;
+        }
+
+        if (!cancel_requested_) {
+            status_ = ActionStatus::COMPLETED;
+            progress_ = 1.0f;
+            context.setActionResult(id_, "Delay completed");
+        } else {
+            status_ = ActionStatus::CANCELLED;
+        }
+    }
+
+    void cancel() override {
+        cancel_requested_ = true;
+    }
+
+    ActionStatus getStatus() const override { return status_; }
+    float getProgress() const override { return progress_; }
+    std::string getDescription() const override { return "Mock cancellable delay action"; }
+
+private:
+    std::string id_;
+    std::chrono::milliseconds duration_;
+    ActionStatus status_;
+    float progress_;
+    std::atomic<bool> cancel_requested_;
+};
+
+/**
  * @brief 테스트용 동작 팩토리
  */
 class MockActionFactory : public IActionFactory {
@@ -221,14 +277,26 @@ public:
             return std::make_shared<ContextModifyingAction>(id);
         } else if (type == "exception" || type.find("exception") != std::string::npos) {
             return std::make_shared<ExceptionThrowingAction>(id);
-        } else {
+        } else if (type == "cancellable_delay") {
+            auto it = params.find("duration_ms");
+            std::chrono::milliseconds duration = std::chrono::milliseconds(0);
+            if (it != params.end()) {
+                try {
+                    duration = std::chrono::milliseconds(std::stoi(it->second));
+                } catch (...) {
+                    // 기본값 사용
+                }
+            }
+            return std::make_shared<CancellableDelayAction>(id, duration);
+        }
+        else {
             // 기본값: 성공 동작
             return std::make_shared<SuccessAction>(id);
         }
     }
 
     std::vector<std::string> getSupportedTypes() const override {
-        return {"success", "failure", "modify", "exception"};
+        return {"success", "failure", "modify", "exception", "cancellable_delay"};
     }
 };
 

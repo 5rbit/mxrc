@@ -288,7 +288,7 @@ make -j$(nproc)
 
 - **README.md**: 프로젝트 개요 및 사용 가이드
 - **CLAUDE.md**: 상세 개발 가이드 및 API 문서
-- **specs/017-action-sequence-orchestration/**: 전체 사양 및 아키텍처
+- **architecture.md**: 전체 사양 및 아키텍처
 
 ## 문제 해결
 

@@ -19,20 +19,39 @@ MXRC는 어떤 로봇도 제어할 수 있는 범용 로봇 제어 컨트롤러�
 
 ### 빌드 명령어
 
-```bash
-# 빌드 설정 및 빌드
-mkdir -p build
-cd build
-cmake ..
-make
+#### 권장 빌드 방법 (macOS, Homebrew)
 
-# 메인 실행 파일 실행
+macOS에서 Homebrew를 사용하여 `tbb`와 `googletest`를 설치한 경우, 아래의 명령어를 사용하면 의존성을 정확하게 찾아 빌드할 수 있습니다. 이 방법은 VSCode의 기본 빌드 태스크로도 설정되어 있습니다.
+
+```bash
+# TBB 및 googletest 경로를 지정하여 빌드
+TBB_ROOT=$(brew --prefix tbb) && \
+GTEST_ROOT=$(brew --prefix googletest) && \
+mkdir -p build && \
+cd build && \
+cmake .. -DTBB_DIR=${TBB_ROOT}/lib/cmake/TBB -DCMAKE_PREFIX_PATH=${GTEST_ROOT} && \
+make -j$(sysctl -n hw.ncpu)
+```
+
+#### 일반 빌드 방법 (Linux)
+
+```bash
+# 빌드 디렉토리 생성 및 빌드
+mkdir -p build && cd build
+cmake ..
+make -j$(nproc)
+```
+
+### 테스트 및 실행
+
+```bash
+# 메인 실행 파일 실행 (build 디렉토리 내부에서)
 ./mxrc
 
-# 모든 테스트 실행 (112 tests)
+# 모든 테스트 실행 (build 디렉토리 내부에서)
 ./run_tests
 
-# 특정 테스트 스위트 실행
+# 특정 테스트 스위트 실행 (build 디렉토리 내부에서)
 ./run_tests --gtest_filter=ActionExecutor*
 ./run_tests --gtest_filter=SequenceEngine*
 ./run_tests --gtest_filter=TaskExecutor*
@@ -520,6 +539,48 @@ TEST_F(ComponentTest, TestScenario) {
 - TaskExecutor: 상태 정리, 실패/취소 처리, 메모리 누수 방지
 - EventBus: 디스패치 스레드 안전 종료, 남은 이벤트 처리
 
+## 📝 메모리 관련 테스트 필수 사항
+
+### 1. 객체 생명주기 및 포인터 유효성 검증
+*   **NULL 포인터 접근 방지**: 모든 포인터 변수 사용 전에 NULL 검사(`if (ptr != nullptr)`)를 철저히 수행해야 합니다.
+*   **댕글링 포인터(Dangling Pointer) 방지**: 객체가 파괴된 후에도 해당 메모리 주소를 가리키는 포인터가 남아있지 않도록 `std::shared_ptr`이나 `std::weak_ptr` 같은 스마트 포인터를 사용하여 객체 생명주기를 관리해야 합니다.
+*   **초기화 보장**: 클래스 멤버 변수 중 포인터는 반드시 생성자에서 `nullptr` 또는 유효한 객체 주소로 초기화되어야 합니다.
+
+### 2. 동시성 및 스레드 안전성 테스트
+*   **경합 조건(Race Condition) 검사**: 멀티스레드 환경에서 공유 자원에 대한 읽기/쓰기 접근이 동시에 발생하지 않도록 락 메커니즘(`std::mutex`, TBB 동시성 컨테이너 등)이 올바르게 적용되었는지 테스트해야 합니다.
+*   **락 효율성 및 데드락 방지**: 락의 범위가 최소화되었는지 확인하고, 여러 스레드가 서로의 락 해제를 기다리는 **교착 상태(Deadlock)**가 발생하지 않도록 테스트해야 합니다.
+*   **스레드 세이프티(Thread Safety) 보장**: `TBB::tbb`와 같이 동시성 라이브러리를 사용할 경우, 해당 라이브러리의 함수가 스레드 안전하게 사용되고 있는지 확인해야 합니다.
+
+### 3. 메모리 할당 및 누수(Leak) 검사
+
+프로그램이 종료되거나 특정 기능이 완료된 후, 할당된 메모리가 올바르게 해제되었는지 전문 도구를 사용하여 확인해야 합니다.
+
+*   **힙 오염(Heap Corruption) 방지**: `new`/`delete` 또는 `malloc`/`free` 쌍이 일치하는지, 배열 할당/해제 시 `new[]`/`delete[]`가 올바르게 사용되었는지 검증합니다.
+
+*   **Valgrind (Ubuntu)**:
+    *   **설치**: `sudo apt-get install valgrind`
+    *   **사용법**: Valgrind는 메모리 누수, 유효하지 않은 메모리 접근 등 다양한 오류를 동적으로 분석합니다.
+    ```bash
+    # Valgrind로 테스트 실행
+    valgrind --leak-check=full --show-leak-kinds=all ./build/run_tests --gtest_filter=<YourTest>
+    ```
+
+*   **Address Sanitizer (ASan)**:
+    *   **사용법**: 컴파일 시 `-fsanitize=address` 플래그를 추가하여 빌드합니다. ASan은 런타임에 메모리 오류를 매우 빠르게 감지합니다.
+    *   **CMake 설정 (`CMakeLists.txt`):**
+        ```cmake
+        # 디버그 빌드 시 Address Sanitizer 활성화
+        if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+            target_compile_options(mxrc PRIVATE -fsanitize=address)
+            target_link_libraries(mxrc PRIVATE -fsanitize=address)
+        endif()
+        ```
+    *   이후 평소처럼 테스트를 실행하면, 메모리 오류 발생 시 상세한 리포트가 출력됩니다.
+
+### 4. 에지 케이스 (Edge Case) 테스트
+*   **동시 초기화/파괴**: 멀티스레드가 동시성 자료구조를 초기화하거나 파괴하려고 시도할 때 프로그램이 충돌하지 않는지 테스트해야 합니다.
+*   **경계 조건**: `0` 또는 시스템이 허용하는 `max_allowed_parallelism` 등의 경계 값에서 TBB가 올바르게 작동하는지 확인해야 합니다.
+
 ## 설계 원칙
 
 ### 1. RAII (Resource Acquisition Is Initialization)
@@ -586,6 +647,22 @@ TEST_F(ComponentTest, TestScenario) {
   - Multi-producer 환경에서 SPSC 큐 사용으로 인한 크래시 해결
   - 향후 MPSC Lock-Free Queue로 최적화 예정
 
+## 문제 해결
+
+### 크리티컬 이슈 (크래시, 세그멘테이션 폴트) 대응
+프로그램 실행 중 크래시 또는 세그멘테이션 폴트와 같은 크리티컬 이슈가 발생하는 경우, 다음 절차를 따릅니다.
+
+1.  **`lldb`를 이용한 버그 식별**:
+    *   디버거(`lldb`)를 사용하여 크래시가 발생한 지점의 스택 트레이스, 레지스터 상태, 메모리 정보를 수집합니다.
+    *   자세한 방법은 `docs/debugging_with_lldb.md` 문서를 참고하세요.
+
+2.  **이슈 파일 작성**:
+    *   `/issue` 디렉토리에 새로운 이슈 파일을 생성합니다.
+    *   이슈 파일은 `docs/templete/issue.md` 템플릿 양식을 따라 작성합니다.
+
+3.  **로그 첨부**:
+    *   작성된 이슈 파일에 `lldb`를 통해 수집한 로그, 백트레이스, 분석 내용 등을 상세히 첨부합니다.
+
 ## 의존성
 
 - **spdlog**: 로깅 프레임워크
@@ -604,13 +681,13 @@ sudo apt-get install libspdlog-dev libgtest-dev cmake
 1. 각 기능은 `specs/<기능번호>-<기능명>/`에 사양을 가짐
 2. 사양에는 사용자 스토리, 인수 기준, 기능적 요구사항 포함
 3. 관련 사양 참조:
-   - `specs/017-action-sequence-orchestration/spec.md`
-   - `specs/017-action-sequence-orchestration/architecture.md`
-   - `specs/017-action-sequence-orchestration/tasks.md`
+   - `specs/<기능번호>-<기능명>/spec.md`
+   - `specs/<기능번호>-<기능명>/architecture.md`
+   - `specs/<기능번호>-<기능명>/tasks.md`
 
 ## 참고 자료
 
-- 전체 아키텍처: `specs/017-action-sequence-orchestration/architecture.md`
-- 구현 계획: `specs/017-action-sequence-orchestration/plan.md`
-- Task 목록: `specs/017-action-sequence-orchestration/tasks.md`
+- 전체 아키텍처: 프로젝트 루트의 `architecture.md`
+- 구현 계획: `specs/<기능번호>-<기능명>/plan.md`
+- Task 목록: `specs/<기능번호>-<기능명>/tasks.md`
 - README: 프로젝트 루트의 `README.md`

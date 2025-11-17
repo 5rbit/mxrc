@@ -5,8 +5,10 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find dependencies
+find_package(Threads REQUIRED)
 find_package(spdlog REQUIRED)
-find_package(GTest REQUIRED) 
+find_package(GTest REQUIRED)
+find_package(TBB REQUIRED) 
 
 # Add executable
 add_executable(mxrc
@@ -35,6 +37,7 @@ target_link_libraries(mxrc PRIVATE
     spdlog::spdlog 
     GTest::GTest 
     GTest::Main
+    TBB::tbb
 )
 
 # Include directories
@@ -87,6 +90,7 @@ add_executable(run_tests
     tests/unit/event/DataStoreEventAdapter_test.cpp
     tests/integration/event/event_flow_test.cpp
     tests/integration/event/monitoring_extension_test.cpp
+    tests/unit/datastore/tbb_integration_test.cpp
     examples/event_monitoring/ExecutionTimeCollector.cpp
     examples/event_monitoring/StateTransitionLogger.cpp
     src/core/task/core/TaskRegistry.cpp
@@ -136,6 +140,7 @@ target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/tests/unit/task
     ${PROJECT_SOURCE_DIR}/tests/unit/sequence
     ${PROJECT_SOURCE_DIR}/tests/unit/event
+    ${PROJECT_SOURCE_DIR}/tests/unit/datastore
     ${PROJECT_SOURCE_DIR}/tests/integration
     ${PROJECT_SOURCE_DIR}/tests/integration/event
     ${PROJECT_SOURCE_DIR}/examples
@@ -148,6 +153,7 @@ target_link_libraries(run_tests PRIVATE
     spdlog::spdlog
     GTest::GTest
     GTest::Main
+    TBB::tbb
 )
 
 include(GoogleTest)

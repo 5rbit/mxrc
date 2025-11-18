@@ -9,28 +9,66 @@
 DataStore* DataStore::instance_ = nullptr;
 std::mutex DataStore::mutex_;
 
-// Concrete Notifier implementation
+// Concrete Notifier implementation with weak_ptr for safe Observer management
 class MapNotifier : public Notifier {
 public:
-    void subscribe(Observer* observer) override {
+    /// @brief Destructor - 정리 보장
+    ~MapNotifier() override {
         std::lock_guard<std::mutex> lock(mutex_);
-        subscribers_.push_back(observer);
+        subscribers_.clear();
     }
 
-    void unsubscribe(Observer* observer) override {
+    /// @brief Observer 구독 (weak_ptr로 내부 관리하여 dangling pointer 방지)
+    void subscribe(std::shared_ptr<Observer> observer) override {
+        if (!observer) {
+            return;  // NULL observer 무시
+        }
         std::lock_guard<std::mutex> lock(mutex_);
-        subscribers_.erase(std::remove(subscribers_.begin(), subscribers_.end(), observer), subscribers_.end());
+        subscribers_.push_back(observer);  // weak_ptr로 자동 변환
     }
 
+    /// @brief Observer 구독 해제
+    void unsubscribe(std::shared_ptr<Observer> observer) override {
+        if (!observer) {
+            return;
+        }
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        // weak_ptr 벡터에서 제거하기 위해 반복 처리
+        for (auto it = subscribers_.begin(); it != subscribers_.end(); ) {
+            if (auto obs = it->lock()) {
+                if (obs == observer) {
+                    it = subscribers_.erase(it);
+                } else {
+                    ++it;
+                }
+            } else {
+                // 파괴된 observer는 자동 제거
+                it = subscribers_.erase(it);
+            }
+        }
+    }
+
+    /// @brief 변경 알림 발행 (파괴된 Observer 자동 감지 및 정리)
     void notify(const SharedData& changed_data) override {
         std::lock_guard<std::mutex> lock(mutex_);
-        for (Observer* observer : subscribers_) {
-            observer->onDataChanged(changed_data);
+
+        // 파괴된 observer 자동 정리 및 호출
+        for (auto it = subscribers_.begin(); it != subscribers_.end(); ) {
+            if (auto observer = it->lock()) {
+                // ✓ Observer가 유효함 - 안전하게 호출
+                observer->onDataChanged(changed_data);
+                ++it;
+            } else {
+                // ✓ Observer가 파괴됨 - 자동 제거
+                it = subscribers_.erase(it);
+            }
         }
     }
 
 private:
-    std::vector<Observer*> subscribers_;
+    // ✓ weak_ptr 사용으로 dangling pointer 방지
+    std::vector<std::weak_ptr<Observer>> subscribers_;
     std::mutex mutex_;
 };
 
@@ -49,7 +87,10 @@ DataStore& DataStore::getInstance() {
     return *instance_;
 }
 
-void DataStore::subscribe(const std::string& id, Observer* observer) {
+void DataStore::subscribe(const std::string& id, std::shared_ptr<Observer> observer) {
+    if (!observer) {
+        return;  // NULL observer 무시
+    }
     std::lock_guard<std::mutex> lock(mutex_);
     if (notifiers_.find(id) == notifiers_.end()) {
         notifiers_[id] = std::make_unique<MapNotifier>();
@@ -57,7 +98,10 @@ void DataStore::subscribe(const std::string& id, Observer* observer) {
     notifiers_[id]->subscribe(observer);
 }
 
-void DataStore::unsubscribe(const std::string& id, Observer* observer) {
+void DataStore::unsubscribe(const std::string& id, std::shared_ptr<Observer> observer) {
+    if (!observer) {
+        return;
+    }
     std::lock_guard<std::mutex> lock(mutex_);
     if (notifiers_.find(id) != notifiers_.end()) {
         notifiers_[id]->unsubscribe(observer);

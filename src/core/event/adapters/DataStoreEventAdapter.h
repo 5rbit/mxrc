@@ -23,7 +23,7 @@ namespace mxrc::core::event {
  * - EventBus 이벤트 → DataStore 업데이트
  * - 순환 업데이트 방지 기능 포함
  */
-class DataStoreEventAdapter : public Observer {
+class DataStoreEventAdapter : public Observer, public std::enable_shared_from_this<DataStoreEventAdapter> {
 public:
     /**
      * @brief 생성자

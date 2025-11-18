@@ -52,8 +52,11 @@ struct DataExpirationPolicy {
 class Notifier {
 public:
     virtual ~Notifier() = default;
-    virtual void subscribe(Observer* observer) = 0;
-    virtual void unsubscribe(Observer* observer) = 0;
+    /// @brief Observer 구독 (shared_ptr 기반으로 안전한 생명주기 관리)
+    virtual void subscribe(std::shared_ptr<Observer> observer) = 0;
+    /// @brief Observer 구독 해제
+    virtual void unsubscribe(std::shared_ptr<Observer> observer) = 0;
+    /// @brief 변경 알림 발행
     virtual void notify(const SharedData& changed_data) = 0;
 };
 
@@ -87,8 +90,15 @@ public:
     T poll(const std::string& id);
 
     // FR-003: Notifier (Observer pattern) for Alarm and Event data
-    void subscribe(const std::string& id, Observer* observer);
-    void unsubscribe(const std::string& id, Observer* observer);
+    /// @brief DataStore 값 변경 알림을 구독 (weak_ptr로 안전하게 관리됨)
+    /// @param id 감시할 데이터 키
+    /// @param observer 구독자 (shared_ptr로 전달되어 weak_ptr로 내부 관리)
+    void subscribe(const std::string& id, std::shared_ptr<Observer> observer);
+
+    /// @brief DataStore 값 변경 알림 구독 해제
+    /// @param id 데이터 키
+    /// @param observer 제거할 구독자
+    void unsubscribe(const std::string& id, std::shared_ptr<Observer> observer);
 
     // FR-007: Data expiration policy management
     void applyExpirationPolicy(const std::string& id, const DataExpirationPolicy& policy);

@@ -14,11 +14,12 @@ using namespace mxrc::core::action;
 class ActionExecutorTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        executor = std::make_unique<ActionExecutor>();
+        // ✓ shared_ptr 사용 (ActionExecutor는 weak_from_this() 사용)
+        executor = std::make_shared<ActionExecutor>();
         context = std::make_unique<ExecutionContext>();
     }
 
-    std::unique_ptr<ActionExecutor> executor;
+    std::shared_ptr<ActionExecutor> executor;  // ✓ shared_ptr로 변경
     std::unique_ptr<ExecutionContext> context;
 };
 

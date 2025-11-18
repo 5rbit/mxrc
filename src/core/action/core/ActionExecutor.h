@@ -29,7 +29,7 @@ namespace mxrc::core::action {
  * EventBus 통합: ActionExecutor는 선택적으로 EventBus를 받아
  * 모든 주요 상태 전환 시 이벤트를 발행합니다.
  */
-class ActionExecutor {
+class ActionExecutor : public std::enable_shared_from_this<ActionExecutor> {
 public:
     /**
      * @brief ActionExecutor 생성자

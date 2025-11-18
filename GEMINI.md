@@ -269,6 +269,420 @@ TEST_F(ComponentTest, TestScenario) {
 *   **동시 초기화/파괴**: 멀티스레드가 동시성 자료구조를 초기화하거나 파괴하려고 시도할 때 프로그램이 충돌하지 않는지 테스트해야 합니다.
 *   **경계 조건**: `0` 또는 시스템이 허용하는 `max_allowed_parallelism` 등의 경계 값에서 TBB가 올바르게 작동하는지 확인해야 합니다.
 
+---
+
+## ⚠️ 반-패턴 (Anti-Patterns) 및 피해야 할 설계
+
+### 1. ❌ Singleton 패턴 사용 (메모리 누수 위험)
+
+**문제 있는 코드:**
+```cpp
+class DataStore {
+private:
+    static DataStore* instance_ = nullptr;  // ❌ 동적 할당
+    static std::mutex mutex_;
+
+public:
+    static DataStore& getInstance() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (instance_ == nullptr) {
+            instance_ = new DataStore();    // ❌ 누수! delete 없음
+        }
+        return *instance_;
+    }
+};
+
+// 테스트에서도 문제
+auto& ds = DataStore::getInstance();  // ❌ 상태 격리 불가
+```
+
+**문제점:**
+- 메모리 누수 (동적 할당 후 해제 안 함)
+- 테스트 상태 격리 불가능
+- 전역 뮤텍스로 인한 성능 병목
+- 의존성이 숨겨짐
+
+**✅ 올바른 방법:**
+```cpp
+class DataStore : public std::enable_shared_from_this<DataStore> {
+public:
+    static std::shared_ptr<DataStore> create() {
+        static std::shared_ptr<DataStore> instance =
+            std::make_shared<DataStore>();  // ✓ 안전한 할당
+        return instance;
+    }
+
+private:
+    DataStore() = default;
+};
+
+// 사용
+auto ds = DataStore::create();  // ✓ shared_ptr로 관리
+```
+
+---
+
+### 2. ❌ raw pointer 기반 Observer 패턴 (이슈 #003의 원인)
+
+**문제 있는 코드:**
+```cpp
+class Notifier {
+private:
+    std::vector<Observer*> subscribers_;  // ❌ dangling pointer 위험
+
+    void notify(const SharedData& data) override {
+        for (Observer* obs : subscribers_) {
+            obs->onDataChanged(data);      // ❌ NULL 포인터 접근 가능
+        }
+    }
+};
+
+// 사용
+class DataStore {
+    void subscribe(Observer* observer) {  // ❌ raw pointer
+        // observer가 파괴되어도 이 포인터가 남음
+    }
+};
+```
+
+**문제점:**
+- Observer 파괴 후 dangling pointer 남음
+- 멀티스레드 환경에서 경쟁 상태
+- NULL 포인터 역참조 세그멘테이션 폴트
+- 생명주기 관리 불명확
+
+**✅ 올바른 방법:**
+```cpp
+class Notifier {
+private:
+    std::vector<std::weak_ptr<Observer>> subscribers_;  // ✓ 안전함
+
+    void notify(const SharedData& data) override {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        // 파괴된 observer 자동 정리
+        for (auto it = subscribers_.begin(); it != subscribers_.end(); ) {
+            if (auto obs = it->lock()) {       // ✓ 자동 NULL 체크
+                obs->onDataChanged(data);
+                ++it;
+            } else {
+                it = subscribers_.erase(it);   // ✓ 자동 정리
+            }
+        }
+    }
+};
+
+// 사용 (shared_ptr 필수!)
+std::shared_ptr<Observer> obs = std::make_shared<MyObserver>();
+notifier->subscribe(obs);  // ✓ weak_ptr로 변환됨
+```
+
+---
+
+### 3. ❌ 전역 뮤텍스 사용 (성능 병목, 이슈 #002와 연관)
+
+**문제 있는 코드:**
+```cpp
+class DataStore {
+private:
+    std::map<std::string, SharedData> data_map_;
+    static std::mutex global_mutex_;  // ❌ 모든 연산 직렬화
+
+public:
+    void set(...) {
+        std::lock_guard<std::mutex> lock(global_mutex_);  // ❌ 블로킹
+        data_map_[id] = data;
+        notify();  // ❌ 이벤트 처리도 블로킹됨
+    }
+
+    SharedData get(...) {
+        std::lock_guard<std::mutex> lock(global_mutex_);  // ❌ 블로킹
+        return data_map_[id];
+    }
+};
+
+// 결과: EventBus 디스패치 스레드가 블로킹되면 이벤트 처리 전체 중단
+```
+
+**문제점:**
+- 모든 스레드가 단일 뮤텍스 대기
+- 10배 이상 성능 저하
+- 이벤트 처리 지연 (연쇄 블로킹)
+- 확장성 최악
+
+**✅ 올바른 방법:**
+```cpp
+#include <tbb/concurrent_hash_map.h>
+
+class DataStore {
+private:
+    // ✓ 내부 세분화된 락 (fine-grained locking)
+    tbb::concurrent_hash_map<std::string, SharedData> data_map_;
+
+public:
+    void set(...) {
+        // ✓ 락이 필요 없음! concurrent_hash_map이 내부 관리
+        typename tbb::concurrent_hash_map<...>::accessor acc;
+        data_map_.insert(acc, id);
+        acc->second = data;
+
+        // 별도 락으로 notify 처리
+        notifySubscribers(data);  // 논블로킹
+    }
+};
+
+// 개선 효과: 1000ms → 100ms (10배 향상)
+```
+
+---
+
+### 4. ❌ new/delete 직접 사용 (메모리 관리 실패)
+
+**문제 있는 코드:**
+```cpp
+// 1. 메모리 누수
+class Factory {
+public:
+    IAction* createAction(...) {
+        return new DelayAction(...);  // ❌ 호출자가 delete 해야 함
+                                      // ❌ 하지만 누군가 깜빡할 수 있음
+    }
+};
+
+// 2. 불일치하는 할당/해제
+void process() {
+    int* arr = new int[100];      // ❌ 배열
+    delete arr;                   // ❌ delete (new[]가 아님) → 힙 손상!
+}
+
+// 3. 예외 안전성 문제
+void setup() {
+    MyObject* obj = new MyObject();
+    doSomething();  // ❌ 예외 발생 → delete 호출 안 됨
+    delete obj;
+}
+```
+
+**✅ 올바른 방법:**
+```cpp
+// 1. shared_ptr/unique_ptr 사용
+class Factory {
+public:
+    std::shared_ptr<IAction> createAction(...) {
+        return std::make_shared<DelayAction>(...);  // ✓ 자동 해제
+    }
+};
+
+// 2. 배열도 스마트 포인터
+void process() {
+    std::vector<int> arr(100);  // ✓ RAII 방식
+    // 또는
+    std::unique_ptr<int[]> arr(new int[100]);  // ✓ 맞는 할당/해제
+}
+
+// 3. 예외 안전성 보장
+void setup() {
+    auto obj = std::make_unique<MyObject>();
+    doSomething();  // ✓ 예외 발생해도 자동 정리
+    // delete 필요 없음
+}
+```
+
+---
+
+### 5. ❌ 동기화 없는 멀티스레드 접근
+
+**문제 있는 코드:**
+```cpp
+class SharedData {
+public:
+    int value = 0;
+    std::string name = "";
+};
+
+class Container {
+private:
+    SharedData data_;  // ❌ 동기화 없음
+
+public:
+    void update(int v) {
+        data_.value = v;    // ❌ Thread #1
+        data_.name = "..."; // ❌ Thread #2와 경쟁
+    }
+
+    int getValue() {
+        return data_.value;  // ❌ 경쟁 상태
+    }
+};
+
+// 결과: 예측 불가능한 버그, 데이터 손상
+```
+
+**✅ 올바른 방법:**
+```cpp
+class Container {
+private:
+    SharedData data_;
+    std::mutex mutex_;  // ✓ 동기화 추가
+
+public:
+    void update(int v) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        data_.value = v;
+        data_.name = "...";  // ✓ 원자적 업데이트
+    }
+
+    int getValue() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return data_.value;  // ✓ 동기화됨
+    }
+};
+
+// 또는 TBB 사용
+#include <tbb/concurrent_hash_map.h>
+tbb::concurrent_hash_map<std::string, SharedData> data_;
+// ✓ 내부 동기화 제공
+```
+
+---
+
+### 6. ❌ 순환 참조 (메모리 누수)
+
+**문제 있는 코드:**
+```cpp
+class Node : public std::enable_shared_from_this<Node> {
+public:
+    std::shared_ptr<Node> next;  // ✓ 정상
+    std::shared_ptr<Node> prev;  // ❌ 순환 참조!
+};
+
+// 사용
+auto node1 = std::make_shared<Node>();
+auto node2 = std::make_shared<Node>();
+node1->next = node2;
+node2->prev = node1;  // ❌ 순환 참조 → 메모리 누수!
+// node1과 node2의 참조 계수가 절대 0이 될 수 없음
+```
+
+**✅ 올바른 방법:**
+```cpp
+class Node {
+public:
+    std::shared_ptr<Node> next;      // ✓ 앞으로만 가능
+    std::weak_ptr<Node> prev;        // ✓ weak_ptr로 역참조
+};
+
+// 사용
+auto node1 = std::make_shared<Node>();
+auto node2 = std::make_shared<Node>();
+node1->next = node2;
+node2->prev = node1;  // ✓ 순환 참조 방지
+
+// prev 사용
+if (auto p = node2->prev.lock()) {
+    // p가 유효한 경우만 사용
+}
+```
+
+---
+
+### 7. ❌ 예외 발생 후 리소스 정리 누락
+
+**문제 있는 코드:**
+```cpp
+void processData() {
+    EventBus* eventBus = new EventBus();
+
+    try {
+        eventBus->start();
+        doSomethingRisky();  // ❌ 예외 발생!
+    } catch (...) {
+        // ❌ eventBus->stop() 호출 안 됨
+    }
+    delete eventBus;  // ❌ 도달하지 않음 → 누수!
+}
+```
+
+**✅ 올바른 방법:**
+```cpp
+void processData() {
+    auto eventBus = std::make_shared<EventBus>();
+
+    eventBus->start();
+    try {
+        doSomethingRisky();  // ✓ 예외 발생해도
+    } catch (...) {
+        // 자동으로 소멸자 호출
+        throw;  // 예외 전파
+    }
+    // ✓ 자동 cleanup (RAII)
+}
+
+// 또는 RAII 래퍼
+class EventBusGuard {
+private:
+    std::shared_ptr<EventBus> bus_;
+
+public:
+    EventBusGuard(std::shared_ptr<EventBus> b) : bus_(b) {
+        bus_->start();  // ✓ 시작
+    }
+
+    ~EventBusGuard() {
+        bus_->stop();   // ✓ 항상 정리 (예외 상황에서도)
+    }
+};
+```
+
+---
+
+### 8. ❌ 테스트에서 Singleton 직접 사용 (상태 격리 불가)
+
+**문제 있는 코드:**
+```cpp
+TEST_F(DataStoreTest, Test1) {
+    DataStore& ds = DataStore::getInstance();  // ❌ 전역 상태
+    ds.set("key", value, type);
+}
+
+TEST_F(DataStoreTest, Test2) {
+    DataStore& ds = DataStore::getInstance();
+    // ❌ Test1의 데이터가 남아있음 → 테스트 상호 간섭!
+}
+```
+
+**✅ 올바른 방법:**
+```cpp
+class DataStoreTest : public ::testing::Test {
+protected:
+    std::shared_ptr<DataStore> ds_;
+
+    void SetUp() override {
+        ds_ = DataStore::create();  // ✓ 각 테스트마다 새 인스턴스
+    }
+};
+
+TEST_F(DataStoreTest, Test1) {
+    ds_->set("key", value, type);  // ✓ 격리됨
+}
+
+TEST_F(DataStoreTest, Test2) {
+    // ✓ Test1의 데이터 없음
+}
+```
+
+---
+
+## 요약: 피해야 할 5가지
+
+| 안티패턴 | 문제 | 권장 방법 |
+|---------|------|---------|
+| Singleton (new) | 메모리 누수 | shared_ptr::create() |
+| raw pointer Observer | Dangling pointer | weak_ptr |
+| 전역 뮤텍스 | 성능 병목 | TBB concurrent_hash_map |
+| new/delete 직접 | 메모리 누수 | 스마트 포인터 |
+| 예외 안전성 미흡 | 리소스 누수 | RAII 원칙 |
+
 ## 최근 변경 사항
 
 ### Phase 3B-1: Task Single Execution (2025-11-15)

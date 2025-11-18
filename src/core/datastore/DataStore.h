@@ -67,11 +67,12 @@ public:
     virtual void onDataChanged(const SharedData& changed_data) = 0;
 };
 
-// DataStore class (Singleton)
-class DataStore {
+// DataStore class (shared_ptr 기반 생성 방식)
+class DataStore : public std::enable_shared_from_this<DataStore> {
 public:
-    // FR-001: Singleton pattern
-    static DataStore& getInstance();
+    /// @brief DataStore 생성 (Singleton 특성 유지)
+    /// @return shared_ptr로 관리되는 DataStore 인스턴스
+    static std::shared_ptr<DataStore> create();
 
     // Delete copy constructor and assignment operator
     DataStore(const DataStore&) = delete;
@@ -128,9 +129,10 @@ public:
     void setAccessPolicy(const std::string& id, const std::string& module_id, bool can_access);
     bool hasAccess(const std::string& id, const std::string& module_id) const;
 
-private:
-    DataStore(); // Private constructor for singleton
+    DataStore(); // Constructor
+    ~DataStore() = default;
 
+private:
     std::map<std::string, SharedData> data_map_;
     std::map<std::string, std::unique_ptr<Notifier>> notifiers_;
     std::map<std::string, DataExpirationPolicy> expiration_policies_;
@@ -147,9 +149,7 @@ private:
     // FR-004, FR-005: Thread safety and low latency
     // Implementation details would involve mutexes, atomic operations, or lock-free data structures
     // For this interface, we just acknowledge the requirement.
-
-    static DataStore* instance_; // Static instance pointer
-    static std::mutex mutex_; // Mutex for thread-safe singleton
+    mutable std::mutex mutex_; // Mutex for thread-safe access
 };
 
 // Template method implementations (typically in a .tpp or .h for header-only)

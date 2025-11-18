@@ -5,9 +5,7 @@
 #include <fstream>
 #include <sstream>
 
-// Initialize static members
-DataStore* DataStore::instance_ = nullptr;
-std::mutex DataStore::mutex_;
+// No static members to initialize - using shared_ptr pattern
 
 // Concrete Notifier implementation with weak_ptr for safe Observer management
 class MapNotifier : public Notifier {
@@ -73,18 +71,16 @@ private:
 };
 
 DataStore::DataStore() {
-    // Private constructor implementation
+    // Constructor implementation
     performance_metrics_["set_calls"] = 0;
     performance_metrics_["get_calls"] = 0;
     performance_metrics_["poll_calls"] = 0;
 }
 
-DataStore& DataStore::getInstance() {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (instance_ == nullptr) {
-        instance_ = new DataStore();
-    }
-    return *instance_;
+std::shared_ptr<DataStore> DataStore::create() {
+    // C++11 thread-safe static initialization (Singleton 특성 유지)
+    static std::shared_ptr<DataStore> instance = std::make_shared<DataStore>();
+    return instance;
 }
 
 void DataStore::subscribe(const std::string& id, std::shared_ptr<Observer> observer) {

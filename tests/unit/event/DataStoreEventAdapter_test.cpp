@@ -18,8 +18,8 @@ namespace mxrc::core::event {
 class DataStoreEventAdapterTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        // DataStore 생성 (shared_ptr 기반)
-        dataStore_ = DataStore::create();
+        // DataStore 생성 (shared_ptr 기반, 테스트 격리를 위해 createForTest 사용)
+        dataStore_ = DataStore::createForTest();
         eventBus_ = std::make_shared<EventBus>();
         eventBus_->start();  // 디스패치 스레드 시작
         adapter_ = std::make_shared<DataStoreEventAdapter>(dataStore_, eventBus_);

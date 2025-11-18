@@ -83,6 +83,11 @@ std::shared_ptr<DataStore> DataStore::create() {
     return instance;
 }
 
+std::shared_ptr<DataStore> DataStore::createForTest() {
+    // 테스트 격리를 위해 매번 새로운 인스턴스 생성
+    return std::make_shared<DataStore>();
+}
+
 void DataStore::subscribe(const std::string& id, std::shared_ptr<Observer> observer) {
     if (!observer) {
         return;  // NULL observer 무시

@@ -75,6 +75,11 @@ public:
     /// @return shared_ptr로 관리되는 DataStore 인스턴스
     static std::shared_ptr<DataStore> create();
 
+    /// @brief 테스트용 독립 인스턴스 생성
+    /// @note 테스트 간 격리를 위해 매번 새로운 인스턴스 반환
+    /// @return 독립적인 DataStore 인스턴스
+    static std::shared_ptr<DataStore> createForTest();
+
     // Delete copy constructor and assignment operator
     DataStore(const DataStore&) = delete;
     DataStore& operator=(const DataStore&) = delete;

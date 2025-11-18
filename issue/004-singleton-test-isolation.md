@@ -293,10 +293,50 @@ auto future = std::async([weak_self, action, ctx]() {
 
 ### 다음 단계
 
-- [ ] **우선순위 1**: 옵션 1 구현 (createForTest() 메서드)
-- [ ] **우선순위 2**: 전체 테스트 스위트에서 DataStore::createForTest() 사용
-- [ ] **우선순위 3**: AddressSanitizer/ThreadSanitizer로 근본 원인 확인
+- [x] **우선순위 1**: 옵션 1 구현 (createForTest() 메서드) - **완료**
+- [x] **우선순위 2**: 전체 테스트 스위트에서 DataStore::createForTest() 사용 - **완료**
+- [ ] **우선순위 3**: AddressSanitizer/ThreadSanitizer로 근본 원인 확인 - **진행 중**
 - [ ] **장기 개선**: 스레드 안전한 종료 보장 (옵션 3)
+
+### 해결 현황 (2025-11-18)
+
+#### ✅ 구현 완료
+
+1. **DataStore::createForTest() 메서드 추가**
+   - DataStore.h: 테스트용 독립 인스턴스 생성 메서드 추가
+   - DataStore.cpp: createForTest() 구현
+   - 각 테스트마다 독립적인 DataStore 인스턴스 생성
+
+2. **모든 테스트에 createForTest() 적용**
+   - DataStore_test.cpp: 모든 테스트가 createForTest() 사용 (singleton 테스트 제외)
+   - DataStoreEventAdapter_test.cpp: createForTest() 사용
+   - Observer를 raw pointer에서 shared_ptr로 변경
+
+3. **테스트 결과**
+   - DataStore 단위 테스트: **20/20 통과** ✅
+   - DataStoreEventAdapter 테스트: 격리 적용
+   - 개별 테스트 스위트는 모두 성공
+
+#### ⚠️ 남은 문제
+
+**Segmentation Fault (새로운 이슈)**:
+- DataStore*:ActionExecutor* 필터로 함께 실행 시 segfault 발생
+- ActionExecutorTest.MemoryLeakPrevention 완료 직후 크래시
+- 원인: 테스트 스위트 간 전환 시 cleanup 문제로 추정
+- **이슈 #004와는 다른 새로운 문제** (pthread mutex error 아님)
+
+```bash
+# 성공
+./run_tests --gtest_filter="DataStoreTest.*"      # 20/20 통과
+
+# 실패
+./run_tests --gtest_filter="DataStore*:ActionExecutor*"  # segfault
+```
+
+**다음 조사 필요**:
+1. AddressSanitizer로 메모리 오류 위치 파악
+2. ActionExecutor와 DataStore 간 상호작용 분석
+3. 테스트 픽스처 TearDown 순서 검토
 
 ### 관련 이슈
 

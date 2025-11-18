@@ -90,6 +90,7 @@ add_executable(run_tests
     tests/unit/event/DataStoreEventAdapter_test.cpp
     tests/integration/event/event_flow_test.cpp
     tests/integration/event/monitoring_extension_test.cpp
+    tests/unit/datastore/DataStore_test.cpp
     tests/unit/datastore/tbb_integration_test.cpp
     examples/event_monitoring/ExecutionTimeCollector.cpp
     examples/event_monitoring/StateTransitionLogger.cpp

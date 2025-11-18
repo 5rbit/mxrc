@@ -73,20 +73,26 @@ void DataStoreEventAdapter::subscribeToActionResults(const std::string& keyPrefi
     // ACTION_COMPLETED 이벤트 구독
     auto subId = eventBus_->subscribe(
         Filters::byType(EventType::ACTION_COMPLETED),
-        [this, keyPrefix, logger](std::shared_ptr<IEvent> event) {
+        [weak_self = weak_from_this(), keyPrefix, logger](std::shared_ptr<IEvent> event) {
+            auto self = weak_self.lock();
+            if (!self) {
+                logger->warn("[DataStoreEventAdapter] Adapter is expired, skipping action result processing.");
+                return;
+            }
+
             auto actionEvent = std::static_pointer_cast<ActionCompletedEvent>(event);
 
             std::string key = keyPrefix + actionEvent->actionId;
 
             // 순환 업데이트 방지
-            markUpdating(key);
+            self->markUpdating(key);
 
             try {
                 // Action 결과를 DataStore에 저장
                 std::ostringstream oss;
                 oss << "completed:" << actionEvent->durationMs << "ms";
 
-                dataStore_->set(key, oss.str(), DataType::TaskState);
+                self->dataStore_->set(key, oss.str(), DataType::TaskState);
 
                 logger->debug("[DataStoreEventAdapter] Stored action result: {} = {}",
                              key, oss.str());
@@ -95,7 +101,7 @@ void DataStoreEventAdapter::subscribeToActionResults(const std::string& keyPrefi
                              e.what());
             }
 
-            unmarkUpdating(key);
+            self->unmarkUpdating(key);
         }
     );
 
@@ -110,13 +116,19 @@ void DataStoreEventAdapter::subscribeToSequenceResults(const std::string& keyPre
     // SEQUENCE_COMPLETED 이벤트 구독
     auto subId = eventBus_->subscribe(
         Filters::byType(EventType::SEQUENCE_COMPLETED),
-        [this, keyPrefix, logger](std::shared_ptr<IEvent> event) {
+        [weak_self = weak_from_this(), keyPrefix, logger](std::shared_ptr<IEvent> event) {
+            auto self = weak_self.lock();
+            if (!self) {
+                logger->warn("[DataStoreEventAdapter] Adapter is expired, skipping sequence result processing.");
+                return;
+            }
+
             auto seqEvent = std::static_pointer_cast<SequenceCompletedEvent>(event);
 
             std::string key = keyPrefix + seqEvent->sequenceId;
 
             // 순환 업데이트 방지
-            markUpdating(key);
+            self->markUpdating(key);
 
             try {
                 // Sequence 결과를 DataStore에 저장
@@ -124,7 +136,7 @@ void DataStoreEventAdapter::subscribeToSequenceResults(const std::string& keyPre
                 oss << "completed:" << seqEvent->completedSteps << "/" << seqEvent->totalSteps
                     << " (" << seqEvent->durationMs << "ms)";
 
-                dataStore_->set(key, oss.str(), DataType::TaskState);
+                self->dataStore_->set(key, oss.str(), DataType::TaskState);
 
                 logger->debug("[DataStoreEventAdapter] Stored sequence result: {} = {}",
                              key, oss.str());
@@ -133,7 +145,7 @@ void DataStoreEventAdapter::subscribeToSequenceResults(const std::string& keyPre
                              e.what());
             }
 
-            unmarkUpdating(key);
+            self->unmarkUpdating(key);
         }
     );
 
@@ -145,8 +157,8 @@ void DataStoreEventAdapter::subscribeToSequenceResults(const std::string& keyPre
 void DataStoreEventAdapter::startWatching(const std::string& keyPattern) {
     auto logger = Logger::get();
 
-    // DataStore에 Observer 등록
-    dataStore_->subscribe(keyPattern, this);
+    // DataStore에 Observer 등록 (shared_ptr로 안전하게 관리)
+    dataStore_->subscribe(keyPattern, shared_from_this());
 
     logger->info("[DataStoreEventAdapter] Started watching DataStore key pattern: {}",
                  keyPattern);
@@ -155,8 +167,8 @@ void DataStoreEventAdapter::startWatching(const std::string& keyPattern) {
 void DataStoreEventAdapter::stopWatching(const std::string& keyPattern) {
     auto logger = Logger::get();
 
-    // DataStore에서 Observer 해제
-    dataStore_->unsubscribe(keyPattern, this);
+    // DataStore에서 Observer 해제 (shared_ptr로 안전하게 관리)
+    dataStore_->unsubscribe(keyPattern, shared_from_this());
 
     logger->info("[DataStoreEventAdapter] Stopped watching DataStore key pattern: {}",
                  keyPattern);

@@ -18,8 +18,8 @@ namespace mxrc::core::event {
 class DataStoreEventAdapterTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        // DataStore는 Singleton이므로 getInstance()로 참조 획득
-        dataStore_ = std::shared_ptr<DataStore>(&DataStore::getInstance(), [](DataStore*) {});
+        // DataStore 생성 (shared_ptr 기반, 테스트 격리를 위해 createForTest 사용)
+        dataStore_ = DataStore::createForTest();
         eventBus_ = std::make_shared<EventBus>();
         eventBus_->start();  // 디스패치 스레드 시작
         adapter_ = std::make_shared<DataStoreEventAdapter>(dataStore_, eventBus_);

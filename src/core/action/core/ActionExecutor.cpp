@@ -43,18 +43,25 @@ ActionExecutor::~ActionExecutor() {
     }
 
     // 모든 타임아웃 스레드 종료 대기
+    // NOTE: RAII 패턴으로 안전하게 처리 - 스레드를 먼저 수집한 후 락 없이 join
+    std::vector<std::unique_ptr<std::thread>> threadsToJoin;
     {
         std::lock_guard<std::mutex> lock(actionsMutex_);
         for (auto& [id, state] : runningActions_) {
             if (state.timeoutThread && state.timeoutThread->joinable()) {
-                logger->debug("[ActionExecutor] Joining timeout thread for action {}", id);
-                // 뮤텍스를 잠시 해제하고 join (데드락 방지)
-                actionsMutex_.unlock();
-                state.timeoutThread->join();
-                actionsMutex_.lock();
+                logger->debug("[ActionExecutor] Collecting timeout thread for action {}", id);
+                threadsToJoin.push_back(std::move(state.timeoutThread));
             }
         }
         runningActions_.clear();
+    }
+
+    // 락을 해제한 상태에서 스레드 종료 대기
+    for (auto& thread : threadsToJoin) {
+        if (thread && thread->joinable()) {
+            logger->debug("[ActionExecutor] Joining timeout thread");
+            thread->join();
+        }
     }
 
     logger->info("[ActionExecutor] Destructor completed");
@@ -121,7 +128,13 @@ std::string ActionExecutor::executeAsync(
         actionId, action->getType()));
 
     // 비동기로 액션 실행
-    auto future = std::async(std::launch::async, [action, &context, actionId, logger, this, startTime]() {
+    auto future = std::async(std::launch::async, [action, &context, actionId, logger, weak_self = weak_from_this(), startTime]() {
+        auto self = weak_self.lock();
+        if (!self) {
+            logger->warn("[ActionExecutor] ASYNC ABORT - ActionExecutor expired before action {} could run.", actionId);
+            return;
+        }
+
         try {
             action->execute(context);
             logger->info("[ActionExecutor] ASYNC COMPLETE - Action {} finished successfully", actionId);
@@ -129,7 +142,7 @@ std::string ActionExecutor::executeAsync(
             // 이벤트 발행: ACTION_COMPLETED
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now() - startTime);
-            publishEvent(std::make_shared<mxrc::core::event::ActionCompletedEvent>(
+            self->publishEvent(std::make_shared<mxrc::core::event::ActionCompletedEvent>(
                 actionId, action->getType(), elapsed.count()));
 
         } catch (const std::exception& e) {
@@ -137,9 +150,9 @@ std::string ActionExecutor::executeAsync(
 
             // 상태에 오류 정보 저장
             {
-                std::lock_guard<std::mutex> lock(actionsMutex_);
-                auto it = runningActions_.find(actionId);
-                if (it != runningActions_.end()) {
+                std::lock_guard<std::mutex> lock(self->actionsMutex_);
+                auto it = self->runningActions_.find(actionId);
+                if (it != self->runningActions_.end()) {
                     it->second.exceptionOccurred = true;
                     it->second.exceptionMessage = e.what();
                 }
@@ -148,7 +161,7 @@ std::string ActionExecutor::executeAsync(
             // 이벤트 발행: ACTION_FAILED
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now() - startTime);
-            publishEvent(std::make_shared<mxrc::core::event::ActionFailedEvent>(
+            self->publishEvent(std::make_shared<mxrc::core::event::ActionFailedEvent>(
                 actionId, action->getType(), e.what(), elapsed.count()));
         }
     });
@@ -171,23 +184,22 @@ std::string ActionExecutor::executeAsync(
         auto it = runningActions_.find(actionId);
         if (it != runningActions_.end()) {
             it->second.timeoutThread = std::make_unique<std::thread>(
-                [this, actionId, timeout, startTime, logger]() {
+                [weak_self = weak_from_this(), actionId, timeout, startTime, logger]() {
+                    auto self = weak_self.lock();
+                    if (!self) {
+                        logger->warn("[ActionExecutor] TIMEOUT ABORT - ActionExecutor expired for action {}.", actionId);
+                        return;
+                    }
+
                     while (true) {
                         std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
                         bool shouldTimeout = false;
-                        bool shouldStop = false;
                         {
-                            std::lock_guard<std::mutex> lock(actionsMutex_);
-                            auto it = runningActions_.find(actionId);
-                            if (it == runningActions_.end()) {
-                                // 액션이 이미 완료되어 제거됨
-                                return;
-                            }
-
-                            // 모니터링 중지 요청 확인
-                            if (it->second.shouldStopMonitoring) {
-                                return;
+                            std::lock_guard<std::mutex> lock(self->actionsMutex_);
+                            auto it = self->runningActions_.find(actionId);
+                            if (it == self->runningActions_.end() || it->second.shouldStopMonitoring) {
+                                return; // 액션이 완료되었거나 모니터링 중지 요청
                             }
 
                             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -206,10 +218,10 @@ std::string ActionExecutor::executeAsync(
                             // 이벤트 발행: ACTION_TIMEOUT
                             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                                 std::chrono::steady_clock::now() - startTime);
-                            publishEvent(std::make_shared<mxrc::core::event::ActionTimeoutEvent>(
+                            self->publishEvent(std::make_shared<mxrc::core::event::ActionTimeoutEvent>(
                                 actionId, "", timeout.count(), elapsed.count()));
 
-                            cancel(actionId);
+                            self->cancel(actionId);
                             return;
                         }
                     }

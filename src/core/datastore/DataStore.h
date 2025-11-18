@@ -10,6 +10,7 @@
 #include <functional> // For std::function
 #include <mutex>
 #include <stdexcept>
+#include <tbb/concurrent_hash_map.h>
 
 // Forward declarations
 class Observer;
@@ -133,7 +134,10 @@ public:
     ~DataStore() = default;
 
 private:
-    std::map<std::string, SharedData> data_map_;
+    // FR-004, FR-005: concurrent_hash_map for high-performance thread-safe data access
+    tbb::concurrent_hash_map<std::string, SharedData> data_map_;
+
+    // Other members still protected by mutex (less critical path)
     std::map<std::string, std::unique_ptr<Notifier>> notifiers_;
     std::map<std::string, DataExpirationPolicy> expiration_policies_;
     std::map<std::string, std::map<std::string, bool>> access_policies_; // id -> module_id -> can_access
@@ -146,10 +150,9 @@ private:
     std::vector<std::string> access_logs_;
     std::vector<std::string> error_logs_;
 
-    // FR-004, FR-005: Thread safety and low latency
-    // Implementation details would involve mutexes, atomic operations, or lock-free data structures
-    // For this interface, we just acknowledge the requirement.
-    mutable std::mutex mutex_; // Mutex for thread-safe access
+    // Mutex for non-critical members (notifiers, policies, metrics)
+    // data_map_ uses concurrent_hash_map's internal fine-grained locking
+    mutable std::mutex mutex_;
 };
 
 // Template method implementations (typically in a .tpp or .h for header-only)
@@ -160,14 +163,6 @@ void DataStore::set(const std::string& id, const T& data, DataType type,
     // For simplicity, assuming current_module_id is available in context or passed.
     // if (!hasAccess(id, "current_module_id")) { throw std::runtime_error("Access denied for ID: " + id); }
 
-    // FR-004, FR-005: Locking mechanism for thread safety
-    std::lock_guard<std::mutex> lock(mutex_);
-
-    // FR-009: Error handling - check for type consistency if data already exists
-    if (data_map_.count(id) && data_map_[id].type != type) {
-        throw std::runtime_error("Data type mismatch for existing ID: " + id);
-    }
-
     SharedData new_data;
     new_data.id = id;
     new_data.type = type;
@@ -177,20 +172,36 @@ void DataStore::set(const std::string& id, const T& data, DataType type,
                                 new_data.timestamp + policy.duration :
                                 std::chrono::time_point<std::chrono::system_clock>();
 
-    data_map_[id] = new_data;
+    // FR-004, FR-005: concurrent_hash_map accessor로 스레드 안전 접근
+    {
+        typename tbb::concurrent_hash_map<std::string, SharedData>::accessor acc;
 
-    // FR-007: Applying expiration policy (stored, actual cleanup by cleanExpiredData)
-    expiration_policies_[id] = policy;
+        // 기존 데이터가 있으면 타입 일치 확인
+        if (data_map_.find(acc, id)) {
+            if (acc->second.type != type) {
+                throw std::runtime_error("Data type mismatch for existing ID: " + id);
+            }
+        } else {
+            // 새로운 키라면 insert
+            data_map_.insert(acc, id);
+        }
 
-    // FR-003: Notifying subscribers if applicable
+        // 데이터 업데이트
+        acc->second = new_data;
+        // accessor는 스코프를 벗어나면 자동 해제 (RAII)
+    }
+
+    // 다른 멤버들은 mutex로 보호 (비-크리티컬 경로)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        // FR-007: Applying expiration policy
+        expiration_policies_[id] = policy;
+        // FR-008: Update performance metrics
+        performance_metrics_["set_calls"]++;
+    }
+
+    // FR-003: Notifying subscribers (락 없이 실행)
     notifySubscribers(new_data);
-
-    // FR-008: Logging access (basic placeholder)
-    // access_logs_.push_back("Set data: " + id);
-
-    // Update performance metrics (placeholder)
-    performance_metrics_["set_calls"]++;
-    // Add latency measurement here
 }
 
 template<typename T>
@@ -198,29 +209,35 @@ T DataStore::get(const std::string& id) {
     // FR-014: Access control check
     // if (!hasAccess(id, "current_module_id")) { throw std::runtime_error("Access denied for ID: " + id); }
 
-    // FR-004, FR-005: Locking mechanism for thread safety
-    std::lock_guard<std::mutex> lock(mutex_);
+    T result;
 
-    // FR-009: Error handling - throw if not found
-    if (data_map_.find(id) == data_map_.end()) {
-        throw std::out_of_range("Data not found for ID: " + id);
+    // FR-004, FR-005: concurrent_hash_map const_accessor로 읽기 전용 접근
+    {
+        typename tbb::concurrent_hash_map<std::string, SharedData>::const_accessor acc;
+
+        // FR-009: Error handling - throw if not found
+        if (!data_map_.find(acc, id)) {
+            throw std::out_of_range("Data not found for ID: " + id);
+        }
+
+        const SharedData& stored_data = acc->second;
+
+        // FR-009: Error handling - type checking and casting
+        if (stored_data.value.type() != typeid(T)) {
+            throw std::runtime_error("Type mismatch for ID: " + id);
+        }
+
+        result = std::any_cast<T>(stored_data.value);
+        // accessor는 스코프를 벗어나면 자동 해제 (RAII)
     }
 
-    SharedData& stored_data = data_map_[id];
-
-    // FR-009: Error handling - type checking and casting
-    if (stored_data.value.type() != typeid(T)) {
-        throw std::runtime_error("Type mismatch for ID: " + id);
+    // FR-008: Update performance metrics (비-크리티컬 경로)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        performance_metrics_["get_calls"]++;
     }
 
-    // FR-008: Logging access (basic placeholder)
-    // access_logs_.push_back("Get data: " + id);
-
-    // Update performance metrics (placeholder)
-    performance_metrics_["get_calls"]++;
-    // Add latency measurement here
-
-    return std::any_cast<T>(stored_data.value);
+    return result;
 }
 
 template<typename T>
@@ -228,29 +245,35 @@ T DataStore::poll(const std::string& id) {
     // FR-014: Access control check
     // if (!hasAccess(id, "current_module_id")) { throw std::runtime_error("Access denied for ID: " + id); }
 
-    // FR-004, FR-005: Locking mechanism for thread safety
-    std::lock_guard<std::mutex> lock(mutex_);
+    T result;
 
-    // FR-009: Error handling - throw if not found
-    if (data_map_.find(id) == data_map_.end()) {
-        throw std::out_of_range("Data not found for ID: " + id);
+    // FR-004, FR-005: concurrent_hash_map const_accessor로 읽기 전용 접근
+    {
+        typename tbb::concurrent_hash_map<std::string, SharedData>::const_accessor acc;
+
+        // FR-009: Error handling - throw if not found
+        if (!data_map_.find(acc, id)) {
+            throw std::out_of_range("Data not found for ID: " + id);
+        }
+
+        const SharedData& stored_data = acc->second;
+
+        // FR-009: Error handling - type checking and casting
+        if (stored_data.value.type() != typeid(T)) {
+            throw std::runtime_error("Type mismatch for ID: " + id);
+        }
+
+        result = std::any_cast<T>(stored_data.value);
+        // accessor는 스코프를 벗어나면 자동 해제 (RAII)
     }
 
-    SharedData& stored_data = data_map_[id];
-
-    // FR-009: Error handling - type checking and casting
-    if (stored_data.value.type() != typeid(T)) {
-        throw std::runtime_error("Type mismatch for ID: " + id);
+    // FR-008: Update performance metrics (비-크리티컬 경로)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        performance_metrics_["poll_calls"]++;
     }
 
-    // FR-008: Logging access (basic placeholder)
-    // access_logs_.push_back("Poll data: " + id);
-
-    // Update performance metrics (placeholder)
-    performance_metrics_["poll_calls"]++;
-    // Add latency measurement here
-
-    return std::any_cast<T>(stored_data.value);
+    return result;
 }
 
 #endif // DATASTORE_H

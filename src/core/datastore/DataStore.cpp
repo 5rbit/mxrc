@@ -105,9 +105,21 @@ void DataStore::unsubscribe(const std::string& id, std::shared_ptr<Observer> obs
 }
 
 void DataStore::notifySubscribers(const SharedData& changed_data) {
-    // This method is called internally by set() if a Notifier exists for the ID
-    if (notifiers_.count(changed_data.id)) {
-        notifiers_[changed_data.id]->notify(changed_data);
+    // notifiers_ 접근은 mutex로 보호 필요
+    Notifier* notifier_raw = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = notifiers_.find(changed_data.id);
+        if (it != notifiers_.end() && it->second) {
+            // Raw pointer를 로컬 변수에 복사 (unique_ptr가 계속 소유권 유지)
+            notifier_raw = it->second.get();
+        }
+    }
+
+    // 락 해제 후 notify 호출 (MapNotifier 내부에 자체 mutex 있음)
+    // 주의: notifier_raw는 notifiers_ map이 삭제되지 않는 한 유효
+    if (notifier_raw) {
+        notifier_raw->notify(changed_data);
     }
 }
 
@@ -123,15 +135,20 @@ void DataStore::removeExpirationPolicy(const std::string& id) {
 }
 
 void DataStore::cleanExpiredData() {
-    std::lock_guard<std::mutex> lock(mutex_);
     auto now = std::chrono::system_clock::now();
-    for (auto it = data_map_.begin(); it != data_map_.end(); ) {
+    std::vector<std::string> expired_keys;
+
+    // 1단계: 만료된 키 수집 (읽기 전용 순회)
+    for (auto it = data_map_.begin(); it != data_map_.end(); ++it) {
         if (it->second.expiration_time != std::chrono::time_point<std::chrono::system_clock>() &&
             it->second.expiration_time <= now) {
-            it = data_map_.erase(it);
-        } else {
-            ++it;
+            expired_keys.push_back(it->first);
         }
+    }
+
+    // 2단계: 만료된 키 삭제
+    for (const auto& key : expired_keys) {
+        data_map_.erase(key);
     }
 }
 
@@ -153,17 +170,18 @@ std::vector<std::string> DataStore::getErrorLogs() const {
 
 // FR-011: Scalability monitoring
 size_t DataStore::getCurrentDataCount() const {
-    std::lock_guard<std::mutex> lock(mutex_);
+    // concurrent_hash_map의 size()는 스레드 안전
     return data_map_.size();
 }
 
 // FR-013: For SharedData memory usage (placeholder implementation)
 size_t DataStore::getCurrentMemoryUsage() const {
-    std::lock_guard<std::mutex> lock(mutex_);
     // This is a very basic placeholder. Actual memory usage calculation is complex.
     // It would involve iterating through data_map_ and estimating size of each std::any.
     size_t total_size = 0;
-    for (const auto& pair : data_map_) {
+
+    // concurrent_hash_map 순회 (읽기 전용)
+    for (auto it = data_map_.begin(); it != data_map_.end(); ++it) {
         total_size += sizeof(SharedData); // Base size
         // Add estimated size of std::any content if possible
         // This is highly dependent on the types stored in std::any

@@ -368,6 +368,37 @@ eventBus->stop();
 
 ## 코드 작성 가이드
 
+### 주석 작성 규칙
+
+**기본 원칙**: 모든 주석은 한글로 작성하되, 기술 용어는 영어를 허용합니다.
+
+**허용되는 기술 용어 예시**:
+- 자료구조: `concurrent_hash_map`, `mutex`, `shared_ptr`, `weak_ptr`, `vector`, `map`
+- 디자인 패턴: `Singleton`, `Observer`, `Factory`, `RAII`
+- 시스템 개념: `thread-safe`, `lock-free`, `accessor`, `dangling pointer`
+- 알고리즘: `hash`, `binary search`, `queue`
+
+**올바른 주석 예시**:
+```cpp
+// ✅ concurrent_hash_map으로 고성능 스레드 안전 데이터 접근
+tbb::concurrent_hash_map<std::string, SharedData> data_map_;
+
+// ✅ weak_ptr 사용으로 dangling pointer 방지
+std::vector<std::weak_ptr<Observer>> subscribers_;
+
+// ✅ RAII 패턴으로 안전한 리소스 관리
+std::lock_guard<std::mutex> lock(mutex_);
+```
+
+**잘못된 주석 예시**:
+```cpp
+// ❌ High-performance thread-safe data access using concurrent_hash_map
+// (완전히 영어로 작성)
+
+// ❌ 동시성 해시 맵을 사용하여 고성능 실을 안전한 데이터 접근
+// (기술 용어를 억지로 번역)
+```
+
 ### 네임스페이스
 
 모든 코드는 중첩된 네임스페이스를 사용:

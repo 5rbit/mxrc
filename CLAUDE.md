@@ -481,6 +481,98 @@ auto status = taskExecutor->getStatus("task1");
 auto progress = taskExecutor->getProgress("task1");
 ```
 
+## Git 커밋 메시지 가이드
+
+### 기본 원칙
+
+**중요**: 모든 커밋 메시지는 **한글**로 작성합니다.
+
+### 커밋 메시지 형식
+
+```
+<타입>(<범위>): <제목>
+
+<본문>
+
+<푸터>
+```
+
+#### 타입 (Type)
+- `feat`: 새로운 기능 추가
+- `fix`: 버그 수정
+- `refactor`: 코드 리팩토링 (기능 변경 없음)
+- `docs`: 문서 수정
+- `test`: 테스트 코드 추가/수정
+- `chore`: 빌드, 설정 파일 수정
+- `style`: 코드 포맷팅, 세미콜론 누락 등
+- `perf`: 성능 개선
+
+#### 범위 (Scope)
+변경된 모듈이나 컴포넌트 (예: action, sequence, task, event, datastore)
+
+#### 제목 (Subject)
+- 50자 이내로 작성
+- 명령형으로 작성 ("수정함" ❌, "수정" ✅)
+- 마침표 없음
+- 한글로 작성
+
+#### 본문 (Body)
+- 72자마다 줄바꿈
+- **무엇을, 왜** 변경했는지 설명
+- "어떻게"는 코드가 설명하므로 생략 가능
+- 한글로 작성
+
+#### 푸터 (Footer)
+- 관련 이슈 번호 (선택사항)
+- 예: `관련 이슈: #003`
+
+### 금지 사항
+
+**❌ 절대 하지 말 것:**
+1. **AI/Claude가 작성했다는 언급 금지**
+   - "Claude가 검토함", "AI가 작성함" 등의 표현 사용 금지
+   - "🤖 Generated with Claude Code" 같은 푸터 사용 금지
+
+2. **영어 커밋 메시지 금지**
+   - 모든 커밋 메시지는 한글로 작성
+   - 코드 예시나 기술 용어는 예외
+
+### 올바른 예시
+
+```
+fix(action): ActionExecutor 소멸자 뮤텍스 데드락 해결
+
+문제 상황:
+- unlock/lock 패턴으로 인한 데드락 발생
+- state 참조가 무효화되어 크래시 가능성
+
+해결 방법:
+- RAII 패턴으로 스레드를 먼저 수집
+- 락 없이 안전하게 join 수행
+
+테스트:
+- ActionExecutor 기본 테스트 통과
+- 소멸자 안정성 테스트 통과
+
+관련 이슈: #003
+```
+
+### 잘못된 예시
+
+```
+❌ fix(action): Fix ActionExecutor destructor mutex deadlock
+   (영어 사용 금지)
+
+❌ fix(action): ActionExecutor 소멸자 수정
+
+   Claude Code가 검토하고 수정함
+   🤖 Generated with Claude Code
+   (AI 언급 금지)
+
+❌ fix: 버그 수정
+   (범위 누락, 제목 불명확)
+```
+
 ## 테스트 규칙
 
 ### 테스트 구조

@@ -43,18 +43,25 @@ ActionExecutor::~ActionExecutor() {
     }
 
     // 모든 타임아웃 스레드 종료 대기
+    // NOTE: RAII 패턴으로 안전하게 처리 - 스레드를 먼저 수집한 후 락 없이 join
+    std::vector<std::unique_ptr<std::thread>> threadsToJoin;
     {
         std::lock_guard<std::mutex> lock(actionsMutex_);
         for (auto& [id, state] : runningActions_) {
             if (state.timeoutThread && state.timeoutThread->joinable()) {
-                logger->debug("[ActionExecutor] Joining timeout thread for action {}", id);
-                // 뮤텍스를 잠시 해제하고 join (데드락 방지)
-                actionsMutex_.unlock();
-                state.timeoutThread->join();
-                actionsMutex_.lock();
+                logger->debug("[ActionExecutor] Collecting timeout thread for action {}", id);
+                threadsToJoin.push_back(std::move(state.timeoutThread));
             }
         }
         runningActions_.clear();
+    }
+
+    // 락을 해제한 상태에서 스레드 종료 대기
+    for (auto& thread : threadsToJoin) {
+        if (thread && thread->joinable()) {
+            logger->debug("[ActionExecutor] Joining timeout thread");
+            thread->join();
+        }
     }
 
     logger->info("[ActionExecutor] Destructor completed");

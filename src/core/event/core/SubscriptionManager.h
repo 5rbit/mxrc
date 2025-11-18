@@ -14,6 +14,7 @@
 #include <memory>
 #include <random>
 #include <sstream>
+#include <atomic>
 
 namespace mxrc::core::event {
 

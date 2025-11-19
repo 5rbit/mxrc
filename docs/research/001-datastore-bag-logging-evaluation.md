@@ -138,6 +138,490 @@ struct SharedDataMessage {
 
 ---
 
+## 🔍 Bag 파일 인덱싱 전략 연구
+
+### 배경 및 요구사항
+
+**문제 정의**:
+- JSONL 포맷의 대용량 Bag 파일 (>1GB)에서 특정 타임스탬프로 빠르게 탐색
+- Replay 기능 구현 시 "10:15:23.456 시점부터 재생" 같은 요구사항 충족
+- 성능 목표: 1GB 파일에서 10초 이내 탐색
+
+**JSONL 포맷 특성**:
+```jsonl
+{"timestamp":1705553123456789,"topic":"mission_state","type":"MissionState","value":"EXECUTING"}
+{"timestamp":1705553123556789,"topic":"task_state","type":"TaskState","value":"RUNNING"}
+{"timestamp":1705553124456789,"topic":"alarm","type":"Alarm","value":"MOTOR_TEMP_HIGH"}
+```
+
+- 장점: 라인별 파싱 가능, 텍스트 기반으로 디버깅 용이, 압축 효율 우수
+- 단점: 가변 길이 라인, 오프셋 예측 불가, 순차 접근 필요
+
+### 3. Bag 파일 인덱싱 전략
+
+**결정**: **파일 내 인덱스 블록 (ROS Bag/MCAP 스타일)**
+
+**근거**:
+- ✅ **독립성**: Bag 파일 하나만으로 완전한 재생 가능 (별도 인덱스 파일 불필요)
+- ✅ **견고성**: 파일 손상 시 인덱스 재구축 가능, 순차 읽기로 복구 가능
+- ✅ **성능**: 1GB 파일에서 2-3초 내 탐색 (Binary search O(log N) + mmap)
+- ✅ **메모리 효율**: 인덱스만 메모리 로드 (~1MB for 1GB file with 1초 간격 인덱스)
+- ✅ **확장성**: 압축, 멀티 토픽 인덱스, 통계 정보 추가 용이
+
+**대안 평가**:
+
+| 접근 방식 | 탐색 속도 | 메모리 사용 | 구현 복잡도 | 파일 포맷 변경 | 복구 가능성 | 최종 판단 |
+|----------|---------|-----------|------------|-------------|-----------|----------|
+| **메모리 인덱스** | ⭐⭐⭐⭐⭐<br>(즉시, <1초) | ❌ 큰 편<br>(10-50MB/1GB) | ⭐⭐⭐⭐⭐<br>(간단) | ✅ 불필요 | ❌ 나쁨<br>(별도 파일) | 🔴 기각 |
+| **파일 내 인덱스** | ⭐⭐⭐⭐<br>(빠름, 2-3초) | ✅ 작음<br>(1-5MB/1GB) | ⭐⭐⭐<br>(중간) | ⚠️ 필요<br>(footer 추가) | ✅ 우수<br>(순차 읽기) | **🟢 채택** |
+| **Binary Search** | ⭐⭐<br>(느림, 5-10초) | ✅ 최소<br>(<1MB) | ⭐⭐⭐⭐<br>(간단) | ✅ 불필요 | ⭐⭐⭐⭐⭐<br>(최고) | 🟡 보조 수단 |
+
+**세부 분석**:
+
+#### 1. 메모리 인덱스 (Separate Index File)
+```cpp
+// 별도 .idx 파일
+// mission_20250118.bag.idx
+struct MemoryIndex {
+    std::map<int64_t, uint64_t> timestamp_to_offset;
+    // 예: {1705553123456789 → 0, 1705553124456789 → 150, ...}
+};
+```
+
+**장점**:
+- ✅ 구현 간단 (std::map 사용)
+- ✅ 즉시 탐색 (메모리 내 binary search)
+- ✅ 파일 포맷 변경 불필요 (JSONL 그대로)
+
+**단점**:
+- ❌ 파일 2개 관리 (.bag + .idx)
+- ❌ .idx 손실 시 재생 불가 (또는 느린 재구축 필요)
+- ❌ 메모리 사용량 큼 (1GB 파일 → 10-50MB 인덱스, 100Hz 샘플링 시)
+- ❌ 동기화 문제 (Bag 파일 업데이트 시 인덱스 재생성 필요)
+
+**성능 벤치마크** (예상):
+```
+1GB Bag 파일 (100Hz TaskState, 8시간 데이터 = 2.88M 레코드)
+- 인덱스 크기: 2.88M * 16 bytes = 46MB (timestamp:8B + offset:8B)
+- 탐색 시간: O(log N) = log₂(2.88M) ≈ 22회 비교 → <1ms
+- 인덱스 로드: 46MB / 500MB/s (SSD) = 92ms
+→ 총 탐색 시간: ~100ms ⭐⭐⭐⭐⭐
+```
+
+**기각 이유**: 파일 독립성 결여, 배포/백업 시 2개 파일 관리 복잡성
+
+---
+
+#### 2. 파일 내 인덱스 블록 (MCAP/ROS Bag 2.0 스타일) ✅ 채택
+
+**파일 구조**:
+```
+┌─────────────────────────────────────────────────────────┐
+│ HEADER (128 bytes)                                      │
+│ - Magic: "MXRC_BAG\0" (8 bytes)                         │
+│ - Version: 1 (4 bytes)                                  │
+│ - Flags: compression=LZ4, indexed=true (4 bytes)        │
+│ - Index offset: 0x3FF00000 (8 bytes, footer 시작 위치)   │
+│ - Reserved: (104 bytes)                                 │
+├─────────────────────────────────────────────────────────┤
+│ DATA SECTION (sequential JSONL records)                 │
+│ {"timestamp":1705553123456789,...}\n                    │ ← offset: 128
+│ {"timestamp":1705553123556789,...}\n                    │ ← offset: 234
+│ {"timestamp":1705553124456789,...}\n                    │ ← offset: 340
+│ ...                                                      │
+│ (계속해서 메시지 누적)                                     │
+│                                                          │
+│ [~1GB data]                                             │
+├─────────────────────────────────────────────────────────┤
+│ INDEX SECTION (sparse timestamp index)                  │
+│ - IndexEntry count: 28800 (4 bytes)                     │
+│ - IndexEntry[] {                                        │
+│     {timestamp: 1705553123000000, offset: 128},         │ ← 1초 간격 샘플링
+│     {timestamp: 1705553124000000, offset: 5340},        │
+│     {timestamp: 1705553125000000, offset: 10520},       │
+│     ...                                                  │
+│     {timestamp: 1705581923000000, offset: 1073740000}   │
+│   }                                                      │
+│ - Total size: 28800 * 16 bytes = 460KB                 │
+├─────────────────────────────────────────────────────────┤
+│ FOOTER (64 bytes)                                       │
+│ - Data section size: 1073739872 (8 bytes)               │
+│ - Index section offset: 1073740000 (8 bytes)            │
+│ - Index entry count: 28800 (4 bytes)                    │
+│ - Checksum: CRC32 (4 bytes)                             │
+│ - Magic (검증용): "MXRC_BAG\0" (8 bytes)                 │
+│ - Reserved: (32 bytes)                                  │
+└─────────────────────────────────────────────────────────┘
+```
+
+**인덱스 데이터 구조**:
+```cpp
+// 1. IndexEntry (16 bytes, 캐시 친화적)
+struct IndexEntry {
+    int64_t timestamp_ns;  // 나노초 타임스탬프
+    uint64_t file_offset;  // 파일 오프셋 (바이트)
+} __attribute__((packed));
+
+// 2. BagIndex (인덱스 관리 클래스)
+class BagIndex {
+public:
+    // 인덱스 로드 (파일 열 때 1회)
+    void load(const std::string& filepath) {
+        std::ifstream ifs(filepath, std::ios::binary);
+
+        // Footer 읽기 (파일 끝에서 64바이트)
+        ifs.seekg(-64, std::ios::end);
+        BagFooter footer;
+        ifs.read(reinterpret_cast<char*>(&footer), sizeof(footer));
+
+        // Magic 검증
+        if (std::string(footer.magic, 8) != "MXRC_BAG") {
+            throw std::runtime_error("Invalid bag file format");
+        }
+
+        // 인덱스 섹션으로 이동
+        ifs.seekg(footer.index_offset, std::ios::beg);
+
+        // 인덱스 엔트리 읽기
+        uint32_t count;
+        ifs.read(reinterpret_cast<char*>(&count), sizeof(count));
+        entries_.resize(count);
+        ifs.read(reinterpret_cast<char*>(entries_.data()),
+                 count * sizeof(IndexEntry));
+
+        spdlog::info("Loaded {} index entries from {}",
+                     count, filepath);
+    }
+
+    // 타임스탬프로 파일 오프셋 찾기 (Binary Search)
+    uint64_t findOffset(int64_t target_timestamp_ns) const {
+        // std::lower_bound: O(log N) 복잡도
+        auto it = std::lower_bound(
+            entries_.begin(), entries_.end(), target_timestamp_ns,
+            [](const IndexEntry& entry, int64_t ts) {
+                return entry.timestamp_ns < ts;
+            });
+
+        if (it == entries_.end()) {
+            return entries_.back().file_offset;  // 마지막 오프셋
+        }
+
+        return it->file_offset;
+    }
+
+    // 통계 정보
+    size_t size() const { return entries_.size(); }
+    int64_t getFirstTimestamp() const { return entries_.front().timestamp_ns; }
+    int64_t getLastTimestamp() const { return entries_.back().timestamp_ns; }
+
+private:
+    std::vector<IndexEntry> entries_;  // 정렬된 인덱스 배열
+};
+
+// 3. BagReader (Replay 시 사용)
+class BagReader {
+public:
+    BagReader(const std::string& filepath)
+        : filepath_(filepath), ifs_(filepath) {
+        // 인덱스 로드
+        index_.load(filepath);
+
+        // mmap 옵션 (선택적, 성능 최적화)
+        #ifdef USE_MMAP
+        fd_ = open(filepath.c_str(), O_RDONLY);
+        struct stat sb;
+        fstat(fd_, &sb);
+        file_size_ = sb.st_size;
+        mmap_ptr_ = static_cast<char*>(
+            mmap(nullptr, file_size_, PROT_READ, MAP_PRIVATE, fd_, 0));
+        #endif
+    }
+
+    // 특정 시간으로 Seek
+    void seekTime(int64_t timestamp_ns) {
+        uint64_t offset = index_.findOffset(timestamp_ns);
+
+        #ifdef USE_MMAP
+        current_ptr_ = mmap_ptr_ + offset;
+        #else
+        ifs_.seekg(offset, std::ios::beg);
+        #endif
+
+        spdlog::info("Seeked to timestamp {} (offset: {})",
+                     timestamp_ns, offset);
+    }
+
+    // 다음 메시지 읽기
+    std::optional<BagMessage> readNext() {
+        std::string line;
+
+        #ifdef USE_MMAP
+        // mmap 사용 시 (고성능)
+        char* line_end = std::strchr(current_ptr_, '\n');
+        if (!line_end) return std::nullopt;
+
+        line = std::string(current_ptr_, line_end - current_ptr_);
+        current_ptr_ = line_end + 1;
+        #else
+        // fstream 사용 시 (표준)
+        if (!std::getline(ifs_, line)) {
+            return std::nullopt;
+        }
+        #endif
+
+        // JSON 파싱
+        auto json = nlohmann::json::parse(line);
+        BagMessage msg;
+        msg.timestamp_ns = json["timestamp"];
+        msg.topic = json["topic"];
+        msg.data_type = static_cast<DataType>(json["type"]);
+        msg.serialized_value = json["value"].dump();
+
+        return msg;
+    }
+
+private:
+    std::string filepath_;
+    std::ifstream ifs_;
+    BagIndex index_;
+
+    #ifdef USE_MMAP
+    int fd_;
+    size_t file_size_;
+    char* mmap_ptr_;
+    char* current_ptr_;
+    #endif
+};
+```
+
+**인덱스 빌드 전략**:
+```cpp
+// BagWriter에서 실시간 인덱스 생성
+class BagWriter {
+public:
+    void appendAsync(const BagMessage& msg) {
+        // 1. 메시지 쓰기
+        uint64_t current_offset = getCurrentFileOffset();
+        writeMessage(msg);  // JSONL 쓰기
+
+        // 2. 인덱스 업데이트 (1초마다 샘플링)
+        auto ts_sec = msg.timestamp_ns / 1'000'000'000;
+        if (ts_sec != last_indexed_second_) {
+            indexBuilder_.addEntry({msg.timestamp_ns, current_offset});
+            last_indexed_second_ = ts_sec;
+        }
+    }
+
+    void close() {
+        // 파일 종료 시 인덱스 쓰기
+        uint64_t data_end_offset = getCurrentFileOffset();
+
+        // Index section 쓰기
+        auto entries = indexBuilder_.getEntries();
+        uint32_t count = entries.size();
+        ofs_.write(reinterpret_cast<char*>(&count), sizeof(count));
+        ofs_.write(reinterpret_cast<char*>(entries.data()),
+                   count * sizeof(IndexEntry));
+
+        // Footer 쓰기
+        BagFooter footer;
+        std::memcpy(footer.magic, "MXRC_BAG", 8);
+        footer.data_size = data_end_offset - 128;  // 헤더 제외
+        footer.index_offset = data_end_offset;
+        footer.index_count = count;
+        footer.checksum = computeCRC32(/*...*/);
+        ofs_.write(reinterpret_cast<char*>(&footer), sizeof(footer));
+
+        spdlog::info("Bag file closed: {} index entries, {} bytes",
+                     count, getCurrentFileOffset());
+    }
+
+private:
+    IndexBuilder indexBuilder_;
+    int64_t last_indexed_second_ = 0;
+};
+```
+
+**성능 벤치마크** (예상):
+
+```
+1GB Bag 파일, 8시간 데이터 (100Hz TaskState)
+- 인덱스 간격: 1초 (sparse index)
+- 인덱스 엔트리 수: 8 * 3600 = 28,800개
+- 인덱스 크기: 28,800 * 16 bytes = 460KB (파일 끝에 저장)
+
+탐색 시간 분석:
+1. Footer 읽기: fseek(-64) + read(64B) = ~1ms (SSD)
+2. 인덱스 로드: fseek(index_offset) + read(460KB) = ~5ms (SSD, 100MB/s)
+3. Binary search: log₂(28,800) ≈ 15회 비교 = <1ms
+4. Data seek: fseek(target_offset) = ~1ms
+→ 총 탐색 시간: ~10ms (파일 캐시 없을 때)
+→ 캐시된 경우: <1ms ⭐⭐⭐⭐
+
+순차 읽기 성능:
+- mmap 사용 시: ~500MB/s (메모리 캐시 히트 시)
+- fstream 사용 시: ~200MB/s (SSD 순차 읽기)
+→ 1GB 파일 전체 파싱: 2-5초
+
+메모리 사용:
+- 인덱스 상주: 460KB (항상 메모리에 로드)
+- mmap 사용 시: 커널이 자동 페이징 (메모리 압박 없음)
+- fstream 사용 시: 버퍼 크기만큼 (~8KB)
+→ 메모리 효율 우수 ⭐⭐⭐⭐⭐
+```
+
+**장점**:
+- ✅ 파일 독립성: .bag 파일 하나로 완전한 재생
+- ✅ 견고성: 인덱스 손상 시 데이터 섹션 순차 읽기로 복구
+- ✅ 성능: 10ms 내 탐색 (목표 10초 대비 1000배 빠름)
+- ✅ 메모리 효율: 460KB 인덱스로 1GB 파일 처리
+- ✅ 확장성: 추후 압축, 멀티 토픽 인덱스 추가 가능
+
+**단점**:
+- ⚠️ 파일 포맷 변경: JSONL → Custom format (Header + Data + Index + Footer)
+- ⚠️ 호환성: 표준 JSONL 도구로 직접 읽기 불가 (Data 섹션만 추출 필요)
+- ⚠️ 스트리밍 제약: 파일 종료 시 인덱스 쓰기 (실시간 스트리밍 시 불완전)
+
+**호환성 유지 방안**:
+```bash
+# Bag 파일에서 JSONL 추출 도구
+$ mxrc-bag-extract mission.bag > mission.jsonl
+
+# 구현
+dd if=mission.bag bs=1 skip=128 count=$DATA_SIZE > mission.jsonl
+# 또는
+mxrc-bag-tool extract mission.bag --output mission.jsonl
+```
+
+---
+
+#### 3. Binary Search with Lazy Parsing (인덱스 없음)
+
+**개념**: 파일을 절반씩 나누며 타임스탬프 샘플링으로 탐색
+
+```cpp
+class BinarySearchBagReader {
+public:
+    void seekTime(int64_t target_timestamp_ns) {
+        uint64_t low = 0;
+        uint64_t high = getFileSize();
+
+        while (high - low > THRESHOLD) {
+            uint64_t mid = (low + high) / 2;
+
+            // 중간 지점의 라인 시작점 찾기
+            uint64_t line_start = findLineStart(mid);
+
+            // 타임스탬프 파싱 (첫 번째 레코드만)
+            auto ts = parseTimestampAt(line_start);
+
+            if (ts < target_timestamp_ns) {
+                low = line_start;
+            } else {
+                high = line_start;
+            }
+        }
+
+        // 최종 위치에서 순차 스캔
+        ifs_.seekg(low);
+        while (true) {
+            auto msg = readNext();
+            if (msg.timestamp_ns >= target_timestamp_ns) {
+                break;
+            }
+        }
+    }
+
+private:
+    uint64_t findLineStart(uint64_t offset) {
+        // offset 이후 첫 번째 '\n' 찾기
+        ifs_.seekg(offset);
+        ifs_.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        return ifs_.tellg();
+    }
+
+    int64_t parseTimestampAt(uint64_t offset) {
+        ifs_.seekg(offset);
+        std::string line;
+        std::getline(ifs_, line);
+
+        // JSON 파싱 (timestamp 필드만)
+        auto json = nlohmann::json::parse(line);
+        return json["timestamp"];
+    }
+};
+```
+
+**성능 벤치마크** (예상):
+
+```
+1GB Bag 파일, Binary Search
+- 파일 크기: 1GB = 1,073,741,824 bytes
+- Binary search 깊이: log₂(1GB / 100B) ≈ log₂(10M) ≈ 24 iterations
+- 각 iteration 비용:
+  - fseek: ~1ms (랜덤 접근, SSD)
+  - findLineStart: ~10μs (라인 스캔)
+  - parseTimestamp: ~50μs (JSON 파싱, 작은 객체)
+→ 총 탐색 시간: 24 * 1.06ms ≈ 25-30ms
+
+최악의 경우 (HDD):
+- fseek: ~10ms (랜덤 접근, 느린 디스크)
+→ 총 탐색 시간: 24 * 10ms ≈ 240ms
+
+파일 캐시된 경우:
+→ 총 탐색 시간: ~5ms ⭐⭐⭐
+```
+
+**장점**:
+- ✅ 파일 포맷 변경 불필요 (순수 JSONL)
+- ✅ 구현 간단 (인덱스 관리 불필요)
+- ✅ 메모리 사용 최소 (상수)
+- ✅ 복구 가능성 최고 (인덱스 손상 위험 없음)
+
+**단점**:
+- ❌ 탐색 느림 (25-30ms, 파일 내 인덱스 대비 3배)
+- ❌ 랜덤 I/O 많음 (24회 fseek)
+- ❌ JSON 파싱 오버헤드 (24회 파싱)
+- ❌ HDD에서 성능 저하 심함 (240ms)
+
+**사용 시나리오**:
+- 인덱스 손상 시 복구 모드
+- 일회성 분석 도구 (인덱스 빌드 비용 회피)
+- 파일 크기 작을 때 (<100MB)
+
+---
+
+### 최종 권장 사항
+
+**채택**: **파일 내 인덱스 블록 (MCAP 스타일)**
+
+**구현 계획**:
+
+1. **Phase 1 (간소화)**: SimpleBagWriter with Footer Index
+   - JSONL data section + Footer with sparse index (1초 간격)
+   - fstream 기반 (mmap 없이)
+   - 예상 성능: 10-20ms seek time (1GB file)
+
+2. **Phase 2 (최적화)**: mmap 지원 추가
+   - 대용량 파일 처리 시 mmap 활성화
+   - 예상 성능: 1-5ms seek time
+
+3. **Phase 3 (확장)**: 멀티 레벨 인덱스
+   - Chunk-based index (ROS Bag 2.0 스타일)
+   - Topic별 인덱스
+   - 압축 청크 지원
+
+**성능 영향**:
+- 인덱스 빌드: 1초마다 16바이트 추가 (무시 가능)
+- 파일 크기 증가: <1% (460KB / 1GB)
+- 탐색 시간: 10ms (목표 10초의 0.1%)
+
+**대안으로 유지**:
+- Binary Search: 인덱스 손상 시 복구 모드로 활용
+- Memory Index: 향후 실시간 분석 도구용 고려
+
+---
+
 ## 📊 MXRC 프로젝트 적합성 분석
 
 ### 1. 프로젝트 요구사항 매핑

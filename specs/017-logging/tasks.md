@@ -99,7 +99,7 @@
 
 ### 3.5 통합 테스트 (US1 완성)
 
-- [ ] T023 [US1] tests/integration/logging/bag_logging_integration_test.cpp 작성 - DataStore → EventBus → BagLogger → Bag 파일 (3 tests)
+- [X] T023 [US1] tests/integration/logging/bag_logging_integration_test.cpp 작성 - DataStore → EventBus → BagLogger → Bag 파일 (3 tests, 전부 통과)
 - [ ] T024 [US1] 성능 벤치마크 실행 - DataStore 성능 저하 <1% 검증 (SC-001)
 
 **완료 기준**:

@@ -4,6 +4,7 @@
 #include "interfaces/IBagWriter.h"
 #include "core/AsyncWriter.h"
 #include "util/RetentionManager.h"
+#include "util/Indexer.h"
 #include <memory>
 #include <chrono>
 #include <mutex>
@@ -83,6 +84,7 @@ private:
     std::string currentFilePath_;               ///< 현재 파일 경로
     std::unique_ptr<AsyncWriter> asyncWriter_;  ///< 비동기 Writer
     std::unique_ptr<RetentionManager> retentionManager_; ///< 보존 관리자
+    Indexer indexer_;                           ///< 인덱스 관리자
 
     RotationPolicy rotationPolicy_;             ///< 순환 정책
     RetentionPolicy retentionPolicy_;           ///< 보존 정책

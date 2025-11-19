@@ -44,6 +44,7 @@ bool SimpleBagWriter::open(const std::string& filepath) {
 
     currentFilePath_ = filepath;
     asyncWriter_ = std::make_unique<AsyncWriter>(currentFilePath_, queueCapacity_);
+    indexer_.clear();  // 새 파일이므로 인덱스 초기화
 
     try {
         asyncWriter_->start();
@@ -65,10 +66,23 @@ void SimpleBagWriter::close() {
         return;
     }
 
+    uint64_t dataSize = 0;
+
     if (asyncWriter_) {
         asyncWriter_->flush(5000);
+        dataSize = asyncWriter_->getBytesWritten();
         asyncWriter_->stop();
         asyncWriter_.reset();
+    }
+
+    // Index 블록 및 Footer 작성 (빈 파일이어도 Footer는 작성)
+    std::ofstream ofs(currentFilePath_, std::ios::binary | std::ios::app);
+    if (ofs.is_open()) {
+        indexer_.writeToFile(ofs, dataSize);
+        ofs.close();
+        spdlog::debug("SimpleBagWriter: Index and Footer written to {}", currentFilePath_);
+    } else {
+        spdlog::error("SimpleBagWriter: Failed to open file for index writing: {}", currentFilePath_);
     }
 
     isOpen_ = false;
@@ -95,12 +109,20 @@ bool SimpleBagWriter::append(const BagMessage& msg) {
         return false;
     }
 
+    // 현재 파일 오프셋 기록 (flush 전)
+    uint64_t currentOffset = asyncWriter_->getBytesWritten();
+
     // 동기 쓰기: tryPush 후 즉시 flush
     if (!asyncWriter_->tryPush(msg)) {
         return false;
     }
 
     bool flushed = asyncWriter_->flush(1000);
+
+    // flush 성공 시 인덱스 업데이트
+    if (flushed) {
+        indexer_.addEntry(static_cast<uint64_t>(msg.timestamp_ns), currentOffset);
+    }
 
     // flush 후 순환 조건 확인
     checkAndRotate();

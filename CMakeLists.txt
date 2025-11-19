@@ -109,6 +109,7 @@ add_executable(run_tests
     tests/unit/logging/AsyncWriter_test.cpp
     tests/unit/logging/RetentionManager_test.cpp
     tests/unit/logging/SimpleBagWriter_test.cpp
+    tests/unit/logging/DataStoreBagLogger_test.cpp
     examples/event_monitoring/ExecutionTimeCollector.cpp
     examples/event_monitoring/StateTransitionLogger.cpp
     src/core/task/core/TaskRegistry.cpp
@@ -133,6 +134,7 @@ add_executable(run_tests
     src/core/logging/core/AsyncWriter.cpp
     src/core/logging/util/RetentionManager.cpp
     src/core/logging/core/SimpleBagWriter.cpp
+    src/core/logging/core/DataStoreBagLogger.cpp
 )
 
 target_include_directories(run_tests PUBLIC

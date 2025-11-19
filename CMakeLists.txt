@@ -4,12 +4,23 @@ project(mxrc)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Optional: backward-cpp for stack traces
+option(USE_BACKWARD "Enable backward-cpp for stack traces" OFF)
+
 # Find dependencies
 find_package(Threads REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(GTest REQUIRED)
 find_package(TBB REQUIRED)
-find_package(nlohmann_json 3.11.0 REQUIRED) 
+find_package(nlohmann_json 3.11.0 REQUIRED)
+
+# backward-cpp (header-only, optional)
+if(USE_BACKWARD)
+    add_library(backward INTERFACE)
+    target_include_directories(backward INTERFACE ${PROJECT_SOURCE_DIR}/src/core/logging)
+    target_compile_definitions(backward INTERFACE USE_BACKWARD_CPP)
+    message(STATUS "backward-cpp enabled for stack traces")
+endif() 
 
 # Add executable
 add_executable(mxrc
@@ -113,7 +124,11 @@ add_executable(run_tests
     tests/unit/logging/Indexer_test.cpp
     tests/unit/logging/BagReader_test.cpp
     tests/unit/logging/BagReplayer_test.cpp
+    tests/unit/logging/AsyncLogger_test.cpp
+    tests/unit/logging/LogPerformance_test.cpp
+    tests/unit/logging/SignalHandler_test.cpp
     tests/integration/logging/bag_logging_integration_test.cpp
+    tests/integration/logging/CrashSafety_test.cpp
     tests/benchmark/logging/datastore_logging_benchmark.cpp
     examples/event_monitoring/ExecutionTimeCollector.cpp
     examples/event_monitoring/StateTransitionLogger.cpp
@@ -197,6 +212,11 @@ target_link_libraries(run_tests PRIVATE
     TBB::tbb
     nlohmann_json::nlohmann_json
 )
+
+# Link backward library if enabled
+if(USE_BACKWARD)
+    target_link_libraries(run_tests PRIVATE backward)
+endif()
 
 include(GoogleTest)
 gtest_discover_tests(run_tests)

@@ -1,109 +1,37 @@
 #include "DataStore.h"
+#include "MapNotifier.h"
 #include <mutex>
 #include <stdexcept>
-#include <algorithm>
 #include <fstream>
-#include <sstream>
+#include <nlohmann/json.hpp>
+#include <filesystem>
 
-// No static members to initialize - using shared_ptr pattern
-
-// Concrete Notifier implementation with weak_ptr for safe Observer management
-class MapNotifier : public Notifier {
-public:
-    /// @brief Destructor - 정리 보장
-    ~MapNotifier() override {
-        std::lock_guard<std::mutex> lock(mutex_);
-        subscribers_.clear();
-    }
-
-    /// @brief Observer 구독 (weak_ptr로 내부 관리하여 dangling pointer 방지)
-    void subscribe(std::shared_ptr<Observer> observer) override {
-        if (!observer) {
-            return;  // NULL observer 무시
-        }
-        std::lock_guard<std::mutex> lock(mutex_);
-        subscribers_.push_back(observer);  // weak_ptr로 자동 변환
-    }
-
-    /// @brief Observer 구독 해제
-    void unsubscribe(std::shared_ptr<Observer> observer) override {
-        if (!observer) {
-            return;
-        }
-        std::lock_guard<std::mutex> lock(mutex_);
-
-        // weak_ptr 벡터에서 제거하기 위해 반복 처리
-        for (auto it = subscribers_.begin(); it != subscribers_.end(); ) {
-            if (auto obs = it->lock()) {
-                if (obs == observer) {
-                    it = subscribers_.erase(it);
-                } else {
-                    ++it;
-                }
-            } else {
-                // 파괴된 observer는 자동 제거
-                it = subscribers_.erase(it);
-            }
-        }
-    }
-
-    /// @brief 변경 알림 발행 (파괴된 Observer 자동 감지 및 정리)
-    void notify(const SharedData& changed_data) override {
-        std::lock_guard<std::mutex> lock(mutex_);
-
-        // 파괴된 observer 자동 정리 및 호출
-        for (auto it = subscribers_.begin(); it != subscribers_.end(); ) {
-            if (auto observer = it->lock()) {
-                // ✓ Observer가 유효함 - 안전하게 호출
-                observer->onDataChanged(changed_data);
-                ++it;
-            } else {
-                // ✓ Observer가 파괴됨 - 자동 제거
-                it = subscribers_.erase(it);
-            }
-        }
-    }
-
-private:
-    // ✓ weak_ptr 사용으로 dangling pointer 방지
-    std::vector<std::weak_ptr<Observer>> subscribers_;
-    std::mutex mutex_;
-};
-
-DataStore::DataStore() {
-    // Constructor implementation
-    performance_metrics_["set_calls"] = 0;
-    performance_metrics_["get_calls"] = 0;
-    performance_metrics_["poll_calls"] = 0;
-}
+DataStore::DataStore()
+    : expiration_manager_(std::make_unique<mxrc::core::datastore::ExpirationManager>()),
+      access_control_manager_(std::make_unique<mxrc::core::datastore::AccessControlManager>()),
+      metrics_collector_(std::make_unique<mxrc::core::datastore::MetricsCollector>()),
+      log_manager_(std::make_unique<mxrc::core::datastore::LogManager>()) {}
 
 std::shared_ptr<DataStore> DataStore::create() {
-    // C++11 thread-safe static initialization (Singleton 특성 유지)
     static std::shared_ptr<DataStore> instance = std::make_shared<DataStore>();
     return instance;
 }
 
 std::shared_ptr<DataStore> DataStore::createForTest() {
-    // 테스트 격리를 위해 매번 새로운 인스턴스 생성
     return std::make_shared<DataStore>();
 }
 
 void DataStore::subscribe(const std::string& id, std::shared_ptr<Observer> observer) {
-    if (!observer) {
-        return;  // NULL observer 무시
-    }
+    if (!observer) return;
     std::lock_guard<std::mutex> lock(mutex_);
     if (notifiers_.find(id) == notifiers_.end()) {
-        // Phase 4: shared_ptr로 Notifier 생성
         notifiers_[id] = std::make_shared<MapNotifier>();
     }
     notifiers_[id]->subscribe(observer);
 }
 
 void DataStore::unsubscribe(const std::string& id, std::shared_ptr<Observer> observer) {
-    if (!observer) {
-        return;
-    }
+    if (!observer) return;
     std::lock_guard<std::mutex> lock(mutex_);
     if (notifiers_.find(id) != notifiers_.end()) {
         notifiers_[id]->unsubscribe(observer);
@@ -111,149 +39,245 @@ void DataStore::unsubscribe(const std::string& id, std::shared_ptr<Observer> obs
 }
 
 void DataStore::notifySubscribers(const SharedData& changed_data) {
-    // Phase 4: shared_ptr 복사로 안전한 생명주기 관리
+    // shared_ptr 복사로 안전한 생명주기 관리
     std::shared_ptr<Notifier> notifier;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         auto it = notifiers_.find(changed_data.id);
         if (it != notifiers_.end() && it->second) {
-            // ✓ shared_ptr 복사 → 참조 카운트 증가
             notifier = it->second;
         }
-    }  // 락 해제
+    }
 
-    // ✓ 락 없이 notify 호출 (생명주기 보장됨)
     if (notifier) {
         try {
             notifier->notify(changed_data);
         } catch (const std::exception& e) {
-            // Notifier 콜백 예외 격리
-            // (향후 spdlog로 로깅 추가 가능)
+            // Notifier 콜백 예외 격리 및 에러 로그 기록
+            log_manager_->logError("callback_exception", e.what(), "id=" + changed_data.id);
         }
     }
-}  // notifier 소멸 → 참조 카운트 감소
+}
 
-// FR-007: Data expiration policy management
 void DataStore::applyExpirationPolicy(const std::string& id, const DataExpirationPolicy& policy) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    expiration_policies_[id] = policy;
+    auto expiration_time = std::chrono::system_clock::now() + policy.duration;
+    expiration_manager_->applyPolicy(id, expiration_time);
 }
 
 void DataStore::removeExpirationPolicy(const std::string& id) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    expiration_policies_.erase(id);
+    expiration_manager_->removePolicy(id);
 }
 
 void DataStore::cleanExpiredData() {
-    auto now = std::chrono::system_clock::now();
-    std::vector<std::string> expired_keys;
+    // TTL 만료 키 수집 및 제거
+    auto expired_keys_ttl = expiration_manager_->getExpiredKeys();
 
-    // 1단계: 만료된 키 수집 (읽기 전용 순회)
-    for (auto it = data_map_.begin(); it != data_map_.end(); ++it) {
-        if (it->second.expiration_time != std::chrono::time_point<std::chrono::system_clock>() &&
-            it->second.expiration_time <= now) {
-            expired_keys.push_back(it->first);
-        }
+    for (const auto& key : expired_keys_ttl) {
+        data_map_.erase(key);
+        expiration_manager_->removePolicy(key);
+        expiration_manager_->removeLRUPolicy(key);  // LRU 추적도 제거
     }
 
-    // 2단계: 만료된 키 삭제
-    for (const auto& key : expired_keys) {
+    // LRU 용량 초과 키 수집 및 제거
+    auto expired_keys_lru = expiration_manager_->getExpiredKeysLRU();
+
+    for (const auto& key : expired_keys_lru) {
         data_map_.erase(key);
+        expiration_manager_->removePolicy(key);  // TTL 정책도 제거
+        // LRU는 이미 getExpiredKeysLRU()에서 제거됨
     }
 }
 
-// FR-008: Observability - Metrics and Logs (Phase 3: atomic load)
 std::map<std::string, double> DataStore::getPerformanceMetrics() const {
-    // atomic load (lock-free)
-    std::map<std::string, double> result;
-    result["get_calls"] = static_cast<double>(metrics_.get_calls.load(std::memory_order_relaxed));
-    result["set_calls"] = static_cast<double>(metrics_.set_calls.load(std::memory_order_relaxed));
-    result["poll_calls"] = static_cast<double>(metrics_.poll_calls.load(std::memory_order_relaxed));
-    result["remove_calls"] = static_cast<double>(metrics_.remove_calls.load(std::memory_order_relaxed));
-    result["has_calls"] = static_cast<double>(metrics_.has_calls.load(std::memory_order_relaxed));
-
-    // 기존 코드 (하위 호환성 유지 - 향후 제거)
-    std::lock_guard<std::mutex> lock(mutex_);
-    for (const auto& [key, value] : performance_metrics_) {
-        result[key] = value;
-    }
-    return result;
+    return metrics_collector_->getMetrics();
 }
 
 std::vector<std::string> DataStore::getAccessLogs() const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    return access_logs_;
+    return log_manager_->getAccessLogs();
 }
 
 std::vector<std::string> DataStore::getErrorLogs() const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    return error_logs_;
+    return log_manager_->getErrorLogs();
 }
 
-// FR-011: Scalability monitoring
 size_t DataStore::getCurrentDataCount() const {
-    // concurrent_hash_map의 size()는 스레드 안전
     return data_map_.size();
 }
 
-// FR-013: For SharedData memory usage (placeholder implementation)
 size_t DataStore::getCurrentMemoryUsage() const {
-    // This is a very basic placeholder. Actual memory usage calculation is complex.
-    // It would involve iterating through data_map_ and estimating size of each std::any.
-    size_t total_size = 0;
-
-    // concurrent_hash_map 순회 (읽기 전용)
-    for (auto it = data_map_.begin(); it != data_map_.end(); ++it) {
-        total_size += sizeof(SharedData); // Base size
-        // Add estimated size of std::any content if possible
-        // This is highly dependent on the types stored in std::any
-    }
-    return total_size;
+    // 기본 추정: 항목 수 * SharedData 크기
+    return data_map_.size() * sizeof(SharedData);
 }
 
-// FR-012: Data recovery (placeholder implementation)
 void DataStore::saveState(const std::string& filepath) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    std::ofstream ofs(filepath);
-    if (!ofs.is_open()) {
-        throw std::runtime_error("Failed to open file for saving state: " + filepath);
+    using json = nlohmann::json;
+
+    // JSON 객체 생성
+    json state;
+    state["version"] = 1;
+    state["data"] = json::array();
+
+    // data_map_의 모든 항목을 순회하여 직렬화
+    {
+        typename tbb::concurrent_hash_map<std::string, SharedData>::const_accessor acc;
+
+        for (auto it = data_map_.begin(); it != data_map_.end(); ++it) {
+            if (data_map_.find(acc, it->first)) {
+                const SharedData& data = acc->second;
+
+                json item;
+                item["id"] = data.id;
+                item["type"] = static_cast<int>(data.type);
+
+                // std::any 타입별 직렬화
+                try {
+                    if (data.value.type() == typeid(int)) {
+                        item["value_type"] = "int";
+                        item["value"] = std::any_cast<int>(data.value);
+                    } else if (data.value.type() == typeid(double)) {
+                        item["value_type"] = "double";
+                        item["value"] = std::any_cast<double>(data.value);
+                    } else if (data.value.type() == typeid(float)) {
+                        item["value_type"] = "float";
+                        item["value"] = std::any_cast<float>(data.value);
+                    } else if (data.value.type() == typeid(std::string)) {
+                        item["value_type"] = "string";
+                        item["value"] = std::any_cast<std::string>(data.value);
+                    } else if (data.value.type() == typeid(bool)) {
+                        item["value_type"] = "bool";
+                        item["value"] = std::any_cast<bool>(data.value);
+                    } else if (data.value.type() == typeid(long)) {
+                        item["value_type"] = "long";
+                        item["value"] = std::any_cast<long>(data.value);
+                    } else {
+                        // 지원하지 않는 타입은 건너뜀
+                        continue;
+                    }
+
+                    state["data"].push_back(item);
+                } catch (const std::bad_any_cast&) {
+                    // any_cast 실패 시 건너뜀
+                    continue;
+                }
+            }
+        }
     }
-    // For a real implementation, serialize data_map_ content
-    ofs << "DataStore state saved (placeholder)" << std::endl;
-    ofs.close();
+
+    // 임시 파일에 먼저 쓰기 (원자적 쓰기)
+    std::string temp_filepath = filepath + ".tmp";
+
+    try {
+        std::ofstream ofs(temp_filepath);
+        if (!ofs.is_open()) {
+            throw std::runtime_error("Failed to open temporary file for saving state: " + temp_filepath);
+        }
+
+        ofs << state.dump(2);  // 들여쓰기 2칸
+        ofs.flush();
+
+        if (!ofs.good()) {
+            throw std::runtime_error("Failed to write state to temporary file: " + temp_filepath);
+        }
+
+        ofs.close();
+
+        // 임시 파일을 실제 파일로 이름 변경 (원자적 연산)
+        std::filesystem::rename(temp_filepath, filepath);
+
+    } catch (const std::exception& e) {
+        // 임시 파일 정리
+        std::filesystem::remove(temp_filepath);
+        throw std::runtime_error("Failed to save DataStore state: " + std::string(e.what()));
+    }
 }
 
 void DataStore::loadState(const std::string& filepath) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    using json = nlohmann::json;
+
+    // 파일 읽기
     std::ifstream ifs(filepath);
     if (!ifs.is_open()) {
         throw std::runtime_error("Failed to open file for loading state: " + filepath);
     }
-    // For a real implementation, deserialize data_map_ content
-    std::string line;
-    std::getline(ifs, line);
-    if (line != "DataStore state saved (placeholder)") {
-        throw std::runtime_error("Invalid DataStore state file: " + filepath);
+
+    json state;
+    try {
+        ifs >> state;
+    } catch (const json::parse_error& e) {
+        throw std::runtime_error("Failed to parse JSON file: " + std::string(e.what()));
     }
-    ifs.close();
+
+    // 버전 확인
+    if (!state.contains("version") || !state["version"].is_number_integer()) {
+        throw std::runtime_error("Invalid or missing version in state file");
+    }
+
+    int version = state["version"];
+    if (version != 1) {
+        throw std::runtime_error("Unsupported state file version: " + std::to_string(version));
+    }
+
+    // 데이터 배열 확인
+    if (!state.contains("data") || !state["data"].is_array()) {
+        throw std::runtime_error("Invalid or missing data array in state file");
+    }
+
+    // 기존 데이터 모두 삭제
+    data_map_.clear();
+
+    // 데이터 역직렬화
+    for (const auto& item : state["data"]) {
+        if (!item.contains("id") || !item.contains("type") ||
+            !item.contains("value_type") || !item.contains("value")) {
+            // 필수 필드 누락 시 건너뜀
+            continue;
+        }
+
+        std::string id = item["id"];
+        DataType type = static_cast<DataType>(item["type"].get<int>());
+        std::string value_type = item["value_type"];
+
+        SharedData new_data;
+        new_data.id = id;
+        new_data.type = type;
+        new_data.timestamp = std::chrono::system_clock::now();
+        new_data.expiration_time = std::chrono::time_point<std::chrono::system_clock>();
+
+        try {
+            // 타입별 역직렬화
+            if (value_type == "int") {
+                new_data.value = item["value"].get<int>();
+            } else if (value_type == "double") {
+                new_data.value = item["value"].get<double>();
+            } else if (value_type == "float") {
+                new_data.value = item["value"].get<float>();
+            } else if (value_type == "string") {
+                new_data.value = item["value"].get<std::string>();
+            } else if (value_type == "bool") {
+                new_data.value = item["value"].get<bool>();
+            } else if (value_type == "long") {
+                new_data.value = item["value"].get<long>();
+            } else {
+                // 지원하지 않는 타입은 건너뜀
+                continue;
+            }
+
+            // concurrent_hash_map에 삽입
+            typename tbb::concurrent_hash_map<std::string, SharedData>::accessor acc;
+            data_map_.insert(acc, id);
+            acc->second = new_data;
+
+        } catch (const std::exception& e) {
+            // 역직렬화 실패 시 건너뜀
+            continue;
+        }
+    }
 }
 
-// FR-014: Security - Access Control (Phase 5: unique_lock for write)
 void DataStore::setAccessPolicy(const std::string& id, const std::string& module_id, bool can_access) {
-    std::unique_lock<std::shared_mutex> lock(access_policies_mutex_);
-    access_policies_[id][module_id] = can_access;
+    access_control_manager_->setPolicy(id, module_id, can_access);
 }
 
 bool DataStore::hasAccess(const std::string& id, const std::string& module_id) const {
-    // Phase 5: shared_lock for read-heavy operation (읽기 병렬성 지원)
-    std::shared_lock<std::shared_mutex> lock(access_policies_mutex_);
-    auto it_id = access_policies_.find(id);
-    if (it_id != access_policies_.end()) {
-        auto it_module = it_id->second.find(module_id);
-        if (it_module != it_id->second.end()) {
-            return it_module->second;
-        }
-    }
-    // Default to no access if no specific policy is set
-    return false;
+    return access_control_manager_->hasAccess(id, module_id);
 }

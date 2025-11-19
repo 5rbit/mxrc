@@ -4,6 +4,7 @@
 #include <vector>
 #include <atomic>
 #include <chrono>
+#include <fstream>
 
 // Define a simple test struct
 struct TestData {
@@ -243,17 +244,275 @@ TEST(DataStoreTest, GetCurrentDataCount) {
     ASSERT_EQ(ds->getCurrentDataCount(), initial_count + 2);
 }
 
-// 테스트: DataStore 상태를 파일에 저장하고 로드하는 기능 확인 (플레이스홀더 구현)
-TEST(DataStoreTest, SaveAndLoadState) {
+// 테스트: 기본 타입(int, double, string, bool)의 저장 및 로드
+TEST(DataStoreTest, SaveAndLoadBasicTypes) {
     auto ds = DataStore::createForTest();
-    std::string filepath = "test_datastore_state.txt";
-    ds->set("state_data_1", 10, DataType::Para);
-    ds->saveState(filepath);
+    std::string filepath = "test_datastore_basic.json";
 
-    // 현재는 loadState가 예외를 발생시키지 않고 파일이 존재하는지 확인하는 수준
-    ASSERT_NO_THROW(ds->loadState(filepath));
+    // 다양한 기본 타입 저장
+    ds->set("int_value", 42, DataType::Para);
+    ds->set("double_value", 3.14159, DataType::Para);
+    ds->set("string_value", std::string("hello world"), DataType::Config);
+    ds->set("bool_value", true, DataType::Event);
+    ds->set("long_value", 9223372036854775807L, DataType::Para);
+
+    // 상태 저장
+    ASSERT_NO_THROW(ds->saveState(filepath));
+
+    // 새로운 인스턴스 생성 후 로드
+    auto ds2 = DataStore::createForTest();
+    ASSERT_NO_THROW(ds2->loadState(filepath));
+
+    // 데이터 검증
+    EXPECT_EQ(ds2->get<int>("int_value"), 42);
+    EXPECT_DOUBLE_EQ(ds2->get<double>("double_value"), 3.14159);
+    EXPECT_EQ(ds2->get<std::string>("string_value"), "hello world");
+    EXPECT_EQ(ds2->get<bool>("bool_value"), true);
+    EXPECT_EQ(ds2->get<long>("long_value"), 9223372036854775807L);
 
     // 테스트 파일 정리
+    std::remove(filepath.c_str());
+}
+
+// 테스트: 다양한 DataType으로 저장 및 로드
+TEST(DataStoreTest, SaveAndLoadDifferentDataTypes) {
+    auto ds = DataStore::createForTest();
+    std::string filepath = "test_datastore_types.json";
+
+    // 각 DataType별로 데이터 저장
+    ds->set("robot_mode", 1, DataType::RobotMode);
+    ds->set("interface_data", 2, DataType::InterfaceData);
+    ds->set("config_data", 3, DataType::Config);
+    ds->set("para_data", 4, DataType::Para);
+    ds->set("alarm_data", 5, DataType::Alarm);
+    ds->set("event_data", 6, DataType::Event);
+    ds->set("mission_state", 7, DataType::MissionState);
+    ds->set("task_state", 8, DataType::TaskState);
+
+    ASSERT_NO_THROW(ds->saveState(filepath));
+
+    auto ds2 = DataStore::createForTest();
+    ASSERT_NO_THROW(ds2->loadState(filepath));
+
+    // 모든 데이터 검증
+    EXPECT_EQ(ds2->get<int>("robot_mode"), 1);
+    EXPECT_EQ(ds2->get<int>("interface_data"), 2);
+    EXPECT_EQ(ds2->get<int>("config_data"), 3);
+    EXPECT_EQ(ds2->get<int>("para_data"), 4);
+    EXPECT_EQ(ds2->get<int>("alarm_data"), 5);
+    EXPECT_EQ(ds2->get<int>("event_data"), 6);
+    EXPECT_EQ(ds2->get<int>("mission_state"), 7);
+    EXPECT_EQ(ds2->get<int>("task_state"), 8);
+
+    std::remove(filepath.c_str());
+}
+
+// 테스트: Round-trip 일관성 (저장 → 로드 → 검증)
+TEST(DataStoreTest, RoundTripConsistency) {
+    auto ds1 = DataStore::createForTest();
+    std::string filepath = "test_roundtrip.json";
+
+    // 복잡한 데이터 세트 생성
+    ds1->set("temperature", 25.5, DataType::Para);
+    ds1->set("position_x", 100, DataType::Config);
+    ds1->set("robot_name", std::string("Robot-A"), DataType::Config);
+    ds1->set("is_active", true, DataType::Event);
+    ds1->set("counter", 12345L, DataType::Para);
+
+    // 첫 번째 저장
+    ds1->saveState(filepath);
+
+    // 로드 후 다시 저장
+    auto ds2 = DataStore::createForTest();
+    ds2->loadState(filepath);
+    std::string filepath2 = "test_roundtrip2.json";
+    ds2->saveState(filepath2);
+
+    // 세 번째 인스턴스로 로드
+    auto ds3 = DataStore::createForTest();
+    ds3->loadState(filepath2);
+
+    // 데이터 일관성 검증
+    EXPECT_DOUBLE_EQ(ds3->get<double>("temperature"), 25.5);
+    EXPECT_EQ(ds3->get<int>("position_x"), 100);
+    EXPECT_EQ(ds3->get<std::string>("robot_name"), "Robot-A");
+    EXPECT_EQ(ds3->get<bool>("is_active"), true);
+    EXPECT_EQ(ds3->get<long>("counter"), 12345L);
+
+    std::remove(filepath.c_str());
+    std::remove(filepath2.c_str());
+}
+
+// 테스트: 빈 DataStore 저장 및 로드
+TEST(DataStoreTest, SaveAndLoadEmptyDataStore) {
+    auto ds = DataStore::createForTest();
+    std::string filepath = "test_empty.json";
+
+    // 빈 상태 저장
+    ASSERT_NO_THROW(ds->saveState(filepath));
+
+    // 빈 상태 로드
+    auto ds2 = DataStore::createForTest();
+    ASSERT_NO_THROW(ds2->loadState(filepath));
+
+    // 데이터가 없는지 확인
+    EXPECT_EQ(ds2->getCurrentDataCount(), 0);
+
+    std::remove(filepath.c_str());
+}
+
+// 테스트: 파일 I/O 에러 처리 (쓰기 실패)
+TEST(DataStoreTest, SaveStateInvalidPath) {
+    auto ds = DataStore::createForTest();
+    ds->set("test_data", 123, DataType::Para);
+
+    // 존재하지 않는 디렉토리 경로
+    std::string invalid_path = "/nonexistent_directory/test_state.json";
+    ASSERT_THROW(ds->saveState(invalid_path), std::runtime_error);
+}
+
+// 테스트: 파일 I/O 에러 처리 (읽기 실패)
+TEST(DataStoreTest, LoadStateFileNotFound) {
+    auto ds = DataStore::createForTest();
+    std::string nonexistent_file = "nonexistent_file.json";
+
+    ASSERT_THROW(ds->loadState(nonexistent_file), std::runtime_error);
+}
+
+// 테스트: 손상된 JSON 파일 처리
+TEST(DataStoreTest, LoadStateCorruptedJSON) {
+    auto ds = DataStore::createForTest();
+    std::string filepath = "test_corrupted.json";
+
+    // 손상된 JSON 파일 생성
+    std::ofstream ofs(filepath);
+    ofs << "{ this is not valid json }";
+    ofs.close();
+
+    ASSERT_THROW(ds->loadState(filepath), std::runtime_error);
+
+    std::remove(filepath.c_str());
+}
+
+// 테스트: 잘못된 버전 처리
+TEST(DataStoreTest, LoadStateInvalidVersion) {
+    auto ds = DataStore::createForTest();
+    std::string filepath = "test_invalid_version.json";
+
+    // 잘못된 버전의 JSON 파일 생성
+    std::ofstream ofs(filepath);
+    ofs << R"({"version": 999, "data": []})";
+    ofs.close();
+
+    ASSERT_THROW(ds->loadState(filepath), std::runtime_error);
+
+    std::remove(filepath.c_str());
+}
+
+// 테스트: 버전 필드 누락 처리
+TEST(DataStoreTest, LoadStateMissingVersion) {
+    auto ds = DataStore::createForTest();
+    std::string filepath = "test_missing_version.json";
+
+    // 버전 필드가 없는 JSON 파일 생성
+    std::ofstream ofs(filepath);
+    ofs << R"({"data": []})";
+    ofs.close();
+
+    ASSERT_THROW(ds->loadState(filepath), std::runtime_error);
+
+    std::remove(filepath.c_str());
+}
+
+// 테스트: 데이터 배열 누락 처리
+TEST(DataStoreTest, LoadStateMissingData) {
+    auto ds = DataStore::createForTest();
+    std::string filepath = "test_missing_data.json";
+
+    // 데이터 배열이 없는 JSON 파일 생성
+    std::ofstream ofs(filepath);
+    ofs << R"({"version": 1})";
+    ofs.close();
+
+    ASSERT_THROW(ds->loadState(filepath), std::runtime_error);
+
+    std::remove(filepath.c_str());
+}
+
+// 테스트: 타입 불일치 처리 (필드 누락 시 graceful skip)
+TEST(DataStoreTest, LoadStateIncompleteData) {
+    auto ds = DataStore::createForTest();
+    std::string filepath = "test_incomplete.json";
+
+    // 불완전한 데이터 항목이 있는 JSON 파일 생성
+    std::ofstream ofs(filepath);
+    ofs << R"({
+        "version": 1,
+        "data": [
+            {"id": "complete", "type": 0, "value_type": "int", "value": 42},
+            {"id": "missing_value", "type": 0, "value_type": "int"},
+            {"id": "missing_type"},
+            {"id": "valid_again", "type": 1, "value_type": "string", "value": "test"}
+        ]
+    })";
+    ofs.close();
+
+    // 불완전한 항목은 건너뛰고 유효한 항목만 로드
+    ASSERT_NO_THROW(ds->loadState(filepath));
+
+    // 유효한 데이터만 존재하는지 확인
+    EXPECT_EQ(ds->get<int>("complete"), 42);
+    EXPECT_EQ(ds->get<std::string>("valid_again"), "test");
+
+    // 불완전한 항목은 존재하지 않아야 함
+    EXPECT_THROW(ds->get<int>("missing_value"), std::out_of_range);
+    EXPECT_THROW(ds->get<int>("missing_type"), std::out_of_range);
+
+    std::remove(filepath.c_str());
+}
+
+// 테스트: loadState 시 기존 데이터 삭제 확인
+TEST(DataStoreTest, LoadStateClearsExistingData) {
+    auto ds = DataStore::createForTest();
+    std::string filepath = "test_clear.json";
+
+    // 초기 데이터 설정
+    ds->set("old_data_1", 100, DataType::Para);
+    ds->set("old_data_2", 200, DataType::Para);
+
+    // 새로운 데이터만 포함된 파일 생성
+    std::ofstream ofs(filepath);
+    ofs << R"({
+        "version": 1,
+        "data": [
+            {"id": "new_data", "type": 0, "value_type": "int", "value": 999}
+        ]
+    })";
+    ofs.close();
+
+    // 로드하면 기존 데이터는 사라져야 함
+    ds->loadState(filepath);
+
+    EXPECT_EQ(ds->get<int>("new_data"), 999);
+    EXPECT_THROW(ds->get<int>("old_data_1"), std::out_of_range);
+    EXPECT_THROW(ds->get<int>("old_data_2"), std::out_of_range);
+
+    std::remove(filepath.c_str());
+}
+
+// 테스트: float 타입 저장 및 로드
+TEST(DataStoreTest, SaveAndLoadFloatType) {
+    auto ds = DataStore::createForTest();
+    std::string filepath = "test_float.json";
+
+    ds->set("float_val", 2.718f, DataType::Para);
+    ds->saveState(filepath);
+
+    auto ds2 = DataStore::createForTest();
+    ds2->loadState(filepath);
+
+    EXPECT_FLOAT_EQ(ds2->get<float>("float_val"), 2.718f);
+
     std::remove(filepath.c_str());
 }
 

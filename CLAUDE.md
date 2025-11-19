@@ -103,6 +103,7 @@ MXRC는 계층적 아키텍처를 따르며, 각 계층은 명확한 책임과 �
 | Task | `task/` | Task 정의, 등록, 실행 모드 관리 | TaskStatus |
 | Sequence | `sequence/` | Action 순서 정의, 조건/병렬 실행 | SequenceStatus |
 | Action | `action/` | 개별 Action 실행, 타임아웃 관리 | ActionStatus |
+| Data | `datastore/` | 모듈 간 데이터 공유, 만료 정책, 접근 제어 | SharedData |
 
 ## 디렉토리 구조
 
@@ -177,15 +178,26 @@ src/core/
 │   └── adapters/
 │       └── DataStoreEventAdapter.{h,cpp}
 │
-└── datastore/
-    └── DataStore.{h,cpp}
+└── datastore/                      # Data Management Layer
+    ├── managers/                   # 전문화된 관리 클래스
+    │   ├── ExpirationManager.{h,cpp}      # TTL/LRU 만료 정책
+    │   ├── AccessControlManager.{h,cpp}   # 모듈별 접근 제어
+    │   ├── MetricsCollector.{h,cpp}       # 성능 메트릭 수집
+    │   └── LogManager.{h,cpp}             # 접근/에러 로그 관리
+    └── DataStore.{h,cpp}           # Facade 인터페이스
 
 tests/
 ├── unit/                           # 단위 테스트
 │   ├── action/                     # 12 tests
 │   ├── sequence/                   # 14 tests
 │   ├── task/                       # 67 tests (Registry, Executor, Scheduler, Trigger, Monitor)
-│   └── event/                      # 42+ tests (NEW)
+│   ├── datastore/                  # 66 tests (NEW)
+│   │   ├── DataStore_test.cpp
+│   │   ├── ExpirationManager_test.cpp
+│   │   ├── AccessControlManager_test.cpp
+│   │   ├── MetricsCollector_test.cpp
+│   │   └── LogManager_test.cpp
+│   └── event/                      # 42+ tests
 │       ├── LockFreeQueue_test.cpp
 │       ├── MPSCLockFreeQueue_test.cpp
 │       ├── SubscriptionManager_test.cpp
@@ -194,6 +206,7 @@ tests/
 └── integration/                    # 통합 테스트
     ├── action_integration_test.cpp
     ├── sequence_integration_test.cpp
+    ├── datastore_logging_integration_test.cpp
     └── event/
         └── event_flow_test.cpp
 ```
@@ -365,6 +378,76 @@ eventBus->stop();
 - publish는 논블로킹: 큐가 가득 차면 이벤트 드롭 (통계에 기록)
 - 동시성 안전성: 여러 스레드에서 publish 가능 (mutex로 보호)
 - **알려진 이슈**: `TROUBLESHOOTING.md` 참조 (SPSC→Mutex 전환 이력)
+
+### Data Management Layer (완료)
+
+**목표**: 모듈 간 스레드 안전한 데이터 공유 및 상태 관리
+
+#### DataStore (Facade 패턴)
+- 중앙 데이터 저장소 역할
+- Manager 클래스들에 위임
+- 스레드 안전성: `tbb::concurrent_hash_map` 사용
+- **테스트**: 32개 단위 테스트 통과
+
+#### ExpirationManager
+- TTL (Time To Live) 만료 정책
+- LRU (Least Recently Used) 용량 기반 만료
+- 자료구조:
+  - TTL: `std::map<timestamp, set<key>>` + `std::unordered_map<key, timestamp>`
+  - LRU: `std::list<key>` + `std::unordered_map<key, list::iterator>`
+- 성능: O(log N) TTL 검색, O(1) LRU 접근
+- **테스트**: 23개 단위 테스트 (성능 벤치마크 포함)
+
+#### AccessControlManager
+- 모듈별 데이터 접근 권한 제어
+- 읽기 우선 락: `std::shared_mutex`
+- **테스트**: 8개 단위 테스트
+
+#### MetricsCollector
+- 성능 메트릭 수집 (lock-free)
+- get/set 평균 지연시간
+- 메모리 사용량
+- **테스트**: 3개 단위 테스트
+
+#### LogManager
+- 접근 로그 및 에러 로그 관리
+- 원형 버퍼 (1000 항목)
+- 스레드 안전성: `std::mutex`
+- **테스트**: 23개 단위 테스트 + 3개 통합 테스트
+
+#### 사용 예시
+```cpp
+// DataStore 생성
+auto dataStore = DataStore::create();
+
+// 데이터 저장
+dataStore->set("temperature", 25.5, DataType::DOUBLE);
+
+// TTL 정책 적용
+DataExpirationPolicy ttl{std::chrono::seconds(60)};
+dataStore->applyExpirationPolicy("temperature", ttl);
+
+// LRU 추적 (자동 용량 관리)
+dataStore->recordAccess("temperature");
+
+// 만료 데이터 정리
+dataStore->cleanExpiredData();
+
+// 상태 영속화
+dataStore->saveState("state.json");
+dataStore->loadState("state.json");
+
+// 로그 조회
+auto accessLogs = dataStore->getAccessLogs();
+auto errorLogs = dataStore->getErrorLogs();
+```
+
+**주요 개선 사항 (이슈 #007)**:
+- God Object 리팩토링 → Facade + Manager 패턴
+- 전역 락 제거 → `concurrent_hash_map` 사용
+- 10배 성능 향상 (1000ms → 100ms for 10K items)
+- 메모리 누수 제거 (weak_ptr 사용)
+- NULL 포인터 안전성 개선
 
 ## 코드 작성 가이드
 

@@ -42,6 +42,11 @@ add_executable(mxrc
     src/core/event/core/EventBus.cpp
     src/core/event/adapters/DataStoreEventAdapter.cpp
     src/core/datastore/DataStore.cpp
+    # DataStore manager classes
+    src/core/datastore/managers/ExpirationManager.cpp
+    src/core/datastore/managers/AccessControlManager.cpp
+    src/core/datastore/managers/MetricsCollector.cpp
+    src/core/datastore/managers/LogManager.cpp
     src/core/logging/util/Serializer.cpp
     src/core/logging/util/FileUtils.cpp
     src/core/logging/core/AsyncWriter.cpp
@@ -82,6 +87,7 @@ target_include_directories(mxrc PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/event/util
     ${PROJECT_SOURCE_DIR}/src/core/event/adapters
     ${PROJECT_SOURCE_DIR}/src/core/datastore
+    ${PROJECT_SOURCE_DIR}/src/core/datastore/managers
     ${PROJECT_SOURCE_DIR}/src/core/logging
     ${PROJECT_SOURCE_DIR}/src/core/logging/interfaces
     ${PROJECT_SOURCE_DIR}/src/core/logging/core
@@ -112,8 +118,13 @@ add_executable(run_tests
     tests/unit/event/DataStoreEventAdapter_test.cpp
     tests/integration/event/event_flow_test.cpp
     tests/integration/event/monitoring_extension_test.cpp
+    tests/integration/datastore_logging_integration_test.cpp
     tests/unit/datastore/DataStore_test.cpp
     tests/unit/datastore/tbb_integration_test.cpp
+    tests/unit/datastore/ExpirationManager_test.cpp
+    tests/unit/datastore/MetricsCollector_test.cpp
+    tests/unit/datastore/AccessControlManager_test.cpp
+    tests/unit/datastore/LogManager_test.cpp
     tests/unit/logging/BagMessage_test.cpp
     tests/unit/logging/Serializer_test.cpp
     tests/unit/logging/FileUtils_test.cpp
@@ -149,6 +160,10 @@ add_executable(run_tests
     src/core/event/core/EventBus.cpp
     src/core/event/adapters/DataStoreEventAdapter.cpp
     src/core/datastore/DataStore.cpp
+    src/core/datastore/managers/ExpirationManager.cpp
+    src/core/datastore/managers/MetricsCollector.cpp
+    src/core/datastore/managers/AccessControlManager.cpp
+    src/core/datastore/managers/LogManager.cpp
     src/core/logging/util/Serializer.cpp
     src/core/logging/util/FileUtils.cpp
     src/core/logging/core/AsyncWriter.cpp

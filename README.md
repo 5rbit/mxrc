@@ -129,6 +129,45 @@ task.setWorkSequence("inspection_seq")
 auto result = taskExecutor->execute(task, context);
 ```
 
+### Data Management Layer
+
+모듈 간 데이터 공유 및 상태 관리를 담당합니다.
+
+- **DataStore**: Facade 패턴 기반 중앙 데이터 저장소
+- **ExpirationManager**: TTL 및 LRU 정책 관리
+- **AccessControlManager**: 모듈별 접근 권한 제어
+- **MetricsCollector**: 성능 메트릭 수집 (lock-free)
+- **LogManager**: 접근/에러 로그 관리
+
+**주요 기능:**
+- **스레드 안전한 데이터 접근**: `tbb::concurrent_hash_map` 사용
+- **만료 정책**: TTL (시간 기반) + LRU (용량 기반)
+- **상태 영속화**: JSON 기반 저장/복원
+- **접근 제어**: 모듈별 읽기/쓰기 권한
+- **성능 모니터링**: get/set 지연, 메모리 사용량
+
+**예시:**
+```cpp
+// DataStore 생성
+auto dataStore = DataStore::create();
+
+// 데이터 저장 및 조회
+dataStore->set("key1", 42, DataType::INTEGER);
+auto value = dataStore->get<int>("key1");
+
+// TTL 정책 적용
+DataExpirationPolicy ttl{std::chrono::seconds(60)};
+dataStore->applyExpirationPolicy("key1", ttl);
+
+// 상태 저장/복원
+dataStore->saveState("state.json");
+dataStore->loadState("state.json");
+
+// 로그 조회
+auto accessLogs = dataStore->getAccessLogs();
+auto errorLogs = dataStore->getErrorLogs();
+```
+
 ## 디렉토리 구조
 
 ```
@@ -136,10 +175,18 @@ mxrc/
 ├── src/core/
 │   ├── action/              # Action Layer (26 tests)
 │   ├── sequence/            # Sequence Layer (33 tests)
-│   └── task/                # Task Layer (53 tests)
+│   ├── task/                # Task Layer (53 tests)
+│   └── datastore/           # Data Management Layer (66 tests)
+│       ├── managers/        # 전문화된 관리 클래스
+│       │   ├── ExpirationManager.{h,cpp}      # TTL/LRU 정책
+│       │   ├── AccessControlManager.{h,cpp}   # 접근 제어
+│       │   ├── MetricsCollector.{h,cpp}       # 성능 메트릭
+│       │   └── LogManager.{h,cpp}             # 로그 관리
+│       └── DataStore.{h,cpp}                  # Facade 인터페이스
 │
 ├── tests/
 │   ├── unit/                # 단위 테스트
+│   │   └── datastore/       # DataStore 테스트 (66 tests)
 │   └── integration/         # 통합 테스트
 │
 ├── specs/                   # 사양 및 계획 문서
@@ -155,13 +202,14 @@ mxrc/
 
 ## 테스트 현황
 
-### 전체 테스트: 129개 (모두 통과 ✅)
+### 전체 테스트: 195개 (모두 통과 ✅)
 
 | 계층 | 테스트 수 | 상태 |
 |------|----------|------|
 | Action Layer | 26 | ✅ 통과 |
 | Sequence Layer | 33 | ✅ 통과 |
 | Task Layer | 53 | ✅ 통과 |
+| Data Management | 66 | ✅ 통과 |
 | Async Logging | 17 | ✅ 통과 |
 
 ### 테스트 실행
@@ -334,5 +382,5 @@ spdlog::critical("Unrecoverable error occurred");  // 즉시 플러시됨
 
 ---
 
-**현재 상태**: Phase 3B-1 완료 + 비동기 로깅 시스템 (129/129 tests passing)
+**현재 상태**: Phase 3B-1 완료 + 비동기 로깅 + DataStore 리팩토링 (195/195 tests passing)
 **마지막 업데이트**: 2025-11-19

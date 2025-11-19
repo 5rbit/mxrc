@@ -668,7 +668,7 @@ fix(action): ActionExecutor 소멸자 뮤텍스 데드락 해결
 - ActionExecutor 기본 테스트 통과
 - 소멸자 안정성 테스트 통과
 
-관련 이슈: #003
+관련 이슈: #003-*
 ```
 
 ### 잘못된 예시
@@ -707,7 +707,7 @@ protected:
         // 정리
     }
 };
-
+TestScenario: 시나리오 테스트
 TEST_F(ComponentTest, TestScenario) {
     // Given
     // When

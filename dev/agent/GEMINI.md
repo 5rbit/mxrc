@@ -1,6 +1,6 @@
 # MXRC 개발 가이드라인 (Gemini AI)
 
-마지막 업데이트: 2025-11-15
+마지막 업데이트: 2025-11-19
 
 ## 프로젝트 개요
 
@@ -685,6 +685,26 @@ TEST_F(DataStoreTest, Test2) {
 
 ## 최근 변경 사항
 
+### Phase 3C: Datastore God Object Refactor (2025-11-19)
+**추가된 기능:**
+- DataStore God Object 해체 및 책임 분리
+    - `DataStore`를 여러 Manager 클래스(`AccessControlManager`, `ExpirationManager`, `LogManager`, `MetricsCollector`)로 리팩토링하여 책임 분할
+    - Observer 패턴 구현을 위한 `MapNotifier` 도입
+- 관련 테스트 추가 및 업데이트
+    - `DataStore_test` 리팩토링 및 테스트 케이스 확장
+    - `AccessControlManager_test` (290 tests) 추가
+    - `ExpirationManager_test` (462 tests) 추가
+    - `LogManager_test` (414 tests) 추가
+    - `MetricsCollector_test` (241 tests) 추가
+    - `datastore_logging_integration_test` (191 tests) 추가
+
+**테스트 현황:**
+- 전체: 1983 tests (모두 통과 ✅)
+- Action: 26 tests
+- Sequence: 33 tests
+- Task: 53 tests
+- Datastore: 1871 tests
+
 ### Phase 3B-1: Task Single Execution (2025-11-15)
 **추가된 기능:**
 - TaskRegistry 구현 (Task 정의 등록 및 조회)
@@ -755,8 +775,6 @@ make -j$(nproc)
 
 ## 다음 단계
 
-### 020-refactor-datastore-locking 
-- 
 ## 참고 문서
 
 - **README.md**: 프로젝트 개요 및 사용 가이드

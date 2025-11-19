@@ -111,6 +111,7 @@ add_executable(run_tests
     tests/unit/logging/SimpleBagWriter_test.cpp
     tests/unit/logging/DataStoreBagLogger_test.cpp
     tests/integration/logging/bag_logging_integration_test.cpp
+    tests/benchmark/logging/datastore_logging_benchmark.cpp
     examples/event_monitoring/ExecutionTimeCollector.cpp
     examples/event_monitoring/StateTransitionLogger.cpp
     src/core/task/core/TaskRegistry.cpp
@@ -178,6 +179,7 @@ target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/logging/util
     ${PROJECT_SOURCE_DIR}/tests/unit/logging
     ${PROJECT_SOURCE_DIR}/tests/integration/logging
+    ${PROJECT_SOURCE_DIR}/tests/benchmark/logging
 )
 
 

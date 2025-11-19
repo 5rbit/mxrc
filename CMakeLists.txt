@@ -8,7 +8,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Threads REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(GTest REQUIRED)
-find_package(TBB REQUIRED) 
+find_package(TBB REQUIRED)
+find_package(nlohmann_json 3.11.0 REQUIRED) 
 
 # Add executable
 add_executable(mxrc
@@ -30,14 +31,19 @@ add_executable(mxrc
     src/core/event/core/EventBus.cpp
     src/core/event/adapters/DataStoreEventAdapter.cpp
     src/core/datastore/DataStore.cpp
+    src/core/logging/util/Serializer.cpp
+    src/core/logging/util/FileUtils.cpp
+    src/core/logging/core/AsyncWriter.cpp
+    src/core/logging/util/RetentionManager.cpp
 )
 
 # Link dependencies
-target_link_libraries(mxrc PRIVATE 
-    spdlog::spdlog 
-    GTest::GTest 
+target_link_libraries(mxrc PRIVATE
+    spdlog::spdlog
+    GTest::GTest
     GTest::Main
     TBB::tbb
+    nlohmann_json::nlohmann_json
 )
 
 # Include directories
@@ -65,6 +71,11 @@ target_include_directories(mxrc PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/event/util
     ${PROJECT_SOURCE_DIR}/src/core/event/adapters
     ${PROJECT_SOURCE_DIR}/src/core/datastore
+    ${PROJECT_SOURCE_DIR}/src/core/logging
+    ${PROJECT_SOURCE_DIR}/src/core/logging/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/logging/core
+    ${PROJECT_SOURCE_DIR}/src/core/logging/dto
+    ${PROJECT_SOURCE_DIR}/src/core/logging/util
 )
 
 # Enable testing
@@ -92,6 +103,12 @@ add_executable(run_tests
     tests/integration/event/monitoring_extension_test.cpp
     tests/unit/datastore/DataStore_test.cpp
     tests/unit/datastore/tbb_integration_test.cpp
+    tests/unit/logging/BagMessage_test.cpp
+    tests/unit/logging/Serializer_test.cpp
+    tests/unit/logging/FileUtils_test.cpp
+    tests/unit/logging/AsyncWriter_test.cpp
+    tests/unit/logging/RetentionManager_test.cpp
+    tests/unit/logging/SimpleBagWriter_test.cpp
     examples/event_monitoring/ExecutionTimeCollector.cpp
     examples/event_monitoring/StateTransitionLogger.cpp
     src/core/task/core/TaskRegistry.cpp
@@ -111,6 +128,11 @@ add_executable(run_tests
     src/core/event/core/EventBus.cpp
     src/core/event/adapters/DataStoreEventAdapter.cpp
     src/core/datastore/DataStore.cpp
+    src/core/logging/util/Serializer.cpp
+    src/core/logging/util/FileUtils.cpp
+    src/core/logging/core/AsyncWriter.cpp
+    src/core/logging/util/RetentionManager.cpp
+    src/core/logging/core/SimpleBagWriter.cpp
 )
 
 target_include_directories(run_tests PUBLIC
@@ -146,6 +168,13 @@ target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/tests/integration/event
     ${PROJECT_SOURCE_DIR}/examples
     ${PROJECT_SOURCE_DIR}/examples/event_monitoring
+    ${PROJECT_SOURCE_DIR}/src/core/logging
+    ${PROJECT_SOURCE_DIR}/src/core/logging/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/logging/core
+    ${PROJECT_SOURCE_DIR}/src/core/logging/dto
+    ${PROJECT_SOURCE_DIR}/src/core/logging/util
+    ${PROJECT_SOURCE_DIR}/tests/unit/logging
+    ${PROJECT_SOURCE_DIR}/tests/integration/logging
 )
 
 
@@ -155,6 +184,7 @@ target_link_libraries(run_tests PRIVATE
     GTest::GTest
     GTest::Main
     TBB::tbb
+    nlohmann_json::nlohmann_json
 )
 
 include(GoogleTest)

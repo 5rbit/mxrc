@@ -58,6 +58,17 @@ struct BagFooter {
     }
 
     /**
+     * @brief 무효한 Footer 생성 (에러 반환용)
+     *
+     * @return 유효하지 않은 BagFooter
+     */
+    static BagFooter createInvalid() {
+        BagFooter footer;
+        std::memset(&footer, 0, sizeof(BagFooter));
+        return footer;
+    }
+
+    /**
      * @brief 매직 넘버 설정
      */
     void setMagic() {

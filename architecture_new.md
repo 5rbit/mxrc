@@ -50,7 +50,39 @@ graph TD
     S -- 이벤트 발행 --> E
     AC -- 이벤트 발행 --> E
 
+    D <-->|DataStoreEventAdapter| E
+
     A -- 이벤트 구독 --> E
+```
+
+### 블록 다이어그램
+
+```text
++---------------------------------+
+|     External Systems / UI       |
++----------------+----------------+
+                 |
+       Schedules |
+                 v
++---------------------------------+      +---------------------------------+
+|           Task Layer            |----->|                                 |
+|         (TaskExecutor)          |<--->|                                 |
++----------------+----------------+      |                                 |
+                 |                       |             DataStore           |
+       Executes  |                       |      (Central State Storage)    |
+                 v                       |                                 |
++---------------------------------+      |                                 |
+|        Sequence Layer           |<--->|                                 |
+|        (SequenceEngine)         |----->|                                 |
++----------------+----------------+      +---------------------------------+
+                 |
+   Orchestrates  |
+                 v                       +---------------------------------+
++---------------------------------+      |                                 |
+|          Action Layer           |----->|             EventBus            |
+|         (ActionExecutor)        |      |      (Async Event System)       |
++---------------------------------+----->|                                 |
+                                         +---------------------------------+
 ```
 
 -   **실행 계층**: 외부의 명령을 받아 실제 동작으로 변환하는 핵심 흐름입니다.
@@ -120,7 +152,66 @@ graph LR
 -   **스레드 안전성**: 여러 스레드가 동시에 이벤트를 발행해도 안전하도록 `std::mutex`로 보호되는 Multi-Producer 큐를 사용합니다.
 -   **느슨한 결합**: 이벤트 발행자는 구독자가 누구인지 알 필요가 없으며, 구독자 또한 발행자를 알 필요가 없습니다. `ActionCompleted`, `SequenceFailed` 등 의미 있는 이벤트로만 통신합니다.
 
-## 5. 동시성 모델
+## 5. 디렉토리 구조
+
+MXRC 프로젝트는 명확한 책임 분리와 모듈화를 위해 다음과 같은 디렉토리 구조를 가집니다.
+
+```
+mxrc/
+├── src/
+│   ├── core/
+│   │   ├── action/              # Action Layer 컴포넌트 (IAction, ActionExecutor 등)
+│   │   ├── sequence/            # Sequence Layer 컴포넌트 (SequenceEngine, ConditionEvaluator 등)
+│   │   ├── task/                # Task Layer 컴포넌트 (TaskExecutor, PeriodicScheduler 등)
+│   │   ├── datastore/           # DataStore 구현
+│   │   ├── event/               # EventBus 구현
+│   │   ├── logging/             # 로깅 관련 구현 (커스텀 로거, spdlog 설정)
+│   │   └── ...                  # 기타 공통/지원 모듈
+├── tests/
+│   ├── unit/                    # 단위 테스트
+│   ├── integration/             # 통합 테스트
+│   └── ...
+├── docs/                        # 각종 문서 (설계, 가이드 등)
+├── specs/                       # 기능 사양서 및 아키텍처 문서
+└── ...                          # 빌드 시스템 (CMakeLists.txt), 기타 설정 파일
+```
+
+## 6. 모듈별 특징
+
+MXRC의 주요 모듈들은 다음과 같은 고유한 역할과 특징을 가집니다.
+
+### Action Layer
+-   **IAction**: 모든 기본 동작이 구현해야 할 인터페이스.
+-   **ActionExecutor**: `IAction`을 실행하고 타임아웃, 취소, 결과 수집 등을 관리.
+-   **ActionFactory**: `IAction` 인스턴스를 동적으로 생성.
+-   **ActionRegistry**: 사용 가능한 `IAction` 타입들을 등록하고 관리.
+
+### Sequence Layer
+-   **SequenceEngine**: `Action`들의 복잡한 조합(순차, 병렬, 조건부 분기)을 조율하고 실행.
+-   **ConditionEvaluator**: `Sequence` 내 조건식을 평가하여 실행 흐름을 제어.
+-   **RetryHandler**: `Action` 또는 `Sequence` 실패 시 재시도 정책을 적용.
+
+### Task Layer
+-   **TaskExecutor**: `Task`의 생명주기를 관리하고 `ONCE`, `PERIODIC`, `TRIGGERED`와 같은 실행 모드를 제어.
+-   **PeriodicScheduler**: 주기적으로 `Task`를 실행하도록 스케줄링.
+-   **TriggerManager**: 특정 이벤트 발생 시 `Task`를 실행하도록 관리.
+
+### DataStore
+-   **중앙 집중식 데이터 관리**: 시스템의 모든 상태와 파라미터를 저장하고 공유하는 단일 접점.
+-   **고성능 & 스레드 안전성**: `tbb::concurrent_hash_map`을 통한 동시성 제어 및 빠른 접근.
+-   **옵저버 패턴**: 데이터 변경 시 `weak_ptr` 기반 알림 메커니즘 제공.
+
+### EventBus
+-   **비동기 & 느슨한 결합**: 모듈 간 직접적인 의존성 없이 비동기적으로 이벤트를 주고받음.
+-   **스레드 안전한 발행**: `std::mutex`를 사용하여 여러 스레드에서 동시에 안전하게 이벤트를 발행.
+-   **구독자 생명주기 관리**: `weak_ptr`를 통해 만료된 구독자를 자동으로 정리.
+
+### Logging
+-   **듀얼 로깅 시스템**:
+    -   **커스텀 'Bag' 로거**: 고속/고용량 구조화된 데이터를 위한 비동기 로거.
+    -   **`spdlog`**: 일반적인 진단 메시지(정보, 경고, 오류)를 위한 로거. (현재 비동기 전환 예정)
+
+## 7. 동시성 모델
 
 MXRC는 고성능을 위해 멀티스레딩을 적극 활용하며, 다음과 같은 일관된 동시성 모델을 따릅니다.
 
@@ -129,7 +220,7 @@ MXRC는 고성능을 위해 멀티스레딩을 적극 활용하며, 다음과 �
 -   **플래그 동시성**: `cancelRequested`와 같이 간단한 상태 플래그는 `std::atomic`을 사용하여 락 없이(Lock-free) 처리합니다.
 -   **실행 동시성**: `ActionExecutor` 등 비동기 작업은 `std::thread` 또는 `std::async`를 사용하여 백그라운드에서 실행합니다.
 
-## 6. 데이터 흐름 예시: 주기적 센서 읽기
+## 8. 데이터 흐름 예시: 주기적 센서 읽기
 
 다음은 각 컴포넌트가 어떻게 상호작용하는지 보여주는 간단한 시나리오입니다.
 

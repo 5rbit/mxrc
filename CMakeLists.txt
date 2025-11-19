@@ -62,6 +62,10 @@ target_link_libraries(mxrc PRIVATE
     nlohmann_json::nlohmann_json
 )
 
+# Enable Address Sanitizer (always on for memory safety)
+target_compile_options(mxrc PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_libraries(mxrc PRIVATE -fsanitize=address)
+
 # Include directories
 target_include_directories(mxrc PUBLIC
     ${PROJECT_SOURCE_DIR}/src
@@ -227,6 +231,10 @@ target_link_libraries(run_tests PRIVATE
     TBB::tbb
     nlohmann_json::nlohmann_json
 )
+
+# Enable Address Sanitizer (always on for memory safety)
+target_compile_options(run_tests PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_libraries(run_tests PRIVATE -fsanitize=address)
 
 # Link backward library if enabled
 if(USE_BACKWARD)

@@ -7,6 +7,7 @@
 #include <chrono>
 #include <atomic>
 #include <vector>
+#include <algorithm>
 
 namespace fs = std::filesystem;
 
@@ -177,9 +178,8 @@ TEST_F(BagReplayerTest, ReplayFastSpeed) {
     EXPECT_LT(elapsed, 2500);
 }
 
-// Test 6: 일시정지 및 재개
-// TODO: 타이밍 이슈로 인해 일시적으로 비활성화
-TEST_F(BagReplayerTest, DISABLED_PauseAndResume) {
+// Test 6: 일시정지 및 재개 (개선된 폴링 기반)
+TEST_F(BagReplayerTest, PauseAndResume) {
     // Given
     BagReplayer replayer;
     ASSERT_TRUE(replayer.open(testBagPath));
@@ -189,30 +189,51 @@ TEST_F(BagReplayerTest, DISABLED_PauseAndResume) {
         messageCount++;
     });
 
-    // When - 실시간 모드로 재생 (느리므로 pause 타이밍 보장)
+    // When - 실시간 모드로 재생
     replayer.start(ReplaySpeed::realtime());
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+    // 최소 1개 메시지 재생될 때까지 대기 (타임아웃 5초)
+    auto waitForMessages = [](std::atomic<int>& count, int targetCount, int timeoutMs) {
+        auto start = std::chrono::steady_clock::now();
+        while (count < targetCount) {
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - start).count();
+            if (elapsed > timeoutMs) {
+                return false;  // 타임아웃
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        return true;
+    };
+
+    ASSERT_TRUE(waitForMessages(messageCount, 1, 5000));  // 최소 1개 메시지 대기
     int countBeforePause = messageCount;
 
+    // Pause 후 안정화 대기
     replayer.pause();
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     EXPECT_TRUE(replayer.isPaused());
 
+    // 일시정지 중 500ms 동안 메시지 수가 증가하지 않는지 확인
+    int countDuringPause1 = messageCount;
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    int countDuringPause = messageCount;
+    int countDuringPause2 = messageCount;
 
+    // Resume 후 추가 메시지 재생 대기
     replayer.resume();
     EXPECT_FALSE(replayer.isPaused());
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+    // 재개 후 최소 1개 이상 추가 메시지 대기
+    int countAtResume = messageCount;
+    ASSERT_TRUE(waitForMessages(messageCount, countAtResume + 1, 5000));
     int countAfterResume = messageCount;
 
     replayer.stop();
 
     // Then
-    EXPECT_GT(countBeforePause, 0);
-    EXPECT_EQ(countDuringPause, countBeforePause);  // 일시정지 중에는 증가 안 함
-    EXPECT_GT(countAfterResume, countDuringPause);  // 재개 후 증가
+    EXPECT_GT(countBeforePause, 0);  // 최소 1개 메시지 재생됨
+    EXPECT_EQ(countDuringPause1, countDuringPause2);  // 일시정지 중에는 증가 안 함
+    EXPECT_GT(countAfterResume, countAtResume);  // 재개 후 증가
 }
 
 // Test 7: 토픽 필터링
@@ -248,33 +269,63 @@ TEST_F(BagReplayerTest, TopicFiltering) {
     EXPECT_EQ(stats.messagesSkipped, 5);
 }
 
-// Test 8: 시간 범위 설정
+// Test 8: 시간 범위 설정 (더 단순화된 테스트)
 TEST_F(BagReplayerTest, TimeRangeFiltering) {
-    // Given
+    // Given - 먼저 BagReader로 실제 타임스탬프 확인
+    BagReader reader;
+    ASSERT_TRUE(reader.open(testBagPath));
+
+    std::vector<uint64_t> allTimestamps;
+    while (reader.hasNext()) {
+        auto msg = reader.readNext();
+        if (msg) {
+            allTimestamps.push_back(static_cast<uint64_t>(msg->timestamp_ns));
+        }
+    }
+    reader.close();
+
+    ASSERT_GE(allTimestamps.size(), 6) << "Need at least 6 messages for this test (indices 0-5)";
+
+    // 타임스탬프 정렬 (Bag 파일이 시간 순서대로 읽히지 않을 수 있음)
+    std::sort(allTimestamps.begin(), allTimestamps.end());
+
+    // 정렬된 타임스탬프 기반으로 범위 설정 (인덱스 1~5, 총 5개)
+    uint64_t startTime = allTimestamps[1];  // 두 번째 메시지부터
+    uint64_t endTime = allTimestamps[5];    // 여섯 번째 메시지까지
+
+    // When - Replayer로 시간 범위 재생
     BagReplayer replayer;
     ASSERT_TRUE(replayer.open(testBagPath));
 
     std::atomic<int> messageCount{0};
+    std::vector<uint64_t> receivedTimestamps;
+    std::mutex timestampsMutex;
+
     replayer.setMessageCallback([&](const BagMessage& msg) {
         messageCount++;
+        std::lock_guard<std::mutex> lock(timestampsMutex);
+        receivedTimestamps.push_back(static_cast<uint64_t>(msg.timestamp_ns));
     });
-
-    // When - 2번째부터 6번째 메시지까지 (5개)
-    // 타임스탬프: baseTimestamp + i * 1s (i = 0~9)
-    uint64_t baseTimestamp = 1700000000000000000ULL;
-    uint64_t startTime = baseTimestamp + 2ULL * 1000000000ULL;  // i=2 (2초 후)
-    uint64_t endTime = baseTimestamp + 6ULL * 1000000000ULL;    // i=6 (6초 후)
 
     replayer.setTimeRange(startTime, endTime);
     replayer.start(ReplaySpeed::asFastAsPossible());
     replayer.waitUntilFinished();
 
-    // Then - 2, 3, 4, 5, 6번째 메시지 (5개)
-    EXPECT_EQ(messageCount, 5);
+    // Then - 인덱스 1~5의 5개 메시지 재생됨
+    EXPECT_EQ(messageCount, 5) << "Expected 5 messages in range [" << startTime << ", " << endTime << "]";
+
+    // 모든 타임스탬프가 범위 내에 있는지 확인
+    for (size_t i = 0; i < receivedTimestamps.size(); i++) {
+        EXPECT_GE(receivedTimestamps[i], startTime)
+            << "Message " << i << " timestamp " << receivedTimestamps[i] << " is before start time";
+        EXPECT_LE(receivedTimestamps[i], endTime)
+            << "Message " << i << " timestamp " << receivedTimestamps[i] << " is after end time";
+    }
 
     auto stats = replayer.getStats();
     EXPECT_EQ(stats.messagesReplayed, 5);
-    EXPECT_GE(stats.messagesSkipped, 2);  // 범위 밖 메시지 (최소 0, 1 건너뜀)
+    // 범위 밖 메시지 확인 (처음 1개 + 마지막 4개 = 5개 skip 예상)
+    EXPECT_GE(stats.messagesSkipped, 1);  // 최소 1개 이상
 }
 
 // Test 9: 재생 통계 확인

@@ -7,8 +7,10 @@
 #include <memory>
 #include <any>
 #include <chrono>
-#include <functional> // For std::function
+#include <functional>  // For std::function
 #include <mutex>
+#include <atomic>      // Phase 2: lock-free metrics
+#include <shared_mutex> // Phase 5: 읽기 병렬성
 #include <stdexcept>
 #include <tbb/concurrent_hash_map.h>
 
@@ -142,22 +144,37 @@ private:
     // FR-004, FR-005: concurrent_hash_map for high-performance thread-safe data access
     tbb::concurrent_hash_map<std::string, SharedData> data_map_;
 
-    // Other members still protected by mutex (less critical path)
-    std::map<std::string, std::unique_ptr<Notifier>> notifiers_;
+    // Phase 4: Notifier 저장 (shared_ptr로 안전한 생명주기 관리)
+    std::map<std::string, std::shared_ptr<Notifier>> notifiers_;
     std::map<std::string, DataExpirationPolicy> expiration_policies_;
     std::map<std::string, std::map<std::string, bool>> access_policies_; // id -> module_id -> can_access
 
     // Internal helper for notification
     void notifySubscribers(const SharedData& changed_data);
 
-    // For observability
+    // Phase 2: PerformanceMetrics 구조체 정의 (lock-free atomic 카운터)
+    struct PerformanceMetrics {
+        std::atomic<size_t> get_calls{0};        // get() 호출 횟수
+        std::atomic<size_t> set_calls{0};        // set() 호출 횟수
+        std::atomic<size_t> poll_calls{0};       // poll() 호출 횟수
+        std::atomic<size_t> remove_calls{0};     // remove() 호출 횟수 (향후)
+        std::atomic<size_t> has_calls{0};        // has() 호출 횟수 (향후)
+    };
+
+    // Phase 2: atomic 메트릭 멤버 변수
+    PerformanceMetrics metrics_;
+
+    // For observability (기존 - 향후 제거 예정)
     std::map<std::string, double> performance_metrics_;
     std::vector<std::string> access_logs_;
     std::vector<std::string> error_logs_;
 
-    // Mutex for non-critical members (notifiers, policies, metrics)
+    // Mutex for non-critical members
     // data_map_ uses concurrent_hash_map's internal fine-grained locking
-    mutable std::mutex mutex_;
+    mutable std::mutex mutex_;  // notifiers, expiration_policies 보호
+
+    // Phase 5: shared_mutex for read-heavy metadata access
+    mutable std::shared_mutex access_policies_mutex_;
 };
 
 // Template method implementations (typically in a .tpp or .h for header-only)
@@ -196,12 +213,15 @@ void DataStore::set(const std::string& id, const T& data, DataType type,
         // accessor는 스코프를 벗어나면 자동 해제 (RAII)
     }
 
+    // FR-008: Update performance metrics (Phase 3: lock-free atomic)
+    metrics_.set_calls.fetch_add(1, std::memory_order_relaxed);
+
     // 다른 멤버들은 mutex로 보호 (비-크리티컬 경로)
     {
         std::lock_guard<std::mutex> lock(mutex_);
         // FR-007: Applying expiration policy
         expiration_policies_[id] = policy;
-        // FR-008: Update performance metrics
+        // 기존 코드 (하위 호환성 유지 - 향후 제거)
         performance_metrics_["set_calls"]++;
     }
 
@@ -236,7 +256,10 @@ T DataStore::get(const std::string& id) {
         // accessor는 스코프를 벗어나면 자동 해제 (RAII)
     }
 
-    // FR-008: Update performance metrics (비-크리티컬 경로)
+    // FR-008: Update performance metrics (Phase 3: lock-free atomic)
+    metrics_.get_calls.fetch_add(1, std::memory_order_relaxed);
+
+    // 기존 코드 (하위 호환성 유지 - 향후 제거)
     {
         std::lock_guard<std::mutex> lock(mutex_);
         performance_metrics_["get_calls"]++;
@@ -272,7 +295,10 @@ T DataStore::poll(const std::string& id) {
         // accessor는 스코프를 벗어나면 자동 해제 (RAII)
     }
 
-    // FR-008: Update performance metrics (비-크리티컬 경로)
+    // FR-008: Update performance metrics (Phase 3: lock-free atomic)
+    metrics_.poll_calls.fetch_add(1, std::memory_order_relaxed);
+
+    // 기존 코드 (하위 호환성 유지 - 향후 제거)
     {
         std::lock_guard<std::mutex> lock(mutex_);
         performance_metrics_["poll_calls"]++;

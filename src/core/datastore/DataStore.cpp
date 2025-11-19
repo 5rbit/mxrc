@@ -94,7 +94,8 @@ void DataStore::subscribe(const std::string& id, std::shared_ptr<Observer> obser
     }
     std::lock_guard<std::mutex> lock(mutex_);
     if (notifiers_.find(id) == notifiers_.end()) {
-        notifiers_[id] = std::make_unique<MapNotifier>();
+        // Phase 4: shared_ptr로 Notifier 생성
+        notifiers_[id] = std::make_shared<MapNotifier>();
     }
     notifiers_[id]->subscribe(observer);
 }
@@ -110,23 +111,27 @@ void DataStore::unsubscribe(const std::string& id, std::shared_ptr<Observer> obs
 }
 
 void DataStore::notifySubscribers(const SharedData& changed_data) {
-    // notifiers_ 접근은 mutex로 보호 필요
-    Notifier* notifier_raw = nullptr;
+    // Phase 4: shared_ptr 복사로 안전한 생명주기 관리
+    std::shared_ptr<Notifier> notifier;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         auto it = notifiers_.find(changed_data.id);
         if (it != notifiers_.end() && it->second) {
-            // Raw pointer를 로컬 변수에 복사 (unique_ptr가 계속 소유권 유지)
-            notifier_raw = it->second.get();
+            // ✓ shared_ptr 복사 → 참조 카운트 증가
+            notifier = it->second;
+        }
+    }  // 락 해제
+
+    // ✓ 락 없이 notify 호출 (생명주기 보장됨)
+    if (notifier) {
+        try {
+            notifier->notify(changed_data);
+        } catch (const std::exception& e) {
+            // Notifier 콜백 예외 격리
+            // (향후 spdlog로 로깅 추가 가능)
         }
     }
-
-    // 락 해제 후 notify 호출 (MapNotifier 내부에 자체 mutex 있음)
-    // 주의: notifier_raw는 notifiers_ map이 삭제되지 않는 한 유효
-    if (notifier_raw) {
-        notifier_raw->notify(changed_data);
-    }
-}
+}  // notifier 소멸 → 참조 카운트 감소
 
 // FR-007: Data expiration policy management
 void DataStore::applyExpirationPolicy(const std::string& id, const DataExpirationPolicy& policy) {
@@ -157,10 +162,22 @@ void DataStore::cleanExpiredData() {
     }
 }
 
-// FR-008: Observability - Metrics and Logs
+// FR-008: Observability - Metrics and Logs (Phase 3: atomic load)
 std::map<std::string, double> DataStore::getPerformanceMetrics() const {
+    // atomic load (lock-free)
+    std::map<std::string, double> result;
+    result["get_calls"] = static_cast<double>(metrics_.get_calls.load(std::memory_order_relaxed));
+    result["set_calls"] = static_cast<double>(metrics_.set_calls.load(std::memory_order_relaxed));
+    result["poll_calls"] = static_cast<double>(metrics_.poll_calls.load(std::memory_order_relaxed));
+    result["remove_calls"] = static_cast<double>(metrics_.remove_calls.load(std::memory_order_relaxed));
+    result["has_calls"] = static_cast<double>(metrics_.has_calls.load(std::memory_order_relaxed));
+
+    // 기존 코드 (하위 호환성 유지 - 향후 제거)
     std::lock_guard<std::mutex> lock(mutex_);
-    return performance_metrics_;
+    for (const auto& [key, value] : performance_metrics_) {
+        result[key] = value;
+    }
+    return result;
 }
 
 std::vector<std::string> DataStore::getAccessLogs() const {
@@ -221,14 +238,15 @@ void DataStore::loadState(const std::string& filepath) {
     ifs.close();
 }
 
-// FR-014: Security - Access Control
+// FR-014: Security - Access Control (Phase 5: unique_lock for write)
 void DataStore::setAccessPolicy(const std::string& id, const std::string& module_id, bool can_access) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::unique_lock<std::shared_mutex> lock(access_policies_mutex_);
     access_policies_[id][module_id] = can_access;
 }
 
 bool DataStore::hasAccess(const std::string& id, const std::string& module_id) const {
-    std::lock_guard<std::mutex> lock(mutex_);
+    // Phase 5: shared_lock for read-heavy operation (읽기 병렬성 지원)
+    std::shared_lock<std::shared_mutex> lock(access_policies_mutex_);
     auto it_id = access_policies_.find(id);
     if (it_id != access_policies_.end()) {
         auto it_module = it_id->second.find(module_id);

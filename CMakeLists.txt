@@ -110,6 +110,7 @@ add_executable(run_tests
     tests/unit/logging/RetentionManager_test.cpp
     tests/unit/logging/SimpleBagWriter_test.cpp
     tests/unit/logging/DataStoreBagLogger_test.cpp
+    tests/integration/logging/bag_logging_integration_test.cpp
     examples/event_monitoring/ExecutionTimeCollector.cpp
     examples/event_monitoring/StateTransitionLogger.cpp
     src/core/task/core/TaskRegistry.cpp

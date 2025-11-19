@@ -112,6 +112,7 @@ add_executable(run_tests
     tests/unit/logging/DataStoreBagLogger_test.cpp
     tests/unit/logging/Indexer_test.cpp
     tests/unit/logging/BagReader_test.cpp
+    tests/unit/logging/BagReplayer_test.cpp
     tests/integration/logging/bag_logging_integration_test.cpp
     tests/benchmark/logging/datastore_logging_benchmark.cpp
     examples/event_monitoring/ExecutionTimeCollector.cpp
@@ -141,6 +142,7 @@ add_executable(run_tests
     src/core/logging/core/SimpleBagWriter.cpp
     src/core/logging/core/DataStoreBagLogger.cpp
     src/core/logging/core/BagReader.cpp
+    src/core/logging/core/BagReplayer.cpp
 )
 
 target_include_directories(run_tests PUBLIC

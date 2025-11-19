@@ -35,6 +35,7 @@ graph TD
             direction LR
             D[DataStore<br>중앙 상태 저장소]
             E[EventBus<br>비동기 이벤트 버스]
+            L(Logging<br>spdlog)
         end
     end
 
@@ -46,57 +47,54 @@ graph TD
     S <-- 상태 및 결과 --> D
     AC <-- 파라미터 및 결과 --> D
 
+    D <-->|DataStoreEventAdapter| E
+
     T -- 이벤트 발행 --> E
     S -- 이벤트 발행 --> E
     AC -- 이벤트 발행 --> E
-
-    D <-->|DataStoreEventAdapter| E
-
+    
     A -- 이벤트 구독 --> E
+
+    T -.->|로그 기록| L
+    S -.->|로그 기록| L
+    AC -.->|로그 기록| L
+    D -.->|로그 기록| L
+    E -.->|로그 기록| L
+
+    linkStyle 10,11,12,13,14 stroke-width:2px,stroke-dasharray: 3 3
 ```
 
 ### 블록 다이어그램
 
 ```text
-     +---------------------------+
-     |   External Systems / UI   |
-     +-------------+-------------+
-                   |
-     (Schedules)   |
-                   v
-+----------------------------------+
-|           Task Layer             |
-|         (TaskExecutor)           |
-+----------------+-----------------+
-                 |
-   (Executes)    |
-                 v
-+----------------------------------+
-|         Sequence Layer           |
-|        (SequenceEngine)          |
-+----------------+-----------------+
-                 |
-   (Orchestrates)|
-                 v
-+----------------------------------+
-|           Action Layer           |
-|         (ActionExecutor)         |
-+----------------------------------+
-
-* 참고: 모든 실행 계층은 DataStore에 대한 양방향(읽기/쓰기) 접근 권한을 가지며, 
-  EventBus로는 단방향(발행)으로 통신합니다.
-
-+--------------------------------+      
-|           DataStore            |      
-|    (Central State Storage)     |      
-+----------------+---------------+      
-                 ^
-                 | (DataStoreEventAdapter)
-                 v
-+----------------+---------------+
-|            EventBus            |
-|     (Async Event System)       |
-+--------------------------------+
++-----------------------------+
+|   External Systems / UI     |
++--------------+--------------+
+               |
+     Schedules |
+               v
++-----------------------------+ <--------------------------------------> +-----------------------------+
+|         Task Layer          |   (Reads task defs, Writes status)     |                             |
+|       (TaskExecutor)        | -------------------------------------> |          DataStore          |
++--------------+--------------+   (Publishes task events)              |   (Central State Storage)   |
+               |                                                       |                             |
+      Executes |                                                       +--------------+--------------+
+               v                                                                      ^
++-----------------------------+ <--> (Reads action results for conditions)            |
+|       Sequence Layer        | ---> (Publishes sequence events)                      | (DataStoreEventAdapter)
+|      (SequenceEngine)       |                                                       v
++--------------+--------------+                                        +--------------+--------------+
+               |                                                       |                             |
+  Orchestrates |                                                       |          EventBus           |
+               v                                                       |    (Async Event System)     |
++-----------------------------+ <--> (Reads params, Writes results)    |                             |
+|         Action Layer          | ---> (Publishes action events)       +--------------+--------------+
+|       (ActionExecutor)        |                                                     ^
++-----------------------------+                                                     |
+                                                                       +--------------+--------------+
+                                                                       |            Logging          |
+                                                                       |    (Used by all modules)    |
+                                                                       +-----------------------------+
 ```
 
 -   **실행 계층**: 외부의 명령을 받아 실제 동작으로 변환하는 핵심 흐름입니다.
@@ -105,18 +103,29 @@ graph TD
     -   **Action Layer**: 시스템이 수행할 수 있는 가장 기본적인 동작(e.g., `Move`, `Delay`, `GripperControl`)을 실행합니다.
 
 -   **공용 모듈**: 모든 계층이 공유하는 핵심 인프라입니다.
-    -   **DataStore**: 시스템의 모든 상태와 데이터를 저장하는 중앙 저장소 역할을 합니다. (자세한 내용은 4.2 참조)
-    -   **EventBus**: 모듈 간의 통신을 담당하는 비동기 메시징 시스템입니다. (자세한 내용은 4.3 참조)
+    -   **DataStore**: 시스템의 모든 상태와 데이터를 저장하는 중앙 저장소 역할을 합니다.
+    -   **EventBus**: 모듈 간의 통신을 담당하는 비동기 메시징 시스템입니다.
+    -   **Logging**: 시스템 전반의 상태, 오류, 이벤트 등을 기록하는 로깅 유틸리티입니다. 모든 컴포넌트에서 사용됩니다.
 
-## 4. 주요 컴포넌트 상세
+## 4. 실행 계층과 DataStore의 관계
 
-### 4.1. 실행 계층 (Execution Layers)
+요청에 따라, 각 실행 계층이 **어떻게 `DataStore`와 상호작용하는지** 명확히 설명합니다.
+
+-   **Task Layer**: `Task`의 현재 상태(`RUNNING`, `COMPLETED`, `FAILED`)나 진행률과 같은 고수준의 정보를 `DataStore`에 기록하여 외부 시스템이 임무의 진행 상황을 쉽게 파악할 수 있도록 합니다.
+-   **Sequence Layer**: 이전 `Action`의 실행 결과를 `DataStore`에서 읽어와, 다음 `Action`의 실행 여부를 결정하는 조건부 분기(`Conditional Branch`)에 사용합니다.
+-   **Action Layer**: `Action` 실행에 필요한 파라미터(예: 이동할 좌표)를 `DataStore`에서 읽어오거나, `Action`의 결과(예: 센서 측정값)를 `DataStore`에 기록하여 다른 모듈이 사용할 수 있도록 합니다.
+
+이처럼 **모든 실행 계층은 `DataStore`와 긴밀하게 상호작용**하며, 이를 통해 계층 간 데이터 공유 및 시스템 상태의 동기화가 이루어집니다.
+
+## 5. 주요 컴포넌트 상세
+
+### 5.1. 실행 계층 (Execution Layers)
 
 -   **TaskExecutor**: Task의 생명주기와 실행 모드(`ONCE`, `PERIODIC`, `TRIGGERED`)를 관리하며, 적절한 시점에 `SequenceEngine`을 호출합니다.
 -   **SequenceEngine**: `SequenceDefinition`에 따라 `Action`들을 순차, 조건부, 병렬로 실행하고 전체 진행 상황을 모니터링합니다.
 -   **ActionExecutor**: `IAction` 인터페이스를 구현한 개별 `Action` 객체를 받아 비동기적으로 실행하고 결과를 반환합니다.
 
-### 4.2. DataStore (중앙 상태 저장소)
+### 5.2. DataStore (중앙 상태 저장소)
 
 `DataStore`는 시스템의 두뇌와 기억장치 역할을 하는 스레드 안전한 중앙 데이터 저장소입니다. 로봇의 현재 상태, 센서 값, 설정 파라미터 등 모든 정보가 이곳에 저장되고 공유됩니다.
 
@@ -156,7 +165,7 @@ graph LR
     N -- notify (weak_ptr) --> O2
 ```
 
-### 4.3. EventBus (비동기 이벤트 버스)
+### 5.3. EventBus (비동기 이벤트 버스)
 
 `EventBus`는 시스템의 각 컴포넌트가 서로 직접적인 의존 관계없이 통신할 수 있도록 지원하는 비동기 메시징 시스템입니다.
 
@@ -166,7 +175,7 @@ graph LR
 -   **스레드 안전성**: 여러 스레드가 동시에 이벤트를 발행해도 안전하도록 `std::mutex`로 보호되는 Multi-Producer 큐를 사용합니다.
 -   **느슨한 결합**: 이벤트 발행자는 구독자가 누구인지 알 필요가 없으며, 구독자 또한 발행자를 알 필요가 없습니다. `ActionCompleted`, `SequenceFailed` 등 의미 있는 이벤트로만 통신합니다.
 
-## 5. 디렉토리 구조
+## 6. 디렉토리 구조
 
 MXRC 프로젝트는 명확한 책임 분리와 모듈화를 위해 다음과 같은 디렉토리 구조를 가집니다.
 
@@ -190,7 +199,7 @@ mxrc/
 └── ...                          # 빌드 시스템 (CMakeLists.txt), 기타 설정 파일
 ```
 
-## 6. 모듈별 특징
+## 7. 모듈별 특징
 
 MXRC의 주요 모듈들은 다음과 같은 고유한 역할과 특징을 가집니다.
 
@@ -199,16 +208,19 @@ MXRC의 주요 모듈들은 다음과 같은 고유한 역할과 특징을 가�
 -   **ActionExecutor**: `IAction`을 실행하고 타임아웃, 취소, 결과 수집 등을 관리.
 -   **ActionFactory**: `IAction` 인스턴스를 동적으로 생성.
 -   **ActionRegistry**: 사용 가능한 `IAction` 타입들을 등록하고 관리.
+-   **DataStore 연동**: `Action` 실행에 필요한 파라미터(예: 이동 좌표)를 `DataStore`에서 읽거나, 실행 결과(예: 센서 값)를 `DataStore`에 기록합니다.
 
 ### Sequence Layer
 -   **SequenceEngine**: `Action`들의 복잡한 조합(순차, 병렬, 조건부 분기)을 조율하고 실행.
 -   **ConditionEvaluator**: `Sequence` 내 조건식을 평가하여 실행 흐름을 제어.
 -   **RetryHandler**: `Action` 또는 `Sequence` 실패 시 재시도 정책을 적용.
+-   **DataStore 연동**: 이전 `Action`의 실행 결과를 `DataStore`에서 읽어와 다음 `Action`의 실행 여부를 결정하는 조건 분기에 사용합니다.
 
 ### Task Layer
 -   **TaskExecutor**: `Task`의 생명주기를 관리하고 `ONCE`, `PERIODIC`, `TRIGGERED`와 같은 실행 모드를 제어.
 -   **PeriodicScheduler**: 주기적으로 `Task`를 실행하도록 스케줄링.
 -   **TriggerManager**: 특정 이벤트 발생 시 `Task`를 실행하도록 관리.
+-   **DataStore 연동**: `Task`의 전반적인 상태(`RUNNING`, `COMPLETED` 등)를 `DataStore`에 기록하여 외부에서 임무 진행 상황을 모니터링할 수 있게 합니다.
 
 ### DataStore
 -   **중앙 집중식 데이터 관리**: 시스템의 모든 상태와 파라미터를 저장하고 공유하는 단일 접점.

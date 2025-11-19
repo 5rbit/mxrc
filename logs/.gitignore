@@ -1,0 +1,6 @@
+# 로그 파일은 Git에 추가하지 않음
+*.log
+*.log.*
+
+# 로그 디렉토리 보존을 위한 .gitignore 자체는 커밋
+!.gitignore

@@ -12,6 +12,12 @@
 #include <mutex>
 #include <string>
 
+// Forward declaration for EventBus (optional dependency)
+namespace mxrc::core::event {
+    class IEventBus;
+    class IEvent;
+}
+
 namespace mxrc::core::action {
 
 /**
@@ -19,10 +25,18 @@ namespace mxrc::core::action {
  *
  * 개별 Action의 실행, 타임아웃 관리, 결과 수집을 담당합니다.
  * 비동기 실행 및 실시간 타임아웃/취소를 지원합니다.
+ *
+ * EventBus 통합: ActionExecutor는 선택적으로 EventBus를 받아
+ * 모든 주요 상태 전환 시 이벤트를 발행합니다.
  */
-class ActionExecutor {
+class ActionExecutor : public std::enable_shared_from_this<ActionExecutor> {
 public:
-    ActionExecutor() = default;
+    /**
+     * @brief ActionExecutor 생성자
+     *
+     * @param eventBus 이벤트 버스 (nullptr이면 이벤트 발행하지 않음)
+     */
+    explicit ActionExecutor(std::shared_ptr<mxrc::core::event::IEventBus> eventBus = nullptr);
     ~ActionExecutor();
 
     /**
@@ -97,6 +111,18 @@ public:
     int clearCompletedActions();
 
 private:
+    // EventBus (optional)
+    std::shared_ptr<mxrc::core::event::IEventBus> eventBus_;
+
+    /**
+     * @brief 이벤트 발행 헬퍼 (non-blocking)
+     *
+     * @tparam EventType 이벤트 타입
+     * @param event 발행할 이벤트
+     */
+    template<typename EventType>
+    void publishEvent(std::shared_ptr<EventType> event);
+
     /**
      * @brief 실행 중인 액션의 상태
      */
@@ -109,6 +135,8 @@ private:
         std::atomic<bool> shouldStopMonitoring{false};  // 타임아웃 모니터링 중지 플래그
         std::unique_ptr<std::thread> timeoutThread;      // 타임아웃 모니터링 스레드
         ExecutionResult result;
+        bool exceptionOccurred{false};  // 예외 발생 여부
+        std::string exceptionMessage;    // 예외 메시지
 
         ExecutionState() = default;
         ExecutionState(std::shared_ptr<IAction> act,
@@ -120,7 +148,8 @@ private:
             , startTime(start)
             , timeout(to)
             , cancelRequested(false)
-            , shouldStopMonitoring(false) {}
+            , shouldStopMonitoring(false)
+            , exceptionOccurred(false) {}
     };
 
     // 실행 중인 액션 관리

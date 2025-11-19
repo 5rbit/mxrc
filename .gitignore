@@ -60,6 +60,9 @@ Icon?
 # Logs
 *.log
 logs/
+*.bag
+*.jsonl
+*.jsonl.gz
 
 # Temporary files
 *.tmp

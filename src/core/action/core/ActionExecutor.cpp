@@ -1,8 +1,22 @@
 #include "ActionExecutor.h"
 #include "core/action/util/Logger.h"
+#include "interfaces/IEventBus.h"
+#include "dto/ActionEvents.h"
 #include <thread>
 
 namespace mxrc::core::action {
+
+ActionExecutor::ActionExecutor(std::shared_ptr<mxrc::core::event::IEventBus> eventBus)
+    : eventBus_(eventBus) {
+    // EventBus는 optional이므로 nullptr 허용
+}
+
+template<typename EventType>
+void ActionExecutor::publishEvent(std::shared_ptr<EventType> event) {
+    if (eventBus_ && event) {
+        eventBus_->publish(event);
+    }
+}
 
 ActionExecutor::~ActionExecutor() {
     auto logger = Logger::get();
@@ -29,18 +43,25 @@ ActionExecutor::~ActionExecutor() {
     }
 
     // 모든 타임아웃 스레드 종료 대기
+    // NOTE: RAII 패턴으로 안전하게 처리 - 스레드를 먼저 수집한 후 락 없이 join
+    std::vector<std::unique_ptr<std::thread>> threadsToJoin;
     {
         std::lock_guard<std::mutex> lock(actionsMutex_);
         for (auto& [id, state] : runningActions_) {
             if (state.timeoutThread && state.timeoutThread->joinable()) {
-                logger->debug("[ActionExecutor] Joining timeout thread for action {}", id);
-                // 뮤텍스를 잠시 해제하고 join (데드락 방지)
-                actionsMutex_.unlock();
-                state.timeoutThread->join();
-                actionsMutex_.lock();
+                logger->debug("[ActionExecutor] Collecting timeout thread for action {}", id);
+                threadsToJoin.push_back(std::move(state.timeoutThread));
             }
         }
         runningActions_.clear();
+    }
+
+    // 락을 해제한 상태에서 스레드 종료 대기
+    for (auto& thread : threadsToJoin) {
+        if (thread && thread->joinable()) {
+            logger->debug("[ActionExecutor] Joining timeout thread");
+            thread->join();
+        }
     }
 
     logger->info("[ActionExecutor] Destructor completed");
@@ -102,13 +123,46 @@ std::string ActionExecutor::executeAsync(
     logger->info("[ActionExecutor] ASYNC START - Action: {} (type: {}, timeout: {}ms)",
                  actionId, action->getType(), timeout.count());
 
+    // 이벤트 발행: ACTION_STARTED
+    publishEvent(std::make_shared<mxrc::core::event::ActionStartedEvent>(
+        actionId, action->getType()));
+
     // 비동기로 액션 실행
-    auto future = std::async(std::launch::async, [action, &context, actionId, logger]() {
+    auto future = std::async(std::launch::async, [action, &context, actionId, logger, weak_self = weak_from_this(), startTime]() {
+        auto self = weak_self.lock();
+        if (!self) {
+            logger->warn("[ActionExecutor] ASYNC ABORT - ActionExecutor expired before action {} could run.", actionId);
+            return;
+        }
+
         try {
             action->execute(context);
             logger->info("[ActionExecutor] ASYNC COMPLETE - Action {} finished successfully", actionId);
+
+            // 이벤트 발행: ACTION_COMPLETED
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - startTime);
+            self->publishEvent(std::make_shared<mxrc::core::event::ActionCompletedEvent>(
+                actionId, action->getType(), elapsed.count()));
+
         } catch (const std::exception& e) {
             logger->error("[ActionExecutor] ASYNC FAILED - Action {} threw exception: {}", actionId, e.what());
+
+            // 상태에 오류 정보 저장
+            {
+                std::lock_guard<std::mutex> lock(self->actionsMutex_);
+                auto it = self->runningActions_.find(actionId);
+                if (it != self->runningActions_.end()) {
+                    it->second.exceptionOccurred = true;
+                    it->second.exceptionMessage = e.what();
+                }
+            }
+
+            // 이벤트 발행: ACTION_FAILED
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - startTime);
+            self->publishEvent(std::make_shared<mxrc::core::event::ActionFailedEvent>(
+                actionId, action->getType(), e.what(), elapsed.count()));
         }
     });
 
@@ -130,23 +184,22 @@ std::string ActionExecutor::executeAsync(
         auto it = runningActions_.find(actionId);
         if (it != runningActions_.end()) {
             it->second.timeoutThread = std::make_unique<std::thread>(
-                [this, actionId, timeout, startTime, logger]() {
+                [weak_self = weak_from_this(), actionId, timeout, startTime, logger]() {
+                    auto self = weak_self.lock();
+                    if (!self) {
+                        logger->warn("[ActionExecutor] TIMEOUT ABORT - ActionExecutor expired for action {}.", actionId);
+                        return;
+                    }
+
                     while (true) {
                         std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
                         bool shouldTimeout = false;
-                        bool shouldStop = false;
                         {
-                            std::lock_guard<std::mutex> lock(actionsMutex_);
-                            auto it = runningActions_.find(actionId);
-                            if (it == runningActions_.end()) {
-                                // 액션이 이미 완료되어 제거됨
-                                return;
-                            }
-
-                            // 모니터링 중지 요청 확인
-                            if (it->second.shouldStopMonitoring) {
-                                return;
+                            std::lock_guard<std::mutex> lock(self->actionsMutex_);
+                            auto it = self->runningActions_.find(actionId);
+                            if (it == self->runningActions_.end() || it->second.shouldStopMonitoring) {
+                                return; // 액션이 완료되었거나 모니터링 중지 요청
                             }
 
                             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -161,7 +214,14 @@ std::string ActionExecutor::executeAsync(
                         if (shouldTimeout) {
                             logger->warn("[ActionExecutor] TIMEOUT - Action {} exceeded timeout of {}ms, cancelling",
                                         actionId, timeout.count());
-                            cancel(actionId);
+
+                            // 이벤트 발행: ACTION_TIMEOUT
+                            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::steady_clock::now() - startTime);
+                            self->publishEvent(std::make_shared<mxrc::core::event::ActionTimeoutEvent>(
+                                actionId, "", timeout.count(), elapsed.count()));
+
+                            self->cancel(actionId);
                             return;
                         }
                     }
@@ -196,6 +256,10 @@ void ActionExecutor::cancel(const std::string& actionId) {
     if (actionToCancel) {
         actionToCancel->cancel();
         logger->info("[ActionExecutor] Action {} cancel request processed", actionId);
+
+        // 이벤트 발행: ACTION_CANCELLED
+        publishEvent(std::make_shared<mxrc::core::event::ActionCancelledEvent>(
+            actionId, actionToCancel->getType(), 0));
     }
 }
 
@@ -223,6 +287,20 @@ ExecutionResult ActionExecutor::getResult(const std::string& actionId) {
     if (it->second.future.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
         // 완료됨 - 결과 수집
         auto& state = it->second;
+
+        // 예외가 발생한 경우 FAILED 상태 반환
+        if (state.exceptionOccurred) {
+            ExecutionResult result(actionId, ActionStatus::FAILED);
+            result.errorMessage = state.exceptionMessage;
+            result.progress = state.action->getProgress();
+
+            auto endTime = std::chrono::steady_clock::now();
+            result.executionTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+                endTime - state.startTime);
+
+            return result;
+        }
+
         ExecutionResult result(actionId, state.action->getStatus());
         result.progress = state.action->getProgress();
 

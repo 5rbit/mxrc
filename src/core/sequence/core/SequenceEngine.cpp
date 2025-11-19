@@ -1,4 +1,6 @@
 #include "core/sequence/core/SequenceEngine.h"
+#include "interfaces/IEventBus.h"
+#include "dto/SequenceEvents.h"
 #include <thread>
 #include <chrono>
 
@@ -8,12 +10,21 @@ using namespace mxrc::core::action;
 
 SequenceEngine::SequenceEngine(
     std::shared_ptr<ActionFactory> factory,
-    std::shared_ptr<ActionExecutor> executor
+    std::shared_ptr<ActionExecutor> executor,
+    std::shared_ptr<mxrc::core::event::IEventBus> eventBus
 ) : factory_(factory),
     executor_(executor),
+    eventBus_(eventBus),
     conditionEvaluator_(std::make_unique<ConditionEvaluator>()),
     retryHandler_(std::make_unique<RetryHandler>()) {
     Logger::get()->info("SequenceEngine initialized");
+}
+
+template<typename EventType>
+void SequenceEngine::publishEvent(std::shared_ptr<EventType> event) {
+    if (eventBus_ && event) {
+        eventBus_->publish(event);
+    }
 }
 
 SequenceEngine::~SequenceEngine() {
@@ -53,8 +64,14 @@ SequenceResult SequenceEngine::execute(
     state.completedSteps = 0;
     state.cancelRequested = false;
     state.pauseRequested = false;
+    state.startTime = std::chrono::steady_clock::now();
+    state.lastReportedProgress = 0.0f;
 
-    auto startTime = std::chrono::steady_clock::now();
+    auto startTime = state.startTime;
+
+    // 이벤트 발행: SEQUENCE_STARTED
+    publishEvent(std::make_shared<mxrc::core::event::SequenceStartedEvent>(
+        definition.id, definition.name, definition.steps.size()));
 
     // 순차 실행
     SequenceResult result = executeSequential(definition, context, state);
@@ -71,6 +88,21 @@ SequenceResult SequenceEngine::execute(
         result.completedSteps,
         result.totalSteps
     );
+
+    // 이벤트 발행: SEQUENCE_COMPLETED, FAILED, or CANCELLED
+    long durationMs = result.executionTime.count();
+    if (result.status == SequenceStatus::COMPLETED) {
+        publishEvent(std::make_shared<mxrc::core::event::SequenceCompletedEvent>(
+            definition.id, definition.name, result.completedSteps, result.totalSteps, durationMs));
+    } else if (result.status == SequenceStatus::FAILED) {
+        int failedStepIndex = result.completedSteps;  // 실패한 스텝은 completedSteps 이후
+        publishEvent(std::make_shared<mxrc::core::event::SequenceFailedEvent>(
+            definition.id, definition.name, result.errorMessage, result.completedSteps,
+            result.totalSteps, failedStepIndex, durationMs));
+    } else if (result.status == SequenceStatus::CANCELLED) {
+        publishEvent(std::make_shared<mxrc::core::event::SequenceCancelledEvent>(
+            definition.id, definition.name, result.completedSteps, result.totalSteps, durationMs));
+    }
 
     return result;
 }
@@ -119,6 +151,10 @@ SequenceResult SequenceEngine::executeSequential(
             step.actionId, step.actionType
         );
 
+        // 이벤트 발행: SEQUENCE_STEP_STARTED
+        publishEvent(std::make_shared<mxrc::core::event::SequenceStepStartedEvent>(
+            definition.id, step.actionId, step.actionType, static_cast<int>(i), definition.steps.size()));
+
         try {
             // Action 파라미터 준비
             std::map<std::string, std::string> params = step.parameters;
@@ -156,6 +192,10 @@ SequenceResult SequenceEngine::executeSequential(
 
                 if (actionResult.isSuccessful()) {
                     actionSucceeded = true;
+
+                    // 이벤트 발행: SEQUENCE_STEP_COMPLETED (성공 시에만)
+                    publishEvent(std::make_shared<mxrc::core::event::SequenceStepCompletedEvent>(
+                        definition.id, step.actionId, step.actionType, static_cast<int>(i), definition.steps.size()));
                 } else {
                     // 재시도 정책 확인
                     if (definition.retryPolicy.has_value() &&

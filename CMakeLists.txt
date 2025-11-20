@@ -129,6 +129,7 @@ target_include_directories(schedule_generator PRIVATE
 )
 target_link_libraries(schedule_generator PRIVATE
     nlohmann_json::nlohmann_json
+    spdlog::spdlog
 )
 
 # Build validate_schedule tool
@@ -143,6 +144,7 @@ target_include_directories(validate_schedule PRIVATE
 )
 target_link_libraries(validate_schedule PRIVATE
     nlohmann_json::nlohmann_json
+    spdlog::spdlog
 )
 
 # Generate RTSchedule.h from config
@@ -253,6 +255,50 @@ target_include_directories(nonrt PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/rt/util
     ${PROJECT_SOURCE_DIR}/src/core/rt/ipc
 )
+
+# ===========================
+# RT Executive
+# ===========================
+
+# RT executable
+add_executable(rt
+    src/rt_main.cpp
+    src/core/rt/RTExecutive.cpp
+    src/core/rt/RTStateMachine.cpp
+    src/core/rt/RTDataStore.cpp
+    src/core/rt/RTDataStoreShared.cpp
+    src/core/rt/ipc/SharedMemory.cpp
+    src/core/rt/util/TimeUtils.cpp
+    src/core/rt/util/ScheduleCalculator.cpp
+    src/core/event/core/EventBus.cpp
+)
+
+# Link dependencies for rt
+target_link_libraries(rt PRIVATE
+    spdlog::spdlog
+    Threads::Threads
+)
+
+# Enable Address Sanitizer
+target_compile_options(rt PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_libraries(rt PRIVATE -fsanitize=address)
+
+# Include directories for rt
+target_include_directories(rt PUBLIC
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/src/core/rt
+    ${PROJECT_SOURCE_DIR}/src/core/rt/util
+    ${PROJECT_SOURCE_DIR}/src/core/rt/ipc
+    ${PROJECT_SOURCE_DIR}/src/core/event
+    ${PROJECT_SOURCE_DIR}/src/core/event/core
+    ${PROJECT_SOURCE_DIR}/src/core/event/dto
+    ${PROJECT_SOURCE_DIR}/src/core/event/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/event/util
+    ${CMAKE_BINARY_DIR}/generated
+)
+
+# Ensure rt depends on schedule generation
+add_dependencies(rt generate_schedule)
 
 # Enable testing
 enable_testing()

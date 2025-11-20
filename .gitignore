@@ -111,3 +111,9 @@ out/
 .gemini/**
 .gemini/**/*.toml
 .gemini/**/*.log
+
+build/generated/
+
+build/generated/
+
+build/generated/

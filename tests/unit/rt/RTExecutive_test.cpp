@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 #include "core/rt/RTExecutive.h"
 #include "core/rt/RTDataStore.h"
+#include "core/rt/RTStateMachine.h"
+#include "core/rt/ipc/SharedMemoryData.h"
 #include "core/rt/util/ScheduleCalculator.h"
+#include "core/rt/util/TimeUtils.h"
 #include <thread>
 #include <atomic>
 
@@ -196,4 +199,237 @@ TEST_F(RTExecutiveTest, MultiplePeriodicActions) {
     EXPECT_GT(count_20ms, count_50ms);
 
     delete exec;
+}
+
+// ==========================================
+// Guard Condition Tests (TASK-023)
+// ==========================================
+
+// Guard condition - RUNNING 상태에서만 실행
+TEST_F(RTExecutiveTest, GuardConditionRunningOnly) {
+    RTExecutive exec(10, 50);
+
+    std::atomic<int> call_count{0};
+    auto callback = [&call_count](RTContext& ctx) {
+        call_count++;
+    };
+
+    // Guard: RUNNING 상태에서만 실행
+    auto guard = [](const RTStateMachine& sm) {
+        return sm.getState() == RTState::RUNNING;
+    };
+
+    exec.registerAction("guarded_action", 10, callback, guard);
+
+    std::thread exec_thread([&exec]() {
+        exec.run();
+    });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    exec.stop();
+    exec_thread.join();
+
+    // RUNNING 상태에서 실행되었으므로 호출되어야 함
+    EXPECT_GT(call_count, 0);
+}
+
+// Guard condition - 특정 상태에서 차단
+TEST_F(RTExecutiveTest, GuardConditionBlocked) {
+    RTExecutive exec(10, 50);
+
+    std::atomic<int> call_count{0};
+    auto callback = [&call_count](RTContext& ctx) {
+        call_count++;
+    };
+
+    // Guard: PAUSED 상태에서만 실행 (절대 실행되지 않음)
+    auto guard = [](const RTStateMachine& sm) {
+        return sm.getState() == RTState::PAUSED;
+    };
+
+    exec.registerAction("blocked_action", 10, callback, guard);
+
+    std::thread exec_thread([&exec]() {
+        exec.run();
+    });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    exec.stop();
+    exec_thread.join();
+
+    // PAUSED 상태가 아니므로 호출되지 않아야 함
+    EXPECT_EQ(0, call_count);
+}
+
+// Guard condition - nullptr (항상 실행)
+TEST_F(RTExecutiveTest, GuardConditionNull) {
+    RTExecutive exec(10, 50);
+
+    std::atomic<int> call_count{0};
+    auto callback = [&call_count](RTContext& ctx) {
+        call_count++;
+    };
+
+    // Guard가 nullptr이면 항상 실행
+    exec.registerAction("always_action", 10, callback, nullptr);
+
+    std::thread exec_thread([&exec]() {
+        exec.run();
+    });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    exec.stop();
+    exec_thread.join();
+
+    EXPECT_GT(call_count, 0);
+}
+
+// ==========================================
+// Heartbeat & SAFE_MODE Tests (TASK-024)
+// ==========================================
+
+// Heartbeat 정상 동작
+TEST_F(RTExecutiveTest, HeartbeatNormal) {
+    RTExecutive exec(10, 50);
+
+    // Shared memory 생성
+    ipc::SharedMemoryData shm_data{};
+    shm_data.rt_heartbeat_ns.store(0);
+    shm_data.nonrt_heartbeat_ns.store(util::getMonotonicTimeNs());
+
+    exec.setSharedMemory(&shm_data);
+    exec.enableHeartbeatMonitoring(true);
+
+    std::thread exec_thread([&exec]() {
+        exec.run();
+    });
+
+    // Non-RT heartbeat 갱신 시뮬레이션
+    std::thread heartbeat_thread([&shm_data]() {
+        for (int i = 0; i < 5; ++i) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            shm_data.nonrt_heartbeat_ns.store(util::getMonotonicTimeNs());
+        }
+    });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    exec.stop();
+    exec_thread.join();
+    heartbeat_thread.join();
+
+    // SAFE_MODE로 전환되지 않아야 함
+    EXPECT_EQ(RTState::SHUTDOWN, exec.getStateMachine()->getState());
+}
+
+// Heartbeat timeout → SAFE_MODE 진입
+TEST_F(RTExecutiveTest, HeartbeatTimeoutSafeMode) {
+    RTExecutive exec(10, 50);
+
+    // Shared memory 생성
+    ipc::SharedMemoryData shm_data{};
+    shm_data.rt_heartbeat_ns.store(0);
+    // Non-RT heartbeat를 오래된 시간으로 설정 (timeout 유발)
+    shm_data.nonrt_heartbeat_ns.store(util::getMonotonicTimeNs() - 2'000'000'000ULL); // 2초 전
+
+    exec.setSharedMemory(&shm_data);
+    exec.enableHeartbeatMonitoring(true);
+
+    std::atomic<bool> entered_safe_mode{false};
+
+    // State transition callback으로 SAFE_MODE 진입 감지
+    exec.getStateMachine()->setTransitionCallback(
+        [&entered_safe_mode](RTState from, RTState to, RTEvent event) {
+            if (to == RTState::SAFE_MODE && event == RTEvent::SAFE_MODE_ENTER) {
+                entered_safe_mode = true;
+            }
+        }
+    );
+
+    std::thread exec_thread([&exec]() {
+        exec.run();
+    });
+
+    // 충분한 시간 대기 (heartbeat check 발생)
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    exec.stop();
+    exec_thread.join();
+
+    // SAFE_MODE로 진입했어야 함
+    EXPECT_TRUE(entered_safe_mode);
+}
+
+// Heartbeat 복구 → SAFE_MODE 탈출
+TEST_F(RTExecutiveTest, HeartbeatRecoverySafeModeExit) {
+    RTExecutive exec(10, 50);
+
+    // Shared memory 생성
+    ipc::SharedMemoryData shm_data{};
+    shm_data.rt_heartbeat_ns.store(0);
+    // 처음에는 timeout
+    shm_data.nonrt_heartbeat_ns.store(util::getMonotonicTimeNs() - 2'000'000'000ULL);
+
+    exec.setSharedMemory(&shm_data);
+    exec.enableHeartbeatMonitoring(true);
+
+    std::atomic<bool> exited_safe_mode{false};
+
+    exec.getStateMachine()->setTransitionCallback(
+        [&exited_safe_mode](RTState from, RTState to, RTEvent event) {
+            if (from == RTState::SAFE_MODE && event == RTEvent::SAFE_MODE_EXIT) {
+                exited_safe_mode = true;
+            }
+        }
+    );
+
+    std::thread exec_thread([&exec]() {
+        exec.run();
+    });
+
+    // SAFE_MODE 진입 대기
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+    // Heartbeat 복구
+    shm_data.nonrt_heartbeat_ns.store(util::getMonotonicTimeNs());
+
+    // 복구 확인 대기
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+    exec.stop();
+    exec_thread.join();
+
+    // SAFE_MODE에서 탈출했어야 함
+    EXPECT_TRUE(exited_safe_mode);
+}
+
+// Heartbeat monitoring 비활성화 시 SAFE_MODE 진입하지 않음
+TEST_F(RTExecutiveTest, HeartbeatMonitoringDisabled) {
+    RTExecutive exec(10, 50);
+
+    ipc::SharedMemoryData shm_data{};
+    shm_data.rt_heartbeat_ns.store(0);
+    shm_data.nonrt_heartbeat_ns.store(util::getMonotonicTimeNs() - 2'000'000'000ULL);
+
+    exec.setSharedMemory(&shm_data);
+    exec.enableHeartbeatMonitoring(false);  // 비활성화
+
+    std::atomic<bool> entered_safe_mode{false};
+
+    exec.getStateMachine()->setTransitionCallback(
+        [&entered_safe_mode](RTState from, RTState to, RTEvent event) {
+            if (to == RTState::SAFE_MODE) {
+                entered_safe_mode = true;
+            }
+        }
+    );
+
+    std::thread exec_thread([&exec]() {
+        exec.run();
+    });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    exec.stop();
+    exec_thread.join();
+
+    // Monitoring이 비활성화되어 SAFE_MODE로 진입하지 않아야 함
+    EXPECT_FALSE(entered_safe_mode);
 }

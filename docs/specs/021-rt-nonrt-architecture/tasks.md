@@ -461,7 +461,7 @@ RT Executive에 10ms/100ms 주기 동기화 Action을 등록합니다.
 주기 설정을 위한 JSON 스키마를 정의합니다.
 
 **체크리스트**:
-- [ ] config/rt_schedule.json 생성
+- [X] config/rt_schedule.json 생성
   ```json
   {
     "periods_ms": [1, 5, 10, 20, 50, 100],

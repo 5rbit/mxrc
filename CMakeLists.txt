@@ -51,6 +51,10 @@ add_executable(mxrc
     src/core/logging/util/FileUtils.cpp
     src/core/logging/core/AsyncWriter.cpp
     src/core/logging/util/RetentionManager.cpp
+    # RT Executive
+    src/core/rt/RTExecutive.cpp
+    src/core/rt/util/TimeUtils.cpp
+    src/core/rt/util/ScheduleCalculator.cpp
 )
 
 # Link dependencies
@@ -97,6 +101,9 @@ target_include_directories(mxrc PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/logging/core
     ${PROJECT_SOURCE_DIR}/src/core/logging/dto
     ${PROJECT_SOURCE_DIR}/src/core/logging/util
+    ${PROJECT_SOURCE_DIR}/src/core/rt
+    ${PROJECT_SOURCE_DIR}/src/core/rt/util
+    ${PROJECT_SOURCE_DIR}/src/core/rt/ipc
 )
 
 # Enable testing

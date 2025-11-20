@@ -175,6 +175,85 @@ add_dependencies(mxrc generate_schedule)
 # Add generated directory to .gitignore
 file(APPEND ${PROJECT_SOURCE_DIR}/.gitignore "\nbuild/generated/\n")
 
+# ===========================
+# Non-RT Executive
+# ===========================
+
+# Non-RT executable
+add_executable(nonrt
+    src/nonrt_main.cpp
+    src/core/nonrt/NonRTExecutive.cpp
+    src/core/action/core/ActionExecutor.cpp
+    src/core/action/core/ActionFactory.cpp
+    src/core/action/core/ActionRegistry.cpp
+    src/core/action/impl/DelayAction.cpp
+    src/core/action/impl/MoveAction.cpp
+    src/core/sequence/core/SequenceRegistry.cpp
+    src/core/sequence/core/SequenceEngine.cpp
+    src/core/sequence/core/ConditionEvaluator.cpp
+    src/core/sequence/core/RetryHandler.cpp
+    src/core/task/core/TaskRegistry.cpp
+    src/core/task/core/TaskExecutor.cpp
+    src/core/task/core/PeriodicScheduler.cpp
+    src/core/task/core/TriggerManager.cpp
+    src/core/task/core/TaskMonitor.cpp
+    src/core/event/core/EventBus.cpp
+    src/core/event/adapters/DataStoreEventAdapter.cpp
+    src/core/datastore/DataStore.cpp
+    # DataStore manager classes
+    src/core/datastore/managers/ExpirationManager.cpp
+    src/core/datastore/managers/AccessControlManager.cpp
+    src/core/datastore/managers/MetricsCollector.cpp
+    src/core/datastore/managers/LogManager.cpp
+    # RT IPC
+    src/core/rt/ipc/SharedMemory.cpp
+    src/core/rt/util/TimeUtils.cpp
+)
+
+# Link dependencies for nonrt
+target_link_libraries(nonrt PRIVATE
+    spdlog::spdlog
+    TBB::tbb
+    nlohmann_json::nlohmann_json
+    Threads::Threads
+)
+
+# Enable Address Sanitizer
+target_compile_options(nonrt PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_libraries(nonrt PRIVATE -fsanitize=address)
+
+# Include directories for nonrt
+target_include_directories(nonrt PUBLIC
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/src/core/action
+    ${PROJECT_SOURCE_DIR}/src/core/action/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/action/core
+    ${PROJECT_SOURCE_DIR}/src/core/action/dto
+    ${PROJECT_SOURCE_DIR}/src/core/action/impl
+    ${PROJECT_SOURCE_DIR}/src/core/action/util
+    ${PROJECT_SOURCE_DIR}/src/core/sequence
+    ${PROJECT_SOURCE_DIR}/src/core/sequence/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/sequence/core
+    ${PROJECT_SOURCE_DIR}/src/core/sequence/dto
+    ${PROJECT_SOURCE_DIR}/src/core/sequence/integration
+    ${PROJECT_SOURCE_DIR}/src/core/task
+    ${PROJECT_SOURCE_DIR}/src/core/task/core
+    ${PROJECT_SOURCE_DIR}/src/core/task/dto
+    ${PROJECT_SOURCE_DIR}/src/core/task/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/event
+    ${PROJECT_SOURCE_DIR}/src/core/event/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/event/core
+    ${PROJECT_SOURCE_DIR}/src/core/event/dto
+    ${PROJECT_SOURCE_DIR}/src/core/event/util
+    ${PROJECT_SOURCE_DIR}/src/core/event/adapters
+    ${PROJECT_SOURCE_DIR}/src/core/datastore
+    ${PROJECT_SOURCE_DIR}/src/core/datastore/managers
+    ${PROJECT_SOURCE_DIR}/src/core/nonrt
+    ${PROJECT_SOURCE_DIR}/src/core/rt
+    ${PROJECT_SOURCE_DIR}/src/core/rt/util
+    ${PROJECT_SOURCE_DIR}/src/core/rt/ipc
+)
+
 # Enable testing
 enable_testing()
 

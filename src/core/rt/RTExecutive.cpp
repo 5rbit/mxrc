@@ -2,6 +2,7 @@
 #include "RTStateMachine.h"
 #include "util/TimeUtils.h"
 #include "util/ScheduleCalculator.h"
+#include "ipc/SharedMemoryData.h"
 #include <spdlog/spdlog.h>
 #include <sched.h>
 
@@ -16,7 +17,10 @@ RTExecutive::RTExecutive(uint32_t minor_cycle_ms, uint32_t major_cycle_ms)
     , running_(false)
     , current_slot_(0)
     , cycle_count_(0)
-    , state_machine_(std::make_unique<RTStateMachine>()) {
+    , state_machine_(std::make_unique<RTStateMachine>())
+    , shared_memory_ptr_(nullptr)
+    , heartbeat_monitoring_enabled_(false)
+    , last_heartbeat_check_ns_(0) {
 
     // Initialize schedule slots
     schedule_.resize(num_slots_);
@@ -91,6 +95,9 @@ int RTExecutive::run() {
         context_.cycle_count = cycle_count_;
         context_.timestamp_ns = cycle_start_ns;
 
+        // Check heartbeat (매 사이클 - 1ms)
+        checkHeartbeat();
+
         // Execute actions for current slot
         executeSlot(current_slot_);
 
@@ -121,7 +128,8 @@ void RTExecutive::stop() {
     }
 }
 
-int RTExecutive::registerAction(const std::string& name, uint32_t period_ms, ActionCallback callback) {
+int RTExecutive::registerAction(const std::string& name, uint32_t period_ms, ActionCallback callback,
+                                GuardCondition guard) {
     // Validate period is a multiple of minor cycle
     if (period_ms % minor_cycle_ms_ != 0) {
         spdlog::error("Action period {}ms is not a multiple of minor cycle {}ms",
@@ -135,7 +143,7 @@ int RTExecutive::registerAction(const std::string& name, uint32_t period_ms, Act
     // Add action to all appropriate slots
     // Action은 slot_interval마다 실행되어야 함
     for (uint32_t slot = 0; slot < num_slots_; slot += slot_interval) {
-        ActionSlot action{name, period_ms, callback, slot_interval};
+        ActionSlot action{name, period_ms, callback, guard, slot_interval};
         schedule_[slot].push_back(action);
     }
 
@@ -146,6 +154,14 @@ int RTExecutive::registerAction(const std::string& name, uint32_t period_ms, Act
 
 void RTExecutive::executeSlot(uint32_t slot) {
     for (auto& action : schedule_[slot]) {
+        // Check guard condition first
+        if (action.guard) {
+            if (!action.guard(*state_machine_)) {
+                spdlog::trace("Skipping action '{}' - guard condition failed", action.name);
+                continue;
+            }
+        }
+
         spdlog::trace("Executing action '{}'", action.name);
 
         // Execute action with context
@@ -163,6 +179,43 @@ void RTExecutive::setDataStore(RTDataStore* data_store) {
 int RTExecutive::waitUntilNextCycle(uint64_t cycle_start_ns, uint64_t cycle_duration_ns) {
     uint64_t wakeup_time_ns = cycle_start_ns + cycle_duration_ns;
     return util::waitUntilAbsoluteTime(wakeup_time_ns);
+}
+
+void RTExecutive::setSharedMemory(void* shared_mem_ptr) {
+    shared_memory_ptr_ = shared_mem_ptr;
+    last_heartbeat_check_ns_ = util::getMonotonicTimeNs();
+    spdlog::info("Shared memory attached for heartbeat monitoring");
+}
+
+void RTExecutive::checkHeartbeat() {
+    if (!heartbeat_monitoring_enabled_ || !shared_memory_ptr_) {
+        return;
+    }
+
+    auto* shm_data = static_cast<ipc::SharedMemoryData*>(shared_memory_ptr_);
+    uint64_t now_ns = util::getMonotonicTimeNs();
+
+    // Check Non-RT heartbeat
+    uint64_t nonrt_hb_ns = shm_data->nonrt_heartbeat_ns.load(std::memory_order_acquire);
+    uint64_t time_since_last_hb = now_ns - nonrt_hb_ns;
+
+    if (time_since_last_hb > ipc::SharedMemoryData::HEARTBEAT_TIMEOUT_NS) {
+        // Heartbeat 실패 - SAFE_MODE 진입
+        if (state_machine_->getState() == RTState::RUNNING) {
+            spdlog::warn("Non-RT heartbeat lost (timeout: {} ms), entering SAFE_MODE",
+                        time_since_last_hb / 1'000'000);
+            state_machine_->handleEvent(RTEvent::SAFE_MODE_ENTER);
+        }
+    } else {
+        // Heartbeat 정상 - SAFE_MODE에서 복구
+        if (state_machine_->getState() == RTState::SAFE_MODE) {
+            spdlog::info("Non-RT heartbeat recovered, exiting SAFE_MODE");
+            state_machine_->handleEvent(RTEvent::SAFE_MODE_EXIT);
+        }
+    }
+
+    // Update RT heartbeat (1ms마다)
+    shm_data->rt_heartbeat_ns.store(now_ns, std::memory_order_release);
 }
 
 } // namespace rt

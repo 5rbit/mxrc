@@ -40,11 +40,23 @@ int RTStateMachine::handleEvent(RTEvent event) {
                 next_state = RTState::SHUTDOWN;
             } else if (event == RTEvent::ERROR_OCCUR) {
                 next_state = RTState::ERROR;
+            } else if (event == RTEvent::SAFE_MODE_ENTER) {
+                next_state = RTState::SAFE_MODE;
             }
             break;
 
         case RTState::PAUSED:
             if (event == RTEvent::RESUME) {
+                next_state = RTState::RUNNING;
+            } else if (event == RTEvent::STOP) {
+                next_state = RTState::SHUTDOWN;
+            } else if (event == RTEvent::ERROR_OCCUR) {
+                next_state = RTState::ERROR;
+            }
+            break;
+
+        case RTState::SAFE_MODE:
+            if (event == RTEvent::SAFE_MODE_EXIT) {
                 next_state = RTState::RUNNING;
             } else if (event == RTEvent::STOP) {
                 next_state = RTState::SHUTDOWN;
@@ -110,6 +122,7 @@ std::string RTStateMachine::stateToString(RTState state) {
         case RTState::READY: return "READY";
         case RTState::RUNNING: return "RUNNING";
         case RTState::PAUSED: return "PAUSED";
+        case RTState::SAFE_MODE: return "SAFE_MODE";
         case RTState::ERROR: return "ERROR";
         case RTState::SHUTDOWN: return "SHUTDOWN";
         default: return "UNKNOWN";
@@ -123,6 +136,8 @@ std::string RTStateMachine::eventToString(RTEvent event) {
         case RTEvent::RESUME: return "RESUME";
         case RTEvent::STOP: return "STOP";
         case RTEvent::ERROR_OCCUR: return "ERROR_OCCUR";
+        case RTEvent::SAFE_MODE_ENTER: return "SAFE_MODE_ENTER";
+        case RTEvent::SAFE_MODE_EXIT: return "SAFE_MODE_EXIT";
         case RTEvent::RESET: return "RESET";
         default: return "UNKNOWN";
     }

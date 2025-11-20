@@ -110,6 +110,71 @@ target_include_directories(mxrc PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/rt/ipc
 )
 
+# ===========================
+# RT Schedule Tools
+# ===========================
+
+# Create generated directory
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/generated)
+
+# Build schedule_generator tool
+add_executable(schedule_generator
+    tools/schedule_generator.cpp
+    src/core/rt/util/ScheduleCalculator.cpp
+)
+target_include_directories(schedule_generator PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/src/core/rt
+    ${PROJECT_SOURCE_DIR}/src/core/rt/util
+)
+target_link_libraries(schedule_generator PRIVATE
+    nlohmann_json::nlohmann_json
+)
+
+# Build validate_schedule tool
+add_executable(validate_schedule
+    tools/validate_schedule.cpp
+    src/core/rt/util/ScheduleCalculator.cpp
+)
+target_include_directories(validate_schedule PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/src/core/rt
+    ${PROJECT_SOURCE_DIR}/src/core/rt/util
+)
+target_link_libraries(validate_schedule PRIVATE
+    nlohmann_json::nlohmann_json
+)
+
+# Generate RTSchedule.h from config
+add_custom_command(
+    OUTPUT ${CMAKE_BINARY_DIR}/generated/RTSchedule.h
+    COMMAND validate_schedule ${CMAKE_SOURCE_DIR}/config/rt_schedule.json
+    COMMAND schedule_generator
+            ${CMAKE_SOURCE_DIR}/config/rt_schedule.json
+            ${CMAKE_BINARY_DIR}/generated/RTSchedule.h
+    DEPENDS
+        schedule_generator
+        validate_schedule
+        ${CMAKE_SOURCE_DIR}/config/rt_schedule.json
+    COMMENT "Generating RT schedule from config..."
+)
+
+# Create custom target for schedule generation
+add_custom_target(generate_schedule
+    DEPENDS ${CMAKE_BINARY_DIR}/generated/RTSchedule.h
+)
+
+# Add generated directory to include path
+target_include_directories(mxrc PUBLIC
+    ${CMAKE_BINARY_DIR}/generated
+)
+
+# Ensure mxrc depends on schedule generation
+add_dependencies(mxrc generate_schedule)
+
+# Add generated directory to .gitignore
+file(APPEND ${PROJECT_SOURCE_DIR}/.gitignore "\nbuild/generated/\n")
+
 # Enable testing
 enable_testing()
 

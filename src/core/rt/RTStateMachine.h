@@ -14,18 +14,21 @@ enum class RTState : uint8_t {
     READY,         // 준비 (스케줄 설정 완료)
     RUNNING,       // 실행 중
     PAUSED,        // 일시정지
+    SAFE_MODE,     // 안전 모드 (Non-RT heartbeat 실패)
     ERROR,         // 오류 발생
     SHUTDOWN       // 종료
 };
 
 // 상태 전환 이벤트
 enum class RTEvent : uint8_t {
-    START = 0,     // 시작 요청
-    PAUSE,         // 일시정지 요청
-    RESUME,        // 재개 요청
-    STOP,          // 중지 요청
-    ERROR_OCCUR,   // 오류 발생
-    RESET          // 리셋
+    START = 0,         // 시작 요청
+    PAUSE,             // 일시정지 요청
+    RESUME,            // 재개 요청
+    STOP,              // 중지 요청
+    ERROR_OCCUR,       // 오류 발생
+    SAFE_MODE_ENTER,   // 안전 모드 진입 (heartbeat 실패)
+    SAFE_MODE_EXIT,    // 안전 모드 탈출 (heartbeat 복구)
+    RESET              // 리셋
 };
 
 // 상태 전환 콜백

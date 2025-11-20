@@ -59,19 +59,19 @@ NEW_PLAN="$IMPL_PLAN"  # Alias for compatibility with existing code
 AGENT_TYPE="${1:-}"
 
 # Agent-specific file paths  
-CLAUDE_FILE="$REPO_ROOT/CLAUDE.md"
-GEMINI_FILE="$REPO_ROOT/GEMINI.md"
+CLAUDE_FILE="$REPO_ROOT/dev/agent/CLAUDE.md"
+GEMINI_FILE="$REPO_ROOT/dev/agent/GEMINI.md"
 COPILOT_FILE="$REPO_ROOT/.github/copilot-instructions.md"
 CURSOR_FILE="$REPO_ROOT/.cursor/rules/specify-rules.mdc"
 QWEN_FILE="$REPO_ROOT/QWEN.md"
-AGENTS_FILE="$REPO_ROOT/AGENTS.md"
+AGENTS_FILE="$REPO_ROOT/dev/agent/AGENTS.md"
 WINDSURF_FILE="$REPO_ROOT/.windsurf/rules/specify-rules.md"
 KILOCODE_FILE="$REPO_ROOT/.kilocode/rules/specify-rules.md"
 AUGGIE_FILE="$REPO_ROOT/.augment/rules/specify-rules.md"
 ROO_FILE="$REPO_ROOT/.roo/rules/specify-rules.md"
 CODEBUDDY_FILE="$REPO_ROOT/CODEBUDDY.md"
-AMP_FILE="$REPO_ROOT/AGENTS.md"
-Q_FILE="$REPO_ROOT/AGENTS.md"
+AMP_FILE="$REPO_ROOT/dev/agent/AGENTS.md"
+Q_FILE="$REPO_ROOT/dev/agent/AGENTS.md"
 
 # Template file
 TEMPLATE_FILE="$REPO_ROOT/.specify/templates/agent-file-template.md"

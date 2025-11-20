@@ -22,6 +22,7 @@ enum class RTState : uint8_t;
 class RTExecutive {
 public:
     using ActionCallback = std::function<void(RTContext&)>;
+    using GuardCondition = std::function<bool(const RTStateMachine&)>;
 
     // minor_cycle_ms: 최소 주기 (ms)
     // major_cycle_ms: 전체 프레임 크기 (ms)
@@ -43,8 +44,10 @@ public:
 
     // 주기적으로 실행할 action 등록
     // period_ms: 실행 주기 (ms), minor_cycle의 배수여야 함
+    // guard: 실행 전 검증 조건 (optional, nullptr이면 항상 실행)
     // 반환: 성공 0, 실패 -1
-    int registerAction(const std::string& name, uint32_t period_ms, ActionCallback callback);
+    int registerAction(const std::string& name, uint32_t period_ms, ActionCallback callback,
+                       GuardCondition guard = nullptr);
 
     // RTDataStore 설정
     void setDataStore(RTDataStore* data_store);
@@ -58,7 +61,15 @@ public:
     RTStateMachine* getStateMachine() { return state_machine_.get(); }
     const RTStateMachine* getStateMachine() const { return state_machine_.get(); }
 
+    // Shared memory 설정 (heartbeat monitoring용)
+    void setSharedMemory(void* shared_mem_ptr);
+
+    // Heartbeat monitoring 활성화/비활성화
+    void enableHeartbeatMonitoring(bool enable) { heartbeat_monitoring_enabled_ = enable; }
+
 private:
+    // Non-RT Heartbeat 체크 및 SAFE_MODE 전환
+    void checkHeartbeat();
     // 현재 슬롯의 모든 action 실행
     void executeSlot(uint32_t slot);
 
@@ -81,11 +92,17 @@ private:
     // State machine
     std::unique_ptr<RTStateMachine> state_machine_;
 
+    // Shared memory for heartbeat monitoring
+    void* shared_memory_ptr_;
+    bool heartbeat_monitoring_enabled_;
+    uint64_t last_heartbeat_check_ns_;
+
     // Action storage
     struct ActionSlot {
         std::string name;
         uint32_t period_ms;
         ActionCallback callback;
+        GuardCondition guard;  // Guard condition (nullptr = always execute)
         uint32_t next_slot;
     };
     std::vector<std::vector<ActionSlot>> schedule_;

@@ -12,10 +12,17 @@ RTExecutive::RTExecutive(uint32_t minor_cycle_ms, uint32_t major_cycle_ms)
     , major_cycle_ms_(major_cycle_ms)
     , num_slots_(major_cycle_ms / minor_cycle_ms)
     , running_(false)
-    , current_slot_(0) {
+    , current_slot_(0)
+    , cycle_count_(0) {
 
     // Initialize schedule slots
     schedule_.resize(num_slots_);
+
+    // Initialize context
+    context_.data_store = nullptr;
+    context_.current_slot = 0;
+    context_.cycle_count = 0;
+    context_.timestamp_ns = 0;
 
     spdlog::info("RTExecutive initialized: minor_cycle={}ms, major_cycle={}ms, slots={}",
                  minor_cycle_ms_, major_cycle_ms_, num_slots_);
@@ -46,17 +53,24 @@ int RTExecutive::run() {
 
     running_ = true;
     current_slot_ = 0;
+    cycle_count_ = 0;
 
     uint64_t cycle_duration_ns = minor_cycle_ms_ * 1'000'000ULL;
     uint64_t cycle_start_ns = util::getMonotonicTimeNs();
 
     // Main cyclic executive loop
     while (running_) {
+        // Update context
+        context_.current_slot = current_slot_;
+        context_.cycle_count = cycle_count_;
+        context_.timestamp_ns = cycle_start_ns;
+
         // Execute actions for current slot
         executeSlot(current_slot_);
 
         // Move to next slot
         current_slot_ = (current_slot_ + 1) % num_slots_;
+        cycle_count_++;
 
         // Wait until next cycle
         uint64_t next_cycle_ns = cycle_start_ns + cycle_duration_ns;
@@ -97,10 +111,18 @@ int RTExecutive::registerAction(const std::string& name, uint32_t period_ms, Act
 
 void RTExecutive::executeSlot(uint32_t slot) {
     for (auto& action : schedule_[slot]) {
-        // TODO: Execute action with context
-        // For now, just log
         spdlog::trace("Executing action '{}'", action.name);
+
+        // Execute action with context
+        if (action.callback) {
+            action.callback(context_);
+        }
     }
+}
+
+void RTExecutive::setDataStore(RTDataStore* data_store) {
+    context_.data_store = data_store;
+    spdlog::info("RTDataStore attached to RTExecutive");
 }
 
 int RTExecutive::waitUntilNextCycle(uint64_t cycle_start_ns, uint64_t cycle_duration_ns) {

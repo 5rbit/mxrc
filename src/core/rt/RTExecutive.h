@@ -1,19 +1,20 @@
 #pragma once
 
+#include "RTContext.h"
 #include <atomic>
 #include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
+#include <memory>
 
 namespace mxrc {
 namespace core {
 namespace rt {
 
 // Forward declarations
-struct RTContext;
+class RTDataStore;
 class RTStateMachine;
-struct SharedMemoryRegion;
 
 // 실시간 주기 실행기
 // SCHED_FIFO 우선순위와 절대 시간 기반 대기로 jitter 최소화
@@ -39,6 +40,9 @@ public:
     // 반환: 성공 0, 실패 -1
     int registerAction(const std::string& name, uint32_t period_ms, ActionCallback callback);
 
+    // RTDataStore 설정
+    void setDataStore(RTDataStore* data_store);
+
 private:
     // 현재 슬롯의 모든 action 실행
     void executeSlot(uint32_t slot);
@@ -54,6 +58,10 @@ private:
     // Runtime state
     std::atomic<bool> running_;
     uint32_t current_slot_;
+    uint64_t cycle_count_;
+
+    // RTContext for action callbacks
+    RTContext context_;
 
     // Action storage
     struct ActionSlot {

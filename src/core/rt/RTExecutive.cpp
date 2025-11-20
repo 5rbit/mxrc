@@ -1,4 +1,5 @@
 #include "RTExecutive.h"
+#include "RTStateMachine.h"
 #include "util/TimeUtils.h"
 #include "util/ScheduleCalculator.h"
 #include <spdlog/spdlog.h>
@@ -14,7 +15,8 @@ RTExecutive::RTExecutive(uint32_t minor_cycle_ms, uint32_t major_cycle_ms)
     , num_slots_(major_cycle_ms / minor_cycle_ms)
     , running_(false)
     , current_slot_(0)
-    , cycle_count_(0) {
+    , cycle_count_(0)
+    , state_machine_(std::make_unique<RTStateMachine>()) {
 
     // Initialize schedule slots
     schedule_.resize(num_slots_);
@@ -24,6 +26,9 @@ RTExecutive::RTExecutive(uint32_t minor_cycle_ms, uint32_t major_cycle_ms)
     context_.current_slot = 0;
     context_.cycle_count = 0;
     context_.timestamp_ns = 0;
+
+    // INIT -> READY 전환
+    state_machine_->handleEvent(RTEvent::START);
 
     spdlog::info("RTExecutive initialized: minor_cycle={}ms, major_cycle={}ms, slots={}",
                  minor_cycle_ms_, major_cycle_ms_, num_slots_);
@@ -50,6 +55,11 @@ RTExecutive::~RTExecutive() {
 
 int RTExecutive::run() {
     spdlog::info("RTExecutive starting...");
+
+    // READY -> RUNNING 전환
+    if (state_machine_->getState() == RTState::READY) {
+        state_machine_->handleEvent(RTEvent::START);
+    }
 
     // Set RT priority
     if (util::setPriority(SCHED_FIFO, 90) != 0) {
@@ -102,6 +112,12 @@ void RTExecutive::stop() {
     if (running_) {
         spdlog::info("RTExecutive stopping...");
         running_ = false;
+
+        // RUNNING/PAUSED -> SHUTDOWN 전환
+        if (state_machine_->getState() == RTState::RUNNING ||
+            state_machine_->getState() == RTState::PAUSED) {
+            state_machine_->handleEvent(RTEvent::STOP);
+        }
     }
 }
 

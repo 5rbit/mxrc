@@ -15,6 +15,7 @@ namespace rt {
 // Forward declarations
 class RTDataStore;
 class RTStateMachine;
+enum class RTState : uint8_t;
 
 // 실시간 주기 실행기
 // SCHED_FIFO 우선순위와 절대 시간 기반 대기로 jitter 최소화
@@ -53,6 +54,10 @@ public:
     uint32_t getMajorCycleMs() const { return major_cycle_ms_; }
     uint32_t getNumSlots() const { return num_slots_; }
 
+    // 상태 머신 조회
+    RTStateMachine* getStateMachine() { return state_machine_.get(); }
+    const RTStateMachine* getStateMachine() const { return state_machine_.get(); }
+
 private:
     // 현재 슬롯의 모든 action 실행
     void executeSlot(uint32_t slot);
@@ -72,6 +77,9 @@ private:
 
     // RTContext for action callbacks
     RTContext context_;
+
+    // State machine
+    std::unique_ptr<RTStateMachine> state_machine_;
 
     // Action storage
     struct ActionSlot {

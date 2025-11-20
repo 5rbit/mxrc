@@ -301,10 +301,12 @@ add_executable(run_tests
     tests/integration/logging/CrashSafety_test.cpp
     tests/benchmark/logging/datastore_logging_benchmark.cpp
     tests/unit/rt/RTDataStore_test.cpp
+    tests/unit/rt/RTDataStore_concurrency_test.cpp
     tests/unit/rt/SharedMemory_test.cpp
     tests/unit/rt/RTExecutive_test.cpp
     tests/unit/rt/RTStateMachine_test.cpp
     tests/integration/rt/rt_integration_test.cpp
+    tests/core/rt/RTExecutiveEventBusTest.cpp
     examples/event_monitoring/ExecutionTimeCollector.cpp
     examples/event_monitoring/StateTransitionLogger.cpp
     src/core/task/core/TaskRegistry.cpp
@@ -393,6 +395,7 @@ target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/rt/ipc
     ${PROJECT_SOURCE_DIR}/tests/unit/rt
     ${PROJECT_SOURCE_DIR}/tests/integration/rt
+    ${PROJECT_SOURCE_DIR}/tests/core/rt
 )
 
 

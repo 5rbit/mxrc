@@ -3,6 +3,8 @@
 #include "util/TimeUtils.h"
 #include "util/ScheduleCalculator.h"
 #include "ipc/SharedMemoryData.h"
+#include "core/event/interfaces/IEventBus.h"
+#include "core/event/dto/RTEvents.h"
 #include <spdlog/spdlog.h>
 #include <sched.h>
 
@@ -10,7 +12,8 @@ namespace mxrc {
 namespace core {
 namespace rt {
 
-RTExecutive::RTExecutive(uint32_t minor_cycle_ms, uint32_t major_cycle_ms)
+RTExecutive::RTExecutive(uint32_t minor_cycle_ms, uint32_t major_cycle_ms,
+                         std::shared_ptr<event::IEventBus> event_bus)
     : minor_cycle_ms_(minor_cycle_ms)
     , major_cycle_ms_(major_cycle_ms)
     , num_slots_(major_cycle_ms / minor_cycle_ms)
@@ -20,7 +23,9 @@ RTExecutive::RTExecutive(uint32_t minor_cycle_ms, uint32_t major_cycle_ms)
     , state_machine_(std::make_unique<RTStateMachine>())
     , shared_memory_ptr_(nullptr)
     , heartbeat_monitoring_enabled_(false)
-    , last_heartbeat_check_ns_(0) {
+    , last_heartbeat_check_ns_(0)
+    , safe_mode_enter_time_ns_(0)
+    , event_bus_(event_bus) {
 
     // Initialize schedule slots
     schedule_.resize(num_slots_);
@@ -31,7 +36,21 @@ RTExecutive::RTExecutive(uint32_t minor_cycle_ms, uint32_t major_cycle_ms)
     context_.cycle_count = 0;
     context_.timestamp_ns = 0;
 
-    // INIT -> READY 전환
+    // INIT -> READY 전환 (상태 변경 콜백 등록 후)
+    if (event_bus_) {
+        state_machine_->setTransitionCallback(
+            [this](RTState from, RTState to, RTEvent event) {
+                // RT 상태 변경 이벤트 발행
+                auto state_event = std::make_shared<event::RTStateChangedEvent>(
+                    state_machine_->stateToString(from),
+                    state_machine_->stateToString(to),
+                    state_machine_->eventToString(event)
+                );
+                event_bus_->publish(state_event);
+            }
+        );
+    }
+
     state_machine_->handleEvent(RTEvent::START);
 
     spdlog::info("RTExecutive initialized: minor_cycle={}ms, major_cycle={}ms, slots={}",
@@ -204,13 +223,35 @@ void RTExecutive::checkHeartbeat() {
         if (state_machine_->getState() == RTState::RUNNING) {
             spdlog::warn("Non-RT heartbeat lost (timeout: {} ms), entering SAFE_MODE",
                         time_since_last_hb / 1'000'000);
+
+            // SAFE_MODE 진입 시각 기록
+            safe_mode_enter_time_ns_ = now_ns;
+
+            // SAFE_MODE 진입 이벤트 발행
+            if (event_bus_) {
+                auto event = std::make_shared<event::RTSafeModeEnteredEvent>(
+                    time_since_last_hb / 1'000'000,  // ms
+                    "Non-RT heartbeat timeout"
+                );
+                event_bus_->publish(event);
+            }
+
             state_machine_->handleEvent(RTEvent::SAFE_MODE_ENTER);
         }
     } else {
         // Heartbeat 정상 - SAFE_MODE에서 복구
         if (state_machine_->getState() == RTState::SAFE_MODE) {
             spdlog::info("Non-RT heartbeat recovered, exiting SAFE_MODE");
+
+            // SAFE_MODE 복구 이벤트 발행
+            if (event_bus_ && safe_mode_enter_time_ns_ > 0) {
+                uint64_t downtime_ms = (now_ns - safe_mode_enter_time_ns_) / 1'000'000;
+                auto event = std::make_shared<event::RTSafeModeExitedEvent>(downtime_ms);
+                event_bus_->publish(event);
+            }
+
             state_machine_->handleEvent(RTEvent::SAFE_MODE_EXIT);
+            safe_mode_enter_time_ns_ = 0;
         }
     }
 

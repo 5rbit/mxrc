@@ -10,6 +10,11 @@
 
 namespace mxrc {
 namespace core {
+
+namespace event {
+class IEventBus;
+}
+
 namespace rt {
 
 // Forward declarations
@@ -26,7 +31,9 @@ public:
 
     // minor_cycle_ms: 최소 주기 (ms)
     // major_cycle_ms: 전체 프레임 크기 (ms)
-    RTExecutive(uint32_t minor_cycle_ms, uint32_t major_cycle_ms);
+    // event_bus: EventBus (optional, nullptr이면 이벤트 발행하지 않음)
+    RTExecutive(uint32_t minor_cycle_ms, uint32_t major_cycle_ms,
+                std::shared_ptr<event::IEventBus> event_bus = nullptr);
 
     // 주기 배열로부터 동적 초기화
     // periods_ms: 등록할 action들의 주기 배열
@@ -96,6 +103,10 @@ private:
     void* shared_memory_ptr_;
     bool heartbeat_monitoring_enabled_;
     uint64_t last_heartbeat_check_ns_;
+    uint64_t safe_mode_enter_time_ns_;  // SAFE_MODE 진입 시각
+
+    // EventBus for publishing state change events
+    std::shared_ptr<event::IEventBus> event_bus_;
 
     // Action storage
     struct ActionSlot {

@@ -160,6 +160,7 @@ add_executable(run_tests
     tests/unit/rt/SharedMemory_test.cpp
     tests/unit/rt/RTExecutive_test.cpp
     tests/unit/rt/RTStateMachine_test.cpp
+    tests/integration/rt/rt_integration_test.cpp
     examples/event_monitoring/ExecutionTimeCollector.cpp
     examples/event_monitoring/StateTransitionLogger.cpp
     src/core/task/core/TaskRegistry.cpp
@@ -247,6 +248,7 @@ target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/rt/util
     ${PROJECT_SOURCE_DIR}/src/core/rt/ipc
     ${PROJECT_SOURCE_DIR}/tests/unit/rt
+    ${PROJECT_SOURCE_DIR}/tests/integration/rt
 )
 
 

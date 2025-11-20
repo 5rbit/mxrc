@@ -53,6 +53,7 @@ add_executable(mxrc
     src/core/logging/util/RetentionManager.cpp
     # RT Executive
     src/core/rt/RTExecutive.cpp
+    src/core/rt/RTDataStore.cpp
     src/core/rt/util/TimeUtils.cpp
     src/core/rt/util/ScheduleCalculator.cpp
 )
@@ -152,6 +153,7 @@ add_executable(run_tests
     tests/integration/logging/bag_logging_integration_test.cpp
     tests/integration/logging/CrashSafety_test.cpp
     tests/benchmark/logging/datastore_logging_benchmark.cpp
+    tests/unit/rt/RTDataStore_test.cpp
     examples/event_monitoring/ExecutionTimeCollector.cpp
     examples/event_monitoring/StateTransitionLogger.cpp
     src/core/task/core/TaskRegistry.cpp
@@ -184,6 +186,10 @@ add_executable(run_tests
     src/core/logging/core/DataStoreBagLogger.cpp
     src/core/logging/core/BagReader.cpp
     src/core/logging/core/BagReplayer.cpp
+    # RT Executive
+    src/core/rt/RTDataStore.cpp
+    src/core/rt/util/TimeUtils.cpp
+    src/core/rt/util/ScheduleCalculator.cpp
 )
 
 target_include_directories(run_tests PUBLIC
@@ -227,6 +233,10 @@ target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/tests/unit/logging
     ${PROJECT_SOURCE_DIR}/tests/integration/logging
     ${PROJECT_SOURCE_DIR}/tests/benchmark/logging
+    ${PROJECT_SOURCE_DIR}/src/core/rt
+    ${PROJECT_SOURCE_DIR}/src/core/rt/util
+    ${PROJECT_SOURCE_DIR}/src/core/rt/ipc
+    ${PROJECT_SOURCE_DIR}/tests/unit/rt
 )
 
 

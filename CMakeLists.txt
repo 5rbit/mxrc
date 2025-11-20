@@ -51,6 +51,14 @@ add_executable(mxrc
     src/core/logging/util/FileUtils.cpp
     src/core/logging/core/AsyncWriter.cpp
     src/core/logging/util/RetentionManager.cpp
+    # RT Executive
+    src/core/rt/RTExecutive.cpp
+    src/core/rt/RTStateMachine.cpp
+    src/core/rt/RTDataStore.cpp
+    src/core/rt/RTDataStoreShared.cpp
+    src/core/rt/ipc/SharedMemory.cpp
+    src/core/rt/util/TimeUtils.cpp
+    src/core/rt/util/ScheduleCalculator.cpp
 )
 
 # Link dependencies
@@ -97,7 +105,200 @@ target_include_directories(mxrc PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/logging/core
     ${PROJECT_SOURCE_DIR}/src/core/logging/dto
     ${PROJECT_SOURCE_DIR}/src/core/logging/util
+    ${PROJECT_SOURCE_DIR}/src/core/rt
+    ${PROJECT_SOURCE_DIR}/src/core/rt/util
+    ${PROJECT_SOURCE_DIR}/src/core/rt/ipc
 )
+
+# ===========================
+# RT Schedule Tools
+# ===========================
+
+# Create generated directory
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/generated)
+
+# Build schedule_generator tool
+add_executable(schedule_generator
+    tools/schedule_generator.cpp
+    src/core/rt/util/ScheduleCalculator.cpp
+)
+target_include_directories(schedule_generator PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/src/core/rt
+    ${PROJECT_SOURCE_DIR}/src/core/rt/util
+)
+target_link_libraries(schedule_generator PRIVATE
+    nlohmann_json::nlohmann_json
+    spdlog::spdlog
+)
+
+# Build validate_schedule tool
+add_executable(validate_schedule
+    tools/validate_schedule.cpp
+    src/core/rt/util/ScheduleCalculator.cpp
+)
+target_include_directories(validate_schedule PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/src/core/rt
+    ${PROJECT_SOURCE_DIR}/src/core/rt/util
+)
+target_link_libraries(validate_schedule PRIVATE
+    nlohmann_json::nlohmann_json
+    spdlog::spdlog
+)
+
+# Generate RTSchedule.h from config
+add_custom_command(
+    OUTPUT ${CMAKE_BINARY_DIR}/generated/RTSchedule.h
+    COMMAND validate_schedule ${CMAKE_SOURCE_DIR}/config/rt_schedule.json
+    COMMAND schedule_generator
+            ${CMAKE_SOURCE_DIR}/config/rt_schedule.json
+            ${CMAKE_BINARY_DIR}/generated/RTSchedule.h
+    DEPENDS
+        schedule_generator
+        validate_schedule
+        ${CMAKE_SOURCE_DIR}/config/rt_schedule.json
+    COMMENT "Generating RT schedule from config..."
+)
+
+# Create custom target for schedule generation
+add_custom_target(generate_schedule
+    DEPENDS ${CMAKE_BINARY_DIR}/generated/RTSchedule.h
+)
+
+# Add generated directory to include path
+target_include_directories(mxrc PUBLIC
+    ${CMAKE_BINARY_DIR}/generated
+)
+
+# Ensure mxrc depends on schedule generation
+add_dependencies(mxrc generate_schedule)
+
+# Add generated directory to .gitignore
+file(APPEND ${PROJECT_SOURCE_DIR}/.gitignore "\nbuild/generated/\n")
+
+# ===========================
+# Non-RT Executive
+# ===========================
+
+# Non-RT executable
+add_executable(nonrt
+    src/nonrt_main.cpp
+    src/core/nonrt/NonRTExecutive.cpp
+    src/core/action/core/ActionExecutor.cpp
+    src/core/action/core/ActionFactory.cpp
+    src/core/action/core/ActionRegistry.cpp
+    src/core/action/impl/DelayAction.cpp
+    src/core/action/impl/MoveAction.cpp
+    src/core/sequence/core/SequenceRegistry.cpp
+    src/core/sequence/core/SequenceEngine.cpp
+    src/core/sequence/core/ConditionEvaluator.cpp
+    src/core/sequence/core/RetryHandler.cpp
+    src/core/task/core/TaskRegistry.cpp
+    src/core/task/core/TaskExecutor.cpp
+    src/core/task/core/PeriodicScheduler.cpp
+    src/core/task/core/TriggerManager.cpp
+    src/core/task/core/TaskMonitor.cpp
+    src/core/event/core/EventBus.cpp
+    src/core/event/adapters/DataStoreEventAdapter.cpp
+    src/core/datastore/DataStore.cpp
+    # DataStore manager classes
+    src/core/datastore/managers/ExpirationManager.cpp
+    src/core/datastore/managers/AccessControlManager.cpp
+    src/core/datastore/managers/MetricsCollector.cpp
+    src/core/datastore/managers/LogManager.cpp
+    # RT IPC
+    src/core/rt/ipc/SharedMemory.cpp
+    src/core/rt/util/TimeUtils.cpp
+)
+
+# Link dependencies for nonrt
+target_link_libraries(nonrt PRIVATE
+    spdlog::spdlog
+    TBB::tbb
+    nlohmann_json::nlohmann_json
+    Threads::Threads
+)
+
+# Enable Address Sanitizer
+target_compile_options(nonrt PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_libraries(nonrt PRIVATE -fsanitize=address)
+
+# Include directories for nonrt
+target_include_directories(nonrt PUBLIC
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/src/core/action
+    ${PROJECT_SOURCE_DIR}/src/core/action/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/action/core
+    ${PROJECT_SOURCE_DIR}/src/core/action/dto
+    ${PROJECT_SOURCE_DIR}/src/core/action/impl
+    ${PROJECT_SOURCE_DIR}/src/core/action/util
+    ${PROJECT_SOURCE_DIR}/src/core/sequence
+    ${PROJECT_SOURCE_DIR}/src/core/sequence/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/sequence/core
+    ${PROJECT_SOURCE_DIR}/src/core/sequence/dto
+    ${PROJECT_SOURCE_DIR}/src/core/sequence/integration
+    ${PROJECT_SOURCE_DIR}/src/core/task
+    ${PROJECT_SOURCE_DIR}/src/core/task/core
+    ${PROJECT_SOURCE_DIR}/src/core/task/dto
+    ${PROJECT_SOURCE_DIR}/src/core/task/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/event
+    ${PROJECT_SOURCE_DIR}/src/core/event/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/event/core
+    ${PROJECT_SOURCE_DIR}/src/core/event/dto
+    ${PROJECT_SOURCE_DIR}/src/core/event/util
+    ${PROJECT_SOURCE_DIR}/src/core/event/adapters
+    ${PROJECT_SOURCE_DIR}/src/core/datastore
+    ${PROJECT_SOURCE_DIR}/src/core/datastore/managers
+    ${PROJECT_SOURCE_DIR}/src/core/nonrt
+    ${PROJECT_SOURCE_DIR}/src/core/rt
+    ${PROJECT_SOURCE_DIR}/src/core/rt/util
+    ${PROJECT_SOURCE_DIR}/src/core/rt/ipc
+)
+
+# ===========================
+# RT Executive
+# ===========================
+
+# RT executable
+add_executable(rt
+    src/rt_main.cpp
+    src/core/rt/RTExecutive.cpp
+    src/core/rt/RTStateMachine.cpp
+    src/core/rt/RTDataStore.cpp
+    src/core/rt/RTDataStoreShared.cpp
+    src/core/rt/ipc/SharedMemory.cpp
+    src/core/rt/util/TimeUtils.cpp
+    src/core/rt/util/ScheduleCalculator.cpp
+    src/core/event/core/EventBus.cpp
+)
+
+# Link dependencies for rt
+target_link_libraries(rt PRIVATE
+    spdlog::spdlog
+    Threads::Threads
+)
+
+# Enable Address Sanitizer
+target_compile_options(rt PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_libraries(rt PRIVATE -fsanitize=address)
+
+# Include directories for rt
+target_include_directories(rt PUBLIC
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/src/core/rt
+    ${PROJECT_SOURCE_DIR}/src/core/rt/util
+    ${PROJECT_SOURCE_DIR}/src/core/rt/ipc
+    ${PROJECT_SOURCE_DIR}/src/core/event
+    ${PROJECT_SOURCE_DIR}/src/core/event/core
+    ${PROJECT_SOURCE_DIR}/src/core/event/dto
+    ${PROJECT_SOURCE_DIR}/src/core/event/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/event/util
+    ${CMAKE_BINARY_DIR}/generated
+)
+
+# Ensure rt depends on schedule generation
+add_dependencies(rt generate_schedule)
 
 # Enable testing
 enable_testing()
@@ -145,6 +346,13 @@ add_executable(run_tests
     tests/integration/logging/bag_logging_integration_test.cpp
     tests/integration/logging/CrashSafety_test.cpp
     tests/benchmark/logging/datastore_logging_benchmark.cpp
+    tests/unit/rt/RTDataStore_test.cpp
+    tests/unit/rt/RTDataStore_concurrency_test.cpp
+    tests/unit/rt/SharedMemory_test.cpp
+    tests/unit/rt/RTExecutive_test.cpp
+    tests/unit/rt/RTStateMachine_test.cpp
+    tests/integration/rt/rt_integration_test.cpp
+    tests/core/rt/RTExecutiveEventBusTest.cpp
     examples/event_monitoring/ExecutionTimeCollector.cpp
     examples/event_monitoring/StateTransitionLogger.cpp
     src/core/task/core/TaskRegistry.cpp
@@ -177,6 +385,14 @@ add_executable(run_tests
     src/core/logging/core/DataStoreBagLogger.cpp
     src/core/logging/core/BagReader.cpp
     src/core/logging/core/BagReplayer.cpp
+    # RT Executive
+    src/core/rt/RTExecutive.cpp
+    src/core/rt/RTStateMachine.cpp
+    src/core/rt/RTDataStore.cpp
+    src/core/rt/RTDataStoreShared.cpp
+    src/core/rt/ipc/SharedMemory.cpp
+    src/core/rt/util/TimeUtils.cpp
+    src/core/rt/util/ScheduleCalculator.cpp
 )
 
 target_include_directories(run_tests PUBLIC
@@ -220,6 +436,12 @@ target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/tests/unit/logging
     ${PROJECT_SOURCE_DIR}/tests/integration/logging
     ${PROJECT_SOURCE_DIR}/tests/benchmark/logging
+    ${PROJECT_SOURCE_DIR}/src/core/rt
+    ${PROJECT_SOURCE_DIR}/src/core/rt/util
+    ${PROJECT_SOURCE_DIR}/src/core/rt/ipc
+    ${PROJECT_SOURCE_DIR}/tests/unit/rt
+    ${PROJECT_SOURCE_DIR}/tests/integration/rt
+    ${PROJECT_SOURCE_DIR}/tests/core/rt
 )
 
 

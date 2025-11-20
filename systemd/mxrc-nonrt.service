@@ -1,0 +1,44 @@
+[Unit]
+Description=MXRC Non-RT Process
+Documentation=https://github.com/mxrc/mxrc
+After=network.target mxrc-rt.service
+Requires=mxrc-rt.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/mxrc-nonrt
+Restart=always
+RestartSec=1
+
+# 일반 스케줄링 (SCHED_OTHER)
+# Non-RT는 특별한 권한이 필요 없음
+
+# 프로세스 제한
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# 보안 설정
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+
+# 공유 메모리 접근 허용
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+
+# 로깅
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mxrc-nonrt
+
+# 실행 사용자/그룹
+User=mxrc
+Group=mxrc
+
+# 작업 디렉토리
+WorkingDirectory=/var/lib/mxrc
+
+[Install]
+WantedBy=multi-user.target

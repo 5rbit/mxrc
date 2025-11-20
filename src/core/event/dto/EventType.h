@@ -86,6 +86,16 @@ enum class EventType {
     /** DataStore 값 삭제됨 */
     DATASTORE_VALUE_REMOVED,
 
+    // ===== RT (Real-Time) Events =====
+    /** RT 상태 변경됨 */
+    RT_STATE_CHANGED,
+
+    /** RT SAFE_MODE 진입 */
+    RT_SAFE_MODE_ENTERED,
+
+    /** RT SAFE_MODE 복구 */
+    RT_SAFE_MODE_EXITED,
+
     // ===== System Events =====
     /** 알 수 없는 이벤트 타입 (오류 처리용) */
     UNKNOWN
@@ -128,6 +138,11 @@ inline std::string eventTypeToString(EventType type) {
         // DataStore Events
         case EventType::DATASTORE_VALUE_CHANGED: return "DATASTORE_VALUE_CHANGED";
         case EventType::DATASTORE_VALUE_REMOVED: return "DATASTORE_VALUE_REMOVED";
+
+        // RT Events
+        case EventType::RT_STATE_CHANGED: return "RT_STATE_CHANGED";
+        case EventType::RT_SAFE_MODE_ENTERED: return "RT_SAFE_MODE_ENTERED";
+        case EventType::RT_SAFE_MODE_EXITED: return "RT_SAFE_MODE_EXITED";
 
         // System Events
         case EventType::UNKNOWN:

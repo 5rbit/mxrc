@@ -57,7 +57,9 @@ RTExecutive::RTExecutive(uint32_t minor_cycle_ms, uint32_t major_cycle_ms,
                  minor_cycle_ms_, major_cycle_ms_, num_slots_);
 }
 
-RTExecutive* RTExecutive::createFromPeriods(const std::vector<uint32_t>& periods_ms) {
+std::unique_ptr<RTExecutive> RTExecutive::createFromPeriods(
+    const std::vector<uint32_t>& periods_ms,
+    std::shared_ptr<event::IEventBus> event_bus) {
     try {
         // 주기 배열로부터 스케줄 파라미터 계산
         auto params = util::calculate(periods_ms);
@@ -65,7 +67,7 @@ RTExecutive* RTExecutive::createFromPeriods(const std::vector<uint32_t>& periods
         spdlog::info("Creating RTExecutive from periods: minor={}ms, major={}ms, slots={}",
                      params.minor_cycle_ms, params.major_cycle_ms, params.num_slots);
 
-        return new RTExecutive(params.minor_cycle_ms, params.major_cycle_ms);
+        return std::make_unique<RTExecutive>(params.minor_cycle_ms, params.major_cycle_ms, event_bus);
     } catch (const std::exception& e) {
         spdlog::error("Failed to create RTExecutive from periods: {}", e.what());
         return nullptr;

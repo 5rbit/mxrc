@@ -118,25 +118,25 @@ TEST_F(SharedMemoryTest, SequenceNumberSync) {
     RTDataStoreShared shared1;
     ASSERT_EQ(0, shared1.createShared("/test_shm"));
 
-    // Sequence 증가
+    // Sequence 증가 (Seqlock: set할 때마다 +2)
     shared1.getDataStore()->setInt32(DataKey::ROBOT_X, 10);
-    EXPECT_EQ(1, shared1.getDataStore()->getSeq(DataKey::ROBOT_X));
+    EXPECT_EQ(2, shared1.getDataStore()->getSeq(DataKey::ROBOT_X));
 
     shared1.getDataStore()->setInt32(DataKey::ROBOT_X, 20);
-    EXPECT_EQ(2, shared1.getDataStore()->getSeq(DataKey::ROBOT_X));
+    EXPECT_EQ(4, shared1.getDataStore()->getSeq(DataKey::ROBOT_X));
 
     // 다른 인스턴스에서 확인
     RTDataStoreShared shared2;
     ASSERT_EQ(0, shared2.openShared("/test_shm"));
 
-    EXPECT_EQ(2, shared2.getDataStore()->getSeq(DataKey::ROBOT_X));
+    EXPECT_EQ(4, shared2.getDataStore()->getSeq(DataKey::ROBOT_X));
 
     // shared2에서 증가
     shared2.getDataStore()->setInt32(DataKey::ROBOT_X, 30);
-    EXPECT_EQ(3, shared2.getDataStore()->getSeq(DataKey::ROBOT_X));
+    EXPECT_EQ(6, shared2.getDataStore()->getSeq(DataKey::ROBOT_X));
 
     // shared1에서 확인
-    EXPECT_EQ(3, shared1.getDataStore()->getSeq(DataKey::ROBOT_X));
+    EXPECT_EQ(6, shared1.getDataStore()->getSeq(DataKey::ROBOT_X));
 }
 
 // Timestamp 동기화

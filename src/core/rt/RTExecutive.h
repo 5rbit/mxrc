@@ -38,7 +38,8 @@ public:
     // 주기 배열로부터 동적 초기화
     // periods_ms: 등록할 action들의 주기 배열
     // 반환: 성공 0, 실패 -1
-    static RTExecutive* createFromPeriods(const std::vector<uint32_t>& periods_ms);
+    static std::unique_ptr<RTExecutive> createFromPeriods(const std::vector<uint32_t>& periods_ms,
+                                                           std::shared_ptr<event::IEventBus> event_bus = nullptr);
 
     ~RTExecutive();
 

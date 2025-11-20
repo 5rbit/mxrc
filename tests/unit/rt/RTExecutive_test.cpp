@@ -28,46 +28,40 @@ TEST_F(RTExecutiveTest, BasicConstruction) {
 // createFromPeriods - 단일 주기
 TEST_F(RTExecutiveTest, CreateFromSinglePeriod) {
     std::vector<uint32_t> periods = {20};
-    auto* exec = RTExecutive::createFromPeriods(periods);
+    auto exec = RTExecutive::createFromPeriods(periods);
 
     ASSERT_NE(nullptr, exec);
     EXPECT_EQ(20, exec->getMinorCycleMs());
     EXPECT_EQ(20, exec->getMajorCycleMs());
     EXPECT_EQ(1, exec->getNumSlots());
-
-    delete exec;
 }
 
 // createFromPeriods - 여러 주기
 TEST_F(RTExecutiveTest, CreateFromMultiplePeriods) {
     std::vector<uint32_t> periods = {10, 20, 50};
-    auto* exec = RTExecutive::createFromPeriods(periods);
+    auto exec = RTExecutive::createFromPeriods(periods);
 
     ASSERT_NE(nullptr, exec);
     EXPECT_EQ(10, exec->getMinorCycleMs());  // GCD(10, 20, 50) = 10
     EXPECT_EQ(100, exec->getMajorCycleMs()); // LCM(10, 20, 50) = 100
     EXPECT_EQ(10, exec->getNumSlots());
-
-    delete exec;
 }
 
 // createFromPeriods - 복잡한 주기
 TEST_F(RTExecutiveTest, CreateFromComplexPeriods) {
     std::vector<uint32_t> periods = {12, 18, 24};
-    auto* exec = RTExecutive::createFromPeriods(periods);
+    auto exec = RTExecutive::createFromPeriods(periods);
 
     ASSERT_NE(nullptr, exec);
     EXPECT_EQ(6, exec->getMinorCycleMs());   // GCD(12, 18, 24) = 6
     EXPECT_EQ(72, exec->getMajorCycleMs());  // LCM(12, 18, 24) = 72
     EXPECT_EQ(12, exec->getNumSlots());
-
-    delete exec;
 }
 
 // createFromPeriods - 빈 배열
 TEST_F(RTExecutiveTest, CreateFromEmptyPeriods) {
     std::vector<uint32_t> periods;
-    auto* exec = RTExecutive::createFromPeriods(periods);
+    auto exec = RTExecutive::createFromPeriods(periods);
 
     EXPECT_EQ(nullptr, exec);
 }
@@ -75,7 +69,7 @@ TEST_F(RTExecutiveTest, CreateFromEmptyPeriods) {
 // createFromPeriods - 0 주기
 TEST_F(RTExecutiveTest, CreateFromZeroPeriod) {
     std::vector<uint32_t> periods = {0, 10};
-    auto* exec = RTExecutive::createFromPeriods(periods);
+    auto exec = RTExecutive::createFromPeriods(periods);
 
     EXPECT_EQ(nullptr, exec);
 }
@@ -84,7 +78,7 @@ TEST_F(RTExecutiveTest, CreateFromZeroPeriod) {
 TEST_F(RTExecutiveTest, CreateFromExcessivePeriods) {
     // LCM이 MAX_MAJOR_CYCLE_MS(1000)을 초과하는 경우
     std::vector<uint32_t> periods = {7, 11, 13, 17};  // LCM = 17017
-    auto* exec = RTExecutive::createFromPeriods(periods);
+    auto exec = RTExecutive::createFromPeriods(periods);
 
     EXPECT_EQ(nullptr, exec);
 }
@@ -175,7 +169,7 @@ TEST_F(RTExecutiveTest, ContextInfo) {
 
 // 여러 주기의 Action 등록
 TEST_F(RTExecutiveTest, MultiplePeriodicActions) {
-    auto* exec = RTExecutive::createFromPeriods({10, 20, 50});
+    auto exec = RTExecutive::createFromPeriods({10, 20, 50});
     ASSERT_NE(nullptr, exec);
 
     std::atomic<int> count_10ms{0};
@@ -186,7 +180,7 @@ TEST_F(RTExecutiveTest, MultiplePeriodicActions) {
     exec->registerAction("20ms", 20, [&count_20ms](RTContext&) { count_20ms++; });
     exec->registerAction("50ms", 50, [&count_50ms](RTContext&) { count_50ms++; });
 
-    std::thread exec_thread([exec]() {
+    std::thread exec_thread([&exec]() {
         exec->run();
     });
 
@@ -197,8 +191,6 @@ TEST_F(RTExecutiveTest, MultiplePeriodicActions) {
     // 비율 확인: 10ms가 가장 많이, 50ms가 가장 적게 호출
     EXPECT_GT(count_10ms, count_20ms);
     EXPECT_GT(count_20ms, count_50ms);
-
-    delete exec;
 }
 
 // ==========================================

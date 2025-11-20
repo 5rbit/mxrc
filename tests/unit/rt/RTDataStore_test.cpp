@@ -99,13 +99,13 @@ TEST_F(RTDataStoreTest, SequenceIncrement) {
     EXPECT_EQ(0, store_.getSeq(DataKey::ROBOT_X));
 
     store_.setInt32(DataKey::ROBOT_X, 10);
-    EXPECT_EQ(1, store_.getSeq(DataKey::ROBOT_X));
+    EXPECT_EQ(2, store_.getSeq(DataKey::ROBOT_X));  // Seqlock: set할 때마다 +2 (쓰기 시작, 쓰기 완료)
 
     store_.setInt32(DataKey::ROBOT_X, 20);
-    EXPECT_EQ(2, store_.getSeq(DataKey::ROBOT_X));
+    EXPECT_EQ(4, store_.getSeq(DataKey::ROBOT_X));  // 2 + 2 = 4
 
     store_.setInt32(DataKey::ROBOT_X, 30);
-    EXPECT_EQ(3, store_.getSeq(DataKey::ROBOT_X));
+    EXPECT_EQ(6, store_.getSeq(DataKey::ROBOT_X));  // 4 + 2 = 6
 }
 
 // Atomic sequence increment

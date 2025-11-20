@@ -2,6 +2,7 @@
 #include "util/TimeUtils.h"
 #include <spdlog/spdlog.h>
 #include <cstring>
+#include <thread>
 
 namespace mxrc {
 namespace core {
@@ -21,10 +22,17 @@ int RTDataStore::setInt32(DataKey key, int32_t value) {
     }
 
     auto idx = static_cast<size_t>(key);
+
+    // Seqlock: 쓰기 시작 (seq를 홀수로)
+    entries_[idx].seq.fetch_add(1, std::memory_order_release);
+
+    // 데이터 쓰기
     entries_[idx].value.i32 = value;
     entries_[idx].type = DataType::INT32;
     entries_[idx].timestamp_ns = util::getMonotonicTimeNs();
-    entries_[idx].seq.fetch_add(1, std::memory_order_relaxed);
+
+    // Seqlock: 쓰기 완료 (seq를 짝수로)
+    entries_[idx].seq.fetch_add(1, std::memory_order_release);
 
     return 0;
 }
@@ -35,10 +43,17 @@ int RTDataStore::setFloat(DataKey key, float value) {
     }
 
     auto idx = static_cast<size_t>(key);
+
+    // Seqlock: 쓰기 시작 (seq를 홀수로)
+    entries_[idx].seq.fetch_add(1, std::memory_order_release);
+
+    // 데이터 쓰기
     entries_[idx].value.f32 = value;
     entries_[idx].type = DataType::FLOAT;
     entries_[idx].timestamp_ns = util::getMonotonicTimeNs();
-    entries_[idx].seq.fetch_add(1, std::memory_order_relaxed);
+
+    // Seqlock: 쓰기 완료 (seq를 짝수로)
+    entries_[idx].seq.fetch_add(1, std::memory_order_release);
 
     return 0;
 }
@@ -49,10 +64,17 @@ int RTDataStore::setDouble(DataKey key, double value) {
     }
 
     auto idx = static_cast<size_t>(key);
+
+    // Seqlock: 쓰기 시작 (seq를 홀수로)
+    entries_[idx].seq.fetch_add(1, std::memory_order_release);
+
+    // 데이터 쓰기
     entries_[idx].value.f64 = value;
     entries_[idx].type = DataType::DOUBLE;
     entries_[idx].timestamp_ns = util::getMonotonicTimeNs();
-    entries_[idx].seq.fetch_add(1, std::memory_order_relaxed);
+
+    // Seqlock: 쓰기 완료 (seq를 짝수로)
+    entries_[idx].seq.fetch_add(1, std::memory_order_release);
 
     return 0;
 }
@@ -63,10 +85,17 @@ int RTDataStore::setUint64(DataKey key, uint64_t value) {
     }
 
     auto idx = static_cast<size_t>(key);
+
+    // Seqlock: 쓰기 시작 (seq를 홀수로)
+    entries_[idx].seq.fetch_add(1, std::memory_order_release);
+
+    // 데이터 쓰기
     entries_[idx].value.u64 = value;
     entries_[idx].type = DataType::UINT64;
     entries_[idx].timestamp_ns = util::getMonotonicTimeNs();
-    entries_[idx].seq.fetch_add(1, std::memory_order_relaxed);
+
+    // Seqlock: 쓰기 완료 (seq를 짝수로)
+    entries_[idx].seq.fetch_add(1, std::memory_order_release);
 
     return 0;
 }
@@ -78,14 +107,19 @@ int RTDataStore::setString(DataKey key, const char* value, size_t len) {
 
     auto idx = static_cast<size_t>(key);
 
+    // Seqlock: 쓰기 시작 (seq를 홀수로)
+    entries_[idx].seq.fetch_add(1, std::memory_order_release);
+
+    // 데이터 쓰기
     // 최대 31바이트 복사 (null terminator 포함 32바이트)
     size_t copy_len = (len < 31) ? len : 31;
     std::memcpy(entries_[idx].value.str, value, copy_len);
     entries_[idx].value.str[copy_len] = '\0';
-
     entries_[idx].type = DataType::STRING;
     entries_[idx].timestamp_ns = util::getMonotonicTimeNs();
-    entries_[idx].seq.fetch_add(1, std::memory_order_relaxed);
+
+    // Seqlock: 쓰기 완료 (seq를 짝수로)
+    entries_[idx].seq.fetch_add(1, std::memory_order_release);
 
     return 0;
 }
@@ -96,11 +130,38 @@ int RTDataStore::getInt32(DataKey key, int32_t& out_value) const {
     }
 
     auto idx = static_cast<size_t>(key);
-    if (entries_[idx].type != DataType::INT32) {
+
+    // Seqlock 읽기: 재시도 루프
+    uint64_t seq1, seq2;
+    int32_t temp_value;
+    DataType temp_type;
+
+    do {
+        // seq 읽기 (쓰기 시작 전)
+        seq1 = entries_[idx].seq.load(std::memory_order_acquire);
+
+        // seq가 홀수이면 쓰기 진행 중 - 재시도
+        if (seq1 & 1) {
+            std::this_thread::yield();
+            continue;
+        }
+
+        // 데이터 읽기
+        temp_type = entries_[idx].type;
+        temp_value = entries_[idx].value.i32;
+
+        // seq 다시 읽기 (쓰기 완료 후)
+        seq2 = entries_[idx].seq.load(std::memory_order_acquire);
+
+        // seq1 == seq2이면 읽는 동안 쓰기가 없었음 - 성공
+    } while (seq1 != seq2);
+
+    // 타입 검증
+    if (temp_type != DataType::INT32) {
         return -1;
     }
 
-    out_value = entries_[idx].value.i32;
+    out_value = temp_value;
     return 0;
 }
 
@@ -110,11 +171,30 @@ int RTDataStore::getFloat(DataKey key, float& out_value) const {
     }
 
     auto idx = static_cast<size_t>(key);
-    if (entries_[idx].type != DataType::FLOAT) {
+
+    // Seqlock 읽기: 재시도 루프
+    uint64_t seq1, seq2;
+    float temp_value;
+    DataType temp_type;
+
+    do {
+        seq1 = entries_[idx].seq.load(std::memory_order_acquire);
+        if (seq1 & 1) {
+            std::this_thread::yield();
+            continue;
+        }
+
+        temp_type = entries_[idx].type;
+        temp_value = entries_[idx].value.f32;
+
+        seq2 = entries_[idx].seq.load(std::memory_order_acquire);
+    } while (seq1 != seq2);
+
+    if (temp_type != DataType::FLOAT) {
         return -1;
     }
 
-    out_value = entries_[idx].value.f32;
+    out_value = temp_value;
     return 0;
 }
 
@@ -124,11 +204,30 @@ int RTDataStore::getDouble(DataKey key, double& out_value) const {
     }
 
     auto idx = static_cast<size_t>(key);
-    if (entries_[idx].type != DataType::DOUBLE) {
+
+    // Seqlock 읽기: 재시도 루프
+    uint64_t seq1, seq2;
+    double temp_value;
+    DataType temp_type;
+
+    do {
+        seq1 = entries_[idx].seq.load(std::memory_order_acquire);
+        if (seq1 & 1) {
+            std::this_thread::yield();
+            continue;
+        }
+
+        temp_type = entries_[idx].type;
+        temp_value = entries_[idx].value.f64;
+
+        seq2 = entries_[idx].seq.load(std::memory_order_acquire);
+    } while (seq1 != seq2);
+
+    if (temp_type != DataType::DOUBLE) {
         return -1;
     }
 
-    out_value = entries_[idx].value.f64;
+    out_value = temp_value;
     return 0;
 }
 
@@ -138,11 +237,30 @@ int RTDataStore::getUint64(DataKey key, uint64_t& out_value) const {
     }
 
     auto idx = static_cast<size_t>(key);
-    if (entries_[idx].type != DataType::UINT64) {
+
+    // Seqlock 읽기: 재시도 루프
+    uint64_t seq1, seq2;
+    uint64_t temp_value;
+    DataType temp_type;
+
+    do {
+        seq1 = entries_[idx].seq.load(std::memory_order_acquire);
+        if (seq1 & 1) {
+            std::this_thread::yield();
+            continue;
+        }
+
+        temp_type = entries_[idx].type;
+        temp_value = entries_[idx].value.u64;
+
+        seq2 = entries_[idx].seq.load(std::memory_order_acquire);
+    } while (seq1 != seq2);
+
+    if (temp_type != DataType::UINT64) {
         return -1;
     }
 
-    out_value = entries_[idx].value.u64;
+    out_value = temp_value;
     return 0;
 }
 
@@ -152,13 +270,32 @@ int RTDataStore::getString(DataKey key, char* out_buffer, size_t buffer_size) co
     }
 
     auto idx = static_cast<size_t>(key);
-    if (entries_[idx].type != DataType::STRING) {
+
+    // Seqlock 읽기: 재시도 루프
+    uint64_t seq1, seq2;
+    char temp_str[32];
+    DataType temp_type;
+
+    do {
+        seq1 = entries_[idx].seq.load(std::memory_order_acquire);
+        if (seq1 & 1) {
+            std::this_thread::yield();
+            continue;
+        }
+
+        temp_type = entries_[idx].type;
+        std::memcpy(temp_str, entries_[idx].value.str, 32);
+
+        seq2 = entries_[idx].seq.load(std::memory_order_acquire);
+    } while (seq1 != seq2);
+
+    if (temp_type != DataType::STRING) {
         return -1;
     }
 
     // 안전하게 복사
     size_t copy_len = (buffer_size < 32) ? buffer_size - 1 : 31;
-    std::memcpy(out_buffer, entries_[idx].value.str, copy_len);
+    std::memcpy(out_buffer, temp_str, copy_len);
     out_buffer[copy_len] = '\0';
 
     return 0;

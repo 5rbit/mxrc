@@ -23,7 +23,7 @@ TEST_F(RTIntegrationTest, FullIntegration) {
 
     // RTExecutive 생성 (동적 주기 설정)
     std::vector<uint32_t> periods = {10, 20};
-    auto* exec = RTExecutive::createFromPeriods(periods);
+    auto exec = RTExecutive::createFromPeriods(periods);
     ASSERT_NE(nullptr, exec);
 
     // 데이터 저장소 연결
@@ -53,7 +53,7 @@ TEST_F(RTIntegrationTest, FullIntegration) {
     });
 
     // 실행
-    std::thread exec_thread([exec]() {
+    std::thread exec_thread([&exec]() {
         exec->run();
     });
 
@@ -78,7 +78,6 @@ TEST_F(RTIntegrationTest, FullIntegration) {
     shared.getDataStore()->getInt32(DataKey::ROBOT_X, final_val);
     EXPECT_GT(final_val, 0);
 
-    delete exec;
 }
 
 // 프로세스 간 통신 시뮬레이션
@@ -112,7 +111,7 @@ TEST_F(RTIntegrationTest, InterProcessDataSharing) {
         RTDataStoreShared writer;
         ASSERT_EQ(0, writer.createShared("/test_rt_integration"));
 
-        auto* exec = RTExecutive::createFromPeriods({10});
+        auto exec = RTExecutive::createFromPeriods({10});
         ASSERT_NE(nullptr, exec);
         exec->setDataStore(writer.getDataStore());
 
@@ -124,7 +123,7 @@ TEST_F(RTIntegrationTest, InterProcessDataSharing) {
             }
         });
 
-        std::thread exec_thread([exec]() {
+        std::thread exec_thread([&exec]() {
             exec->run();
         });
 
@@ -138,7 +137,6 @@ TEST_F(RTIntegrationTest, InterProcessDataSharing) {
         EXPECT_TRUE(WIFEXITED(status));
         EXPECT_EQ(0, WEXITSTATUS(status));
 
-        delete exec;
     }
 }
 
@@ -147,7 +145,7 @@ TEST_F(RTIntegrationTest, StateTransitionsIntegration) {
     RTDataStoreShared shared;
     ASSERT_EQ(0, shared.createShared("/test_rt_integration"));
 
-    auto* exec = RTExecutive::createFromPeriods({10});
+    auto exec = RTExecutive::createFromPeriods({10});
     ASSERT_NE(nullptr, exec);
     exec->setDataStore(shared.getDataStore());
 
@@ -162,7 +160,7 @@ TEST_F(RTIntegrationTest, StateTransitionsIntegration) {
     EXPECT_EQ(RTState::READY, exec->getStateMachine()->getState());
     int initial_transitions = transition_count.load();
 
-    std::thread exec_thread([exec]() {
+    std::thread exec_thread([&exec]() {
         exec->run();
     });
 
@@ -179,5 +177,4 @@ TEST_F(RTIntegrationTest, StateTransitionsIntegration) {
     // 최소 2번 전환 (READY->RUNNING, RUNNING->SHUTDOWN)
     EXPECT_GE(transition_count - initial_transitions, 2);
 
-    delete exec;
 }

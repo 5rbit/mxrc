@@ -353,6 +353,10 @@ add_executable(run_tests
     tests/unit/rt/RTStateMachine_test.cpp
     tests/integration/rt/rt_integration_test.cpp
     tests/core/rt/RTExecutiveEventBusTest.cpp
+    tests/unit/monitoring/MetricsCollector_test.cpp
+    tests/unit/monitoring/MetricsServer_test.cpp
+    tests/unit/monitoring/RTMetrics_test.cpp
+    tests/integration/monitoring/monitoring_integration_test.cpp
     examples/event_monitoring/ExecutionTimeCollector.cpp
     examples/event_monitoring/StateTransitionLogger.cpp
     src/core/task/core/TaskRegistry.cpp
@@ -393,6 +397,10 @@ add_executable(run_tests
     src/core/rt/ipc/SharedMemory.cpp
     src/core/rt/util/TimeUtils.cpp
     src/core/rt/util/ScheduleCalculator.cpp
+    # Monitoring
+    src/core/monitoring/MetricsCollector.cpp
+    src/core/monitoring/MetricsServer.cpp
+    src/core/rt/RTMetrics.cpp
 )
 
 target_include_directories(run_tests PUBLIC
@@ -442,6 +450,9 @@ target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/tests/unit/rt
     ${PROJECT_SOURCE_DIR}/tests/integration/rt
     ${PROJECT_SOURCE_DIR}/tests/core/rt
+    ${PROJECT_SOURCE_DIR}/src/core/monitoring
+    ${PROJECT_SOURCE_DIR}/tests/unit/monitoring
+    ${PROJECT_SOURCE_DIR}/tests/integration/monitoring
 )
 
 

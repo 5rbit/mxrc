@@ -27,7 +27,7 @@ private:
 
     void serverLoop();
     void handleClient(int client_socket);
-    std::string buildHttpResponse(const std::string& body) const;
+    std::string buildHttpResponse(const std::string& body, const std::string& content_type = "text/plain") const;
 
 public:
     /**

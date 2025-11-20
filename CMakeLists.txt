@@ -157,6 +157,7 @@ add_executable(run_tests
     tests/benchmark/logging/datastore_logging_benchmark.cpp
     tests/unit/rt/RTDataStore_test.cpp
     tests/unit/rt/SharedMemory_test.cpp
+    tests/unit/rt/RTExecutive_test.cpp
     examples/event_monitoring/ExecutionTimeCollector.cpp
     examples/event_monitoring/StateTransitionLogger.cpp
     src/core/task/core/TaskRegistry.cpp
@@ -190,6 +191,7 @@ add_executable(run_tests
     src/core/logging/core/BagReader.cpp
     src/core/logging/core/BagReplayer.cpp
     # RT Executive
+    src/core/rt/RTExecutive.cpp
     src/core/rt/RTDataStore.cpp
     src/core/rt/RTDataStoreShared.cpp
     src/core/rt/ipc/SharedMemory.cpp

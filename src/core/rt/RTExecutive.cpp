@@ -1,5 +1,6 @@
 #include "RTExecutive.h"
 #include "util/TimeUtils.h"
+#include "util/ScheduleCalculator.h"
 #include <spdlog/spdlog.h>
 #include <sched.h>
 
@@ -26,6 +27,21 @@ RTExecutive::RTExecutive(uint32_t minor_cycle_ms, uint32_t major_cycle_ms)
 
     spdlog::info("RTExecutive initialized: minor_cycle={}ms, major_cycle={}ms, slots={}",
                  minor_cycle_ms_, major_cycle_ms_, num_slots_);
+}
+
+RTExecutive* RTExecutive::createFromPeriods(const std::vector<uint32_t>& periods_ms) {
+    try {
+        // 주기 배열로부터 스케줄 파라미터 계산
+        auto params = util::calculate(periods_ms);
+
+        spdlog::info("Creating RTExecutive from periods: minor={}ms, major={}ms, slots={}",
+                     params.minor_cycle_ms, params.major_cycle_ms, params.num_slots);
+
+        return new RTExecutive(params.minor_cycle_ms, params.major_cycle_ms);
+    } catch (const std::exception& e) {
+        spdlog::error("Failed to create RTExecutive from periods: {}", e.what());
+        return nullptr;
+    }
 }
 
 RTExecutive::~RTExecutive() {
@@ -100,9 +116,12 @@ int RTExecutive::registerAction(const std::string& name, uint32_t period_ms, Act
     // Calculate slot interval
     uint32_t slot_interval = period_ms / minor_cycle_ms_;
 
-    // Add action to first slot, and calculate next execution slots
-    ActionSlot action{name, period_ms, callback, slot_interval};
-    schedule_[0].push_back(action);
+    // Add action to all appropriate slots
+    // Action은 slot_interval마다 실행되어야 함
+    for (uint32_t slot = 0; slot < num_slots_; slot += slot_interval) {
+        ActionSlot action{name, period_ms, callback, slot_interval};
+        schedule_[slot].push_back(action);
+    }
 
     spdlog::info("Registered action '{}' with period {}ms (slot interval: {})",
                  name, period_ms, slot_interval);

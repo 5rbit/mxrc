@@ -26,6 +26,11 @@ public:
     // major_cycle_ms: 전체 프레임 크기 (ms)
     RTExecutive(uint32_t minor_cycle_ms, uint32_t major_cycle_ms);
 
+    // 주기 배열로부터 동적 초기화
+    // periods_ms: 등록할 action들의 주기 배열
+    // 반환: 성공 0, 실패 -1
+    static RTExecutive* createFromPeriods(const std::vector<uint32_t>& periods_ms);
+
     ~RTExecutive();
 
     // 실시간 주기 실행 시작
@@ -42,6 +47,11 @@ public:
 
     // RTDataStore 설정
     void setDataStore(RTDataStore* data_store);
+
+    // 스케줄 파라미터 조회
+    uint32_t getMinorCycleMs() const { return minor_cycle_ms_; }
+    uint32_t getMajorCycleMs() const { return major_cycle_ms_; }
+    uint32_t getNumSlots() const { return num_slots_; }
 
 private:
     // 현재 슬롯의 모든 action 실행

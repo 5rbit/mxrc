@@ -131,5 +131,20 @@ inline std::string checkpointStateToString(CheckpointState state) {
     }
 }
 
+/**
+ * @brief Factory function to create StateCheckpointManager
+ *
+ * @param process_name Process name for checkpoints
+ * @param checkpoint_dir Directory to store checkpoints
+ * @param max_checkpoints Maximum number of checkpoints to retain
+ * @param retention_hours Retention period in hours
+ * @return std::unique_ptr<IStateCheckpoint> Checkpoint manager instance
+ */
+std::unique_ptr<IStateCheckpoint> createStateCheckpointManager(
+    const std::string& process_name,
+    const std::filesystem::path& checkpoint_dir = "/tmp/mxrc/checkpoints",
+    size_t max_checkpoints = 10,
+    size_t retention_hours = 24);
+
 } // namespace ha
 } // namespace mxrc

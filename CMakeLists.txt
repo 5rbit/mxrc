@@ -318,6 +318,7 @@ add_executable(rt
     # Production readiness: High Availability
     src/core/ha/HealthCheckServer.cpp
     src/core/ha/ProcessMonitor.cpp
+    src/core/ha/StateCheckpoint.cpp
 )
 
 # Link dependencies for rt
@@ -470,6 +471,7 @@ add_executable(run_tests
     src/core/config/ConfigLoader.cpp
     # Production readiness: High Availability
     src/core/ha/HealthCheckServer.cpp
+    src/core/ha/StateCheckpoint.cpp
     src/core/ha/ProcessMonitor.cpp
 )
 

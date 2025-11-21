@@ -139,6 +139,8 @@ target_include_directories(mxrc PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/rt
     ${PROJECT_SOURCE_DIR}/src/core/rt/util
     ${PROJECT_SOURCE_DIR}/src/core/rt/ipc
+    ${PROJECT_SOURCE_DIR}/src/core/ha
+    ${PROJECT_SOURCE_DIR}/src/core/monitoring
 )
 
 # ===========================
@@ -313,6 +315,8 @@ add_executable(rt
     src/core/rt/RTMetrics.cpp
     src/core/monitoring/MetricsCollector.cpp
     src/core/monitoring/MetricsServer.cpp
+    # Production readiness: High Availability
+    src/core/ha/HealthCheckServer.cpp
 )
 
 # Link dependencies for rt
@@ -343,6 +347,8 @@ target_include_directories(rt PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/event/dto
     ${PROJECT_SOURCE_DIR}/src/core/event/interfaces
     ${PROJECT_SOURCE_DIR}/src/core/event/util
+    ${PROJECT_SOURCE_DIR}/src/core/ha
+    ${PROJECT_SOURCE_DIR}/src/core/monitoring
     ${CMAKE_BINARY_DIR}/generated
 )
 
@@ -461,6 +467,8 @@ add_executable(run_tests
     src/core/rt/perf/NUMABinding.cpp
     src/core/rt/perf/PerfMonitor.cpp
     src/core/config/ConfigLoader.cpp
+    # Production readiness: High Availability
+    src/core/ha/HealthCheckServer.cpp
 )
 
 target_include_directories(run_tests PUBLIC
@@ -513,6 +521,7 @@ target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/monitoring
     ${PROJECT_SOURCE_DIR}/tests/unit/monitoring
     ${PROJECT_SOURCE_DIR}/tests/integration/monitoring
+    ${PROJECT_SOURCE_DIR}/src/core/ha
 )
 
 

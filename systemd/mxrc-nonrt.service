@@ -1,23 +1,28 @@
 [Unit]
-Description=MXRC Non-Real-Time Process
+Description=MXRC Non-RT Executive - Non-Realtime Control Process
 Documentation=https://github.com/your-org/mxrc
 After=network.target
-Wants=mxrc-monitor.service
+Before=mxrc-rt.service
 
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/mxrc-nonrt
+
+# Restart policy
 Restart=on-failure
 RestartSec=5s
+
+# Service timeouts
 TimeoutStartSec=30s
 TimeoutStopSec=30s
 
-# CPU affinity for non-RT cores (cores 0-1)
+# CPU affinity for Non-RT cores (cores 0-1)
 CPUAffinity=0 1
 
-# NUMA policy
-NUMAPolicy=bind
-NUMAMask=0
+# Resource limits (User Story 3)
+CPUQuota=100%
+MemoryMax=1G
+IOWeight=100
 
 # User and group
 User=mxrc

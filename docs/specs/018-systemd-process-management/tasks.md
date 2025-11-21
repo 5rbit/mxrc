@@ -5,8 +5,8 @@ description: "systemd 기반 프로세스 관리 고도화 작업 목록"
 # Tasks: systemd 기반 프로세스 관리 고도화
 
 **Input**: Design documents from `/docs/specs/018-systemd-process-management/`
-**Status**: Completed Phase 4 - MVP Complete (RT Performance + Watchdog)
-**Progress**: 49/115 tasks completed (43%)
+**Status**: Completed Phase 5 - Resource Control Complete
+**Progress**: 60/115 tasks completed (52%)
 **Last Updated**: 2025-01-21
 **Prerequisites**: plan.md (required), spec.md (required for user stories)
 
@@ -134,22 +134,22 @@ description: "systemd 기반 프로세스 관리 고도화 작업 목록"
 
 ### Tests for User Story 3
 
-- [ ] T050 [P] [US3] CPU quota 제한 테스트 in tests/integration/systemd/cpu_quota_test.cpp
-- [ ] T051 [P] [US3] 메모리 제한 테스트 in tests/integration/systemd/memory_limit_test.cpp
-- [ ] T052 [P] [US3] I/O 가중치 테스트 in tests/integration/systemd/io_weight_test.cpp
+- [x] T050 [P] [US3] CPU quota 제한 테스트 in tests/integration/systemd/cpu_quota_test.cpp
+- [x] T051 [P] [US3] 메모리 제한 테스트 in tests/integration/systemd/memory_limit_test.cpp
+- [x] T052 [P] [US3] I/O 가중치 테스트 in tests/integration/systemd/io_weight_test.cpp
 
 ### Implementation for User Story 3
 
-- [ ] T053 [P] [US3] CPUQuota=200% 설정 추가 in systemd/mxrc-rt.service
-- [ ] T054 [P] [US3] MemoryMax=2G 설정 추가 in systemd/mxrc-rt.service
-- [ ] T055 [P] [US3] IOWeight=500 설정 추가 in systemd/mxrc-rt.service
-- [ ] T056 [P] [US3] mxrc-nonrt.service 파일 생성 in systemd/mxrc-nonrt.service
-- [ ] T057 [US3] Non-RT 프로세스 리소스 제한 설정 (CPUQuota=100%, MemoryMax=1G, IOWeight=100)
-- [ ] T058 [US3] CPUAffinity=0,1 설정 추가 (Non-RT) in systemd/mxrc-nonrt.service
-- [ ] T059 [P] [US3] cgroups 설정 검증 스크립트 작성 scripts/verify-cgroups.sh
-- [ ] T060 [US3] systemd-cgtop 통합 모니터링 스크립트 작성 scripts/monitor-cgroups.sh
+- [x] T053 [P] [US3] CPUQuota=200% 설정 추가 in systemd/mxrc-rt.service
+- [x] T054 [P] [US3] MemoryMax=2G 설정 추가 in systemd/mxrc-rt.service
+- [x] T055 [P] [US3] IOWeight=500 설정 추가 in systemd/mxrc-rt.service
+- [x] T056 [P] [US3] mxrc-nonrt.service 파일 생성 in systemd/mxrc-nonrt.service
+- [x] T057 [US3] Non-RT 프로세스 리소스 제한 설정 (CPUQuota=100%, MemoryMax=1G, IOWeight=100)
+- [x] T058 [US3] CPUAffinity=0,1 설정 추가 (Non-RT) in systemd/mxrc-nonrt.service
+- [x] T059 [P] [US3] cgroups 설정 검증 스크립트 작성 scripts/verify-cgroups.sh
+- [x] T060 [US3] systemd-cgtop 통합 모니터링 스크립트 작성 scripts/monitor-cgroups.sh
 
-**Checkpoint**: US1 + US2 + US3 완료 - 리소스 격리로 시스템 전체 안정성 보장
+**Checkpoint**: ✅ US1 + US2 + US3 완료 - 리소스 격리로 시스템 전체 안정성 보장
 
 ---
 

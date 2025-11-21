@@ -279,6 +279,63 @@ systemctl is-enabled mxrc.target
 
 ---
 
+## 리소스 제어 (User Story 3)
+
+### 1. cgroups 리소스 제한
+
+mxrc-rt.service와 mxrc-nonrt.service는 cgroups를 통해 CPU, 메모리, I/O 리소스를 제어합니다:
+
+```bash
+# RT 프로세스 리소스 제한
+# - CPUQuota=200% (2 코어 최대)
+# - MemoryMax=2G
+# - IOWeight=500 (높은 I/O 우선순위)
+
+# Non-RT 프로세스 리소스 제한
+# - CPUQuota=100% (1 코어 최대)
+# - MemoryMax=1G
+# - IOWeight=100 (기본 I/O 우선순위)
+```
+
+### 2. 리소스 사용량 모니터링
+
+```bash
+# 실시간 리소스 모니터링 (systemd-cgtop)
+./scripts/monitor-cgroups.sh
+
+# cgroups 설정 검증
+./scripts/verify-cgroups.sh mxrc-rt
+./scripts/verify-cgroups.sh mxrc-nonrt
+
+# 수동 확인 (cgroup v2)
+cat /sys/fs/cgroup/system.slice/mxrc-rt.service/cpu.max
+# 출력: 200000 100000 (200% quota)
+
+cat /sys/fs/cgroup/system.slice/mxrc-rt.service/memory.max
+# 출력: 2147483648 (2GB)
+
+cat /sys/fs/cgroup/system.slice/mxrc-rt.service/io.weight
+# 출력: default 500
+```
+
+### 3. 리소스 제한 조정
+
+```bash
+# 런타임 CPU quota 변경 (재시작 불필요)
+sudo systemctl set-property mxrc-rt.service CPUQuota=300%
+
+# 메모리 제한 변경
+sudo systemctl set-property mxrc-rt.service MemoryMax=3G
+
+# I/O 가중치 변경
+sudo systemctl set-property mxrc-rt.service IOWeight=700
+
+# 변경사항 영구 저장
+sudo systemctl daemon-reload
+```
+
+---
+
 ## 모니터링
 
 ### 1. 서비스 상태 확인

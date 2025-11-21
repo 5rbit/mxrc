@@ -29,6 +29,11 @@ CPUAffinity=2 3
 # Memory locking for RT performance
 LimitMEMLOCK=infinity
 
+# Resource limits (User Story 3)
+CPUQuota=200%
+MemoryMax=2G
+IOWeight=500
+
 # NUMA policy
 NUMAPolicy=bind
 NUMAMask=0

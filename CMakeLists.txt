@@ -536,6 +536,10 @@ add_executable(run_tests
     tests/unit/systemd/systemd_util_test.cpp
     tests/unit/systemd/watchdog_notifier_test.cpp
     tests/unit/systemd/watchdog_timer_test.cpp
+    # systemd integration tests (Phase 5: Resource Control)
+    tests/integration/systemd/cpu_quota_test.cpp
+    tests/integration/systemd/memory_limit_test.cpp
+    tests/integration/systemd/io_weight_test.cpp
     src/core/systemd/util/SystemdUtil.cpp
     src/core/systemd/util/WatchdogTimer.cpp
     src/core/systemd/impl/SdNotifyWatchdog.cpp

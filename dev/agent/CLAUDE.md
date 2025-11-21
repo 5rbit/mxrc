@@ -66,6 +66,11 @@ Action Layer (기본 동작 실행)
 
 > 기능 완료 후 30일이 지나면 자동으로 제거됩니다.
 
+### 018-systemd-process-management
+- **Status**: Review
+- **Spec**: [docs/specs/018-systemd-process-management/spec.md](../docs/specs/018-systemd-process-management/spec.md)
+- 상세: Spec 문서 참조
+
 **Feature Specifications**: [docs/specs/](../docs/specs/)
 - 상세: 각 Spec 문서 참조
 
@@ -280,3 +285,10 @@ tests/
 ---
 
 > 💡 **중요**: 이 파일은 컴팩트하게 유지됩니다. 상세 내용은 항상 docs/ 디렉토리의 문서를 참조하세요.
+
+## Active Technologies
+- C++20 (GCC 11+ 또는 Clang 14+) + libsystemd-dev (sd_notify API), spdlog >= 1.x, nlohmann_json >= 3.11.0, Prometheus C++ client (선택적) (018-systemd-process-management)
+- N/A (systemd 메트릭 및 로그는 journald/Prometheus에 저장) (018-systemd-process-management)
+
+## Recent Changes
+- 018-systemd-process-management: Added C++20 (GCC 11+ 또는 Clang 14+) + libsystemd-dev (sd_notify API), spdlog >= 1.x, nlohmann_json >= 3.11.0, Prometheus C++ client (선택적)

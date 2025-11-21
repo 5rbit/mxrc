@@ -17,6 +17,7 @@ MXRC는 범용 로봇 제어 컨트롤러로, C++20으로 개발되며 계층적
 - **로깅**: spdlog
 - **테스트**: Google Test (GTest)
 - **메모리 관리**: C++ STL (shared_ptr, unique_ptr)
+- **동시성**: Boost.Lockfree (SPSC 큐)
 
 ### 개발 환경
 - **OS**: Ubuntu 24.04 LTS PREEMPT_RT
@@ -824,3 +825,10 @@ sudo apt-get install --reinstall libspdlog-dev libgtest-dev
 <!-- 수동 추가 시작 -->
 <!-- 프로젝트별 추가 설정이나 노트를 여기에 작성 -->
 <!-- 수동 추가 끝 -->
+
+## Active Technologies
+- C++20 (GCC 11+ 또는 Clang 14+) + libsystemd-dev (sd_notify API), spdlog >= 1.x, nlohmann_json >= 3.11.0, Prometheus C++ client (선택적) (018-systemd-process-management)
+- N/A (systemd 메트릭 및 로그는 journald/Prometheus에 저장) (018-systemd-process-management)
+
+## Recent Changes
+- 018-systemd-process-management: Added C++20 (GCC 11+ 또는 Clang 14+) + libsystemd-dev (sd_notify API), spdlog >= 1.x, nlohmann_json >= 3.11.0, Prometheus C++ client (선택적)

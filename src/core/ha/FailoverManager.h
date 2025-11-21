@@ -2,6 +2,7 @@
 
 #include <string>
 #include <cstdint>
+#include <memory>
 
 namespace mxrc {
 namespace ha {
@@ -152,6 +153,20 @@ public:
      */
     virtual const FailoverPolicy& getPolicy() const = 0;
 };
+
+// Forward declaration
+class IStateCheckpoint;
+
+/**
+ * @brief Factory function to create FailoverManager
+ *
+ * @param policy Failover policy configuration
+ * @param checkpoint_manager Optional checkpoint manager for state recovery
+ * @return std::unique_ptr<IFailoverManager> Failover manager instance
+ */
+std::unique_ptr<IFailoverManager> createFailoverManager(
+    const FailoverPolicy& policy,
+    std::shared_ptr<IStateCheckpoint> checkpoint_manager = nullptr);
 
 } // namespace ha
 } // namespace mxrc

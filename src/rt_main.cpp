@@ -41,23 +41,23 @@ int main(int argc, char** argv) {
     auto event_bus = std::make_shared<event::EventBus>();
 
     // RTExecutive 생성 (1ms minor cycle, 10ms major cycle)
-    auto executive = std::make_unique<rt::RTExecutive>(1, 10, event_bus);
+    auto executive = std::make_unique<core::rt::RTExecutive>(1, 10, event_bus);
 
     // 공유 메모리 생성
-    rt::ipc::SharedMemoryRegion shm_region;
-    if (shm_region.create(shm_name, sizeof(rt::ipc::SharedMemoryData)) != 0) {
+    core::rt::ipc::SharedMemoryRegion shm_region;
+    if (shm_region.create(shm_name, sizeof(core::rt::ipc::SharedMemoryData)) != 0) {
         spdlog::error("Failed to create shared memory: {}", shm_name);
         return 1;
     }
 
-    auto* shm_data = static_cast<rt::ipc::SharedMemoryData*>(shm_region.getPtr());
+    auto* shm_data = static_cast<core::rt::ipc::SharedMemoryData*>(shm_region.getPtr());
     if (!shm_data) {
         spdlog::error("Invalid shared memory pointer");
         return 1;
     }
 
     // SharedMemoryData 초기화
-    new (shm_data) rt::ipc::SharedMemoryData();
+    new (shm_data) core::rt::ipc::SharedMemoryData();
 
     // RTExecutive에 공유 메모리 연결
     executive->setSharedMemory(shm_data);

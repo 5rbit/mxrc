@@ -38,6 +38,20 @@ private:
     // DataStore 메트릭 (동적 생성)
     // key별로 writes_total, reads_total, seqlock_retries_total
 
+    // Production readiness: NUMA metrics
+    std::shared_ptr<monitoring::Gauge> numa_local_pages_;
+    std::shared_ptr<monitoring::Gauge> numa_remote_pages_;
+    std::shared_ptr<monitoring::Gauge> numa_local_access_percent_;
+
+    // Production readiness: Performance monitoring metrics
+    std::shared_ptr<monitoring::Histogram> perf_latency_;
+    std::shared_ptr<monitoring::Gauge> perf_p50_latency_;
+    std::shared_ptr<monitoring::Gauge> perf_p95_latency_;
+    std::shared_ptr<monitoring::Gauge> perf_p99_latency_;
+    std::shared_ptr<monitoring::Gauge> perf_jitter_;
+    std::shared_ptr<monitoring::Counter> perf_deadline_misses_;
+    std::shared_ptr<monitoring::Gauge> perf_deadline_miss_rate_;
+
 public:
     /**
      * @brief RTMetrics 생성자
@@ -132,6 +146,54 @@ public:
     std::shared_ptr<monitoring::MetricsCollector> getCollector() const {
         return collector_;
     }
+
+    // Production readiness: NUMA monitoring methods
+
+    /**
+     * @brief Update NUMA memory statistics
+     *
+     * @param local_pages Number of pages allocated on local NUMA node
+     * @param remote_pages Number of pages allocated on remote NUMA nodes
+     * @param local_access_percent Percentage of local NUMA access
+     */
+    void updateNUMAStats(uint64_t local_pages, uint64_t remote_pages, double local_access_percent);
+
+    // Production readiness: Performance monitoring methods
+
+    /**
+     * @brief Record performance latency sample
+     *
+     * @param latency_seconds Latency in seconds
+     */
+    void recordPerfLatency(double latency_seconds);
+
+    /**
+     * @brief Update performance percentile metrics
+     *
+     * @param p50_seconds P50 latency in seconds
+     * @param p95_seconds P95 latency in seconds
+     * @param p99_seconds P99 latency in seconds
+     */
+    void updatePerfPercentiles(double p50_seconds, double p95_seconds, double p99_seconds);
+
+    /**
+     * @brief Update performance jitter
+     *
+     * @param jitter_seconds Jitter (standard deviation) in seconds
+     */
+    void updatePerfJitter(double jitter_seconds);
+
+    /**
+     * @brief Increment performance deadline miss counter
+     */
+    void incrementPerfDeadlineMisses();
+
+    /**
+     * @brief Update performance deadline miss rate
+     *
+     * @param miss_rate_percent Deadline miss rate as percentage
+     */
+    void updatePerfDeadlineMissRate(double miss_rate_percent);
 };
 
 } // namespace mxrc::core::rt

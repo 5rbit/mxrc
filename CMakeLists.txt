@@ -14,6 +14,22 @@ find_package(GTest REQUIRED)
 find_package(TBB REQUIRED)
 find_package(nlohmann_json 3.11.0 REQUIRED)
 
+# Production readiness dependencies
+find_library(NUMA_LIBRARY NAMES numa)
+find_path(NUMA_INCLUDE_DIR NAMES numa.h)
+if(NUMA_LIBRARY AND NUMA_INCLUDE_DIR)
+    message(STATUS "NUMA library found: ${NUMA_LIBRARY}")
+    set(NUMA_FOUND TRUE)
+else()
+    message(STATUS "NUMA library not found, will need to be installed for performance optimization (Phase 3)")
+    set(NUMA_FOUND FALSE)
+endif()
+
+find_package(opentelemetry-cpp QUIET)
+if(NOT opentelemetry-cpp_FOUND)
+    message(STATUS "OpenTelemetry not found, will need to be installed for tracing support")
+endif()
+
 # backward-cpp (header-only, optional)
 if(USE_BACKWARD)
     add_library(backward INTERFACE)
@@ -59,6 +75,15 @@ add_executable(mxrc
     src/core/rt/ipc/SharedMemory.cpp
     src/core/rt/util/TimeUtils.cpp
     src/core/rt/util/ScheduleCalculator.cpp
+    src/core/config/ConfigLoader.cpp
+    # Production readiness: Performance optimization
+    src/core/rt/perf/CPUAffinityManager.cpp
+    src/core/rt/perf/NUMABinding.cpp
+    src/core/rt/perf/PerfMonitor.cpp
+    # Production readiness: Monitoring
+    src/core/rt/RTMetrics.cpp
+    src/core/monitoring/MetricsCollector.cpp
+    src/core/monitoring/MetricsServer.cpp
 )
 
 # Link dependencies
@@ -69,6 +94,12 @@ target_link_libraries(mxrc PRIVATE
     TBB::tbb
     nlohmann_json::nlohmann_json
 )
+
+# Link NUMA if found
+if(NUMA_FOUND)
+    target_link_libraries(mxrc PRIVATE ${NUMA_LIBRARY})
+    target_include_directories(mxrc PRIVATE ${NUMA_INCLUDE_DIR})
+endif()
 
 # Enable Address Sanitizer (always on for memory safety)
 target_compile_options(mxrc PRIVATE -fsanitize=address -fno-omit-frame-pointer)
@@ -210,6 +241,8 @@ add_executable(nonrt
     # RT IPC
     src/core/rt/ipc/SharedMemory.cpp
     src/core/rt/util/TimeUtils.cpp
+    # Config loader
+    src/core/config/ConfigLoader.cpp
 )
 
 # Link dependencies for nonrt
@@ -271,13 +304,29 @@ add_executable(rt
     src/core/rt/util/TimeUtils.cpp
     src/core/rt/util/ScheduleCalculator.cpp
     src/core/event/core/EventBus.cpp
+    src/core/config/ConfigLoader.cpp
+    # Production readiness: Performance optimization
+    src/core/rt/perf/CPUAffinityManager.cpp
+    src/core/rt/perf/NUMABinding.cpp
+    src/core/rt/perf/PerfMonitor.cpp
+    # Production readiness: Monitoring
+    src/core/rt/RTMetrics.cpp
+    src/core/monitoring/MetricsCollector.cpp
+    src/core/monitoring/MetricsServer.cpp
 )
 
 # Link dependencies for rt
 target_link_libraries(rt PRIVATE
     spdlog::spdlog
     Threads::Threads
+    nlohmann_json::nlohmann_json
 )
+
+# Link NUMA if found
+if(NUMA_FOUND)
+    target_link_libraries(rt PRIVATE ${NUMA_LIBRARY})
+    target_include_directories(rt PRIVATE ${NUMA_INCLUDE_DIR})
+endif()
 
 # Enable Address Sanitizer
 target_compile_options(rt PRIVATE -fsanitize=address -fno-omit-frame-pointer)
@@ -401,6 +450,17 @@ add_executable(run_tests
     src/core/monitoring/MetricsCollector.cpp
     src/core/monitoring/MetricsServer.cpp
     src/core/rt/RTMetrics.cpp
+    # Production readiness: Performance tests
+    tests/unit/perf/CPUAffinityManager_test.cpp
+    tests/unit/perf/NUMABinding_test.cpp
+    tests/unit/perf/PerfMonitor_test.cpp
+    # Production readiness: Integration tests
+    tests/integration/perf/cpu_isolation_test.cpp
+    tests/integration/perf/numa_optimization_test.cpp
+    src/core/rt/perf/CPUAffinityManager.cpp
+    src/core/rt/perf/NUMABinding.cpp
+    src/core/rt/perf/PerfMonitor.cpp
+    src/core/config/ConfigLoader.cpp
 )
 
 target_include_directories(run_tests PUBLIC
@@ -464,6 +524,12 @@ target_link_libraries(run_tests PRIVATE
     TBB::tbb
     nlohmann_json::nlohmann_json
 )
+
+# Link NUMA if found
+if(NUMA_FOUND)
+    target_link_libraries(run_tests PRIVATE ${NUMA_LIBRARY})
+    target_include_directories(run_tests PRIVATE ${NUMA_INCLUDE_DIR})
+endif()
 
 # Enable Address Sanitizer (always on for memory safety)
 target_compile_options(run_tests PRIVATE -fsanitize=address -fno-omit-frame-pointer)

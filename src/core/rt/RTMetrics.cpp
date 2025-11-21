@@ -61,6 +61,59 @@ RTMetrics::RTMetrics(std::shared_ptr<monitoring::MetricsCollector> collector)
         "rt_nonrt_heartbeat_timeout_seconds",
         {},
         "Non-RT heartbeat timeout in seconds");
+
+    // Production readiness: NUMA metrics
+    numa_local_pages_ = collector_->getOrCreateGauge(
+        "rt_numa_local_pages",
+        {},
+        "Number of pages allocated on local NUMA node");
+
+    numa_remote_pages_ = collector_->getOrCreateGauge(
+        "rt_numa_remote_pages",
+        {},
+        "Number of pages allocated on remote NUMA nodes");
+
+    numa_local_access_percent_ = collector_->getOrCreateGauge(
+        "rt_numa_local_access_percent",
+        {},
+        "Percentage of memory accesses to local NUMA node");
+
+    // Production readiness: Performance monitoring metrics
+    perf_latency_ = collector_->getOrCreateHistogram(
+        "rt_perf_latency_seconds",
+        {},
+        {0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005, 0.01},
+        "RT performance monitoring latency distribution in seconds");
+
+    perf_p50_latency_ = collector_->getOrCreateGauge(
+        "rt_perf_p50_latency_seconds",
+        {},
+        "RT performance P50 (median) latency in seconds");
+
+    perf_p95_latency_ = collector_->getOrCreateGauge(
+        "rt_perf_p95_latency_seconds",
+        {},
+        "RT performance P95 latency in seconds");
+
+    perf_p99_latency_ = collector_->getOrCreateGauge(
+        "rt_perf_p99_latency_seconds",
+        {},
+        "RT performance P99 latency in seconds");
+
+    perf_jitter_ = collector_->getOrCreateGauge(
+        "rt_perf_jitter_seconds",
+        {},
+        "RT performance jitter (standard deviation) in seconds");
+
+    perf_deadline_misses_ = collector_->getOrCreateCounter(
+        "rt_perf_deadline_misses_total",
+        {},
+        "Total number of performance deadline misses");
+
+    perf_deadline_miss_rate_ = collector_->getOrCreateGauge(
+        "rt_perf_deadline_miss_rate_percent",
+        {},
+        "Percentage of cycles that missed deadline");
 }
 
 void RTMetrics::recordMinorCycleDuration(double duration_seconds) {
@@ -109,6 +162,38 @@ void RTMetrics::incrementDataStoreReads(const std::string& key) {
 
 void RTMetrics::incrementDataStoreSeqlockRetries(const std::string& key) {
     collector_->incrementCounter("rt_datastore_seqlock_retries_total", {{"key", key}});
+}
+
+// Production readiness: NUMA monitoring methods
+
+void RTMetrics::updateNUMAStats(uint64_t local_pages, uint64_t remote_pages, double local_access_percent) {
+    numa_local_pages_->set(static_cast<double>(local_pages));
+    numa_remote_pages_->set(static_cast<double>(remote_pages));
+    numa_local_access_percent_->set(local_access_percent);
+}
+
+// Production readiness: Performance monitoring methods
+
+void RTMetrics::recordPerfLatency(double latency_seconds) {
+    perf_latency_->observe(latency_seconds);
+}
+
+void RTMetrics::updatePerfPercentiles(double p50_seconds, double p95_seconds, double p99_seconds) {
+    perf_p50_latency_->set(p50_seconds);
+    perf_p95_latency_->set(p95_seconds);
+    perf_p99_latency_->set(p99_seconds);
+}
+
+void RTMetrics::updatePerfJitter(double jitter_seconds) {
+    perf_jitter_->set(jitter_seconds);
+}
+
+void RTMetrics::incrementPerfDeadlineMisses() {
+    perf_deadline_misses_->increment();
+}
+
+void RTMetrics::updatePerfDeadlineMissRate(double miss_rate_percent) {
+    perf_deadline_miss_rate_->set(miss_rate_percent);
 }
 
 } // namespace mxrc::core::rt

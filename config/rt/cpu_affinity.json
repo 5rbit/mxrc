@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "CPU Affinity Configuration for RT Process",
+  "version": "1.0.0",
+
+  "process_name": "mxrc_rt",
+
+  "cpu_affinity": {
+    "enabled": true,
+    "cpu_cores": [1, 2],
+    "comment": "RT process will be pinned to CPU cores 1 and 2. These cores should be isolated using isolcpus kernel parameter."
+  },
+
+  "scheduler": {
+    "policy": "SCHED_FIFO",
+    "priority": 99,
+    "comment": "SCHED_FIFO with highest priority (99) for deterministic RT performance. Requires CAP_SYS_NICE capability."
+  },
+
+  "isolation": {
+    "verify_isolcpus": true,
+    "verify_cgroups": false,
+    "comment": "Verify CPU cores are isolated from kernel scheduler. Requires isolcpus=1,2 kernel boot parameter."
+  },
+
+  "fallback": {
+    "allow_non_isolated": false,
+    "default_policy": "SCHED_OTHER",
+    "default_priority": 0,
+    "comment": "Fallback settings if RT scheduling fails. Set allow_non_isolated=true for testing without isolated CPUs."
+  }
+}

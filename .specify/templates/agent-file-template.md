@@ -1,28 +1,28 @@
-# [PROJECT NAME] 개발 가이드라인
+# [PROJECT NAME] Development Guidelines
 
-모든 기능 계획에서 자동 생성됨. 마지막 업데이트: [DATE]
+Auto-generated from all feature plans. Last updated: [DATE]
 
-## 활성 기술
+## Active Technologies
 
-[모든 PLAN.MD 파일에서 추출]
+[EXTRACTED FROM ALL PLAN.MD FILES]
 
-## 프로젝트 구조
+## Project Structure
 
 ```text
-[계획의 실제 구조]
+[ACTUAL STRUCTURE FROM PLANS]
 ```
 
-## 명령어
+## Commands
 
-[활성 기술에 대한 명령어만]
+[ONLY COMMANDS FOR ACTIVE TECHNOLOGIES]
 
-## 코드 스타일
+## Code Style
 
-[사용 중인 언어에만 해당, 언어별]
+[LANGUAGE-SPECIFIC, ONLY FOR LANGUAGES IN USE]
 
-## 최근 변경 사항
+## Recent Changes
 
-[마지막 3개 기능 및 추가된 내용]
+[LAST 3 FEATURES AND WHAT THEY ADDED]
 
-<!-- 수동 추가 시작 -->
-<!-- 수동 추가 끝 -->
+<!-- MANUAL ADDITIONS START -->
+<!-- MANUAL ADDITIONS END -->

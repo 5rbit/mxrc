@@ -3,6 +3,7 @@
 
 #include "core/EventBus.h"
 #include <spdlog/spdlog.h>
+#include <algorithm>
 #include <chrono>
 #include <thread>
 
@@ -68,6 +69,9 @@ bool EventBus::publish(std::shared_ptr<IEvent> event) {
         return false;
     }
 
+    // Production readiness: Notify observers before publish
+    notifyBeforePublish(event);
+
     // Mutex로 보호하여 여러 생산자가 안전하게 publish 가능
     std::lock_guard<std::mutex> lock(publishMutex_);
 
@@ -81,6 +85,9 @@ bool EventBus::publish(std::shared_ptr<IEvent> event) {
         spdlog::warn("Event queue full, dropped event: {} ({})",
                     event->getTypeName(), event->getEventId());
     }
+
+    // Production readiness: Notify observers after publish
+    notifyAfterPublish(event, success);
 
     return success;
 }
@@ -146,7 +153,11 @@ void EventBus::dispatchToSubscribers(std::shared_ptr<IEvent> event) {
         return;
     }
 
+    // Production readiness: Notify observers before dispatch
+    notifyBeforeDispatch(event);
+
     auto subscriptions = subscriptionManager_.getAllSubscriptions();
+    size_t subscriber_count = 0;
 
     for (const auto& sub : subscriptions) {
         try {
@@ -154,6 +165,7 @@ void EventBus::dispatchToSubscribers(std::shared_ptr<IEvent> event) {
             if (sub.filter(event)) {
                 sub.callback(event);
                 stats_.processedEvents.fetch_add(1, std::memory_order_relaxed);
+                subscriber_count++;
             }
         } catch (const std::exception& e) {
             stats_.failedCallbacks.fetch_add(1, std::memory_order_relaxed);
@@ -163,6 +175,86 @@ void EventBus::dispatchToSubscribers(std::shared_ptr<IEvent> event) {
             stats_.failedCallbacks.fetch_add(1, std::memory_order_relaxed);
             spdlog::error("Unknown subscriber exception for event {} ({})",
                          event->getTypeName(), event->getEventId());
+        }
+    }
+
+    // Production readiness: Notify observers after dispatch
+    notifyAfterDispatch(event, subscriber_count);
+}
+
+// Production readiness: Observer pattern implementation
+void EventBus::registerObserver(std::shared_ptr<IEventObserver> observer) {
+    if (!observer) {
+        spdlog::warn("Attempted to register null observer");
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(observerMutex_);
+    observers_.push_back(observer);
+    spdlog::info("Event observer registered (total: {})", observers_.size());
+}
+
+void EventBus::unregisterObserver(std::shared_ptr<IEventObserver> observer) {
+    if (!observer) {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(observerMutex_);
+    auto it = std::find(observers_.begin(), observers_.end(), observer);
+    if (it != observers_.end()) {
+        observers_.erase(it);
+        spdlog::info("Event observer unregistered (total: {})", observers_.size());
+    }
+}
+
+void EventBus::notifyBeforePublish(const std::shared_ptr<IEvent>& event) {
+    std::lock_guard<std::mutex> lock(observerMutex_);
+    for (const auto& observer : observers_) {
+        try {
+            observer->onBeforePublish(event);
+        } catch (const std::exception& e) {
+            spdlog::error("Observer exception in onBeforePublish: {}", e.what());
+        } catch (...) {
+            spdlog::error("Unknown observer exception in onBeforePublish");
+        }
+    }
+}
+
+void EventBus::notifyAfterPublish(const std::shared_ptr<IEvent>& event, bool success) {
+    std::lock_guard<std::mutex> lock(observerMutex_);
+    for (const auto& observer : observers_) {
+        try {
+            observer->onAfterPublish(event, success);
+        } catch (const std::exception& e) {
+            spdlog::error("Observer exception in onAfterPublish: {}", e.what());
+        } catch (...) {
+            spdlog::error("Unknown observer exception in onAfterPublish");
+        }
+    }
+}
+
+void EventBus::notifyBeforeDispatch(const std::shared_ptr<IEvent>& event) {
+    std::lock_guard<std::mutex> lock(observerMutex_);
+    for (const auto& observer : observers_) {
+        try {
+            observer->onBeforeDispatch(event);
+        } catch (const std::exception& e) {
+            spdlog::error("Observer exception in onBeforeDispatch: {}", e.what());
+        } catch (...) {
+            spdlog::error("Unknown observer exception in onBeforeDispatch");
+        }
+    }
+}
+
+void EventBus::notifyAfterDispatch(const std::shared_ptr<IEvent>& event, size_t subscriber_count) {
+    std::lock_guard<std::mutex> lock(observerMutex_);
+    for (const auto& observer : observers_) {
+        try {
+            observer->onAfterDispatch(event, subscriber_count);
+        } catch (const std::exception& e) {
+            spdlog::error("Observer exception in onAfterDispatch: {}", e.what());
+        } catch (...) {
+            spdlog::error("Unknown observer exception in onAfterDispatch");
         }
     }
 }

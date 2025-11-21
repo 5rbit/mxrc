@@ -20,7 +20,27 @@ namespace rt {
 // Forward declarations
 class RTDataStore;
 class RTStateMachine;
+class RTMetrics;
 enum class RTState : uint8_t;
+
+} // namespace rt
+} // namespace core
+} // namespace mxrc
+
+// Forward declarations for mxrc::rt::perf
+namespace mxrc {
+namespace rt {
+namespace perf {
+class CPUAffinityManager;
+class NUMABinding;
+class PerfMonitor;
+} // namespace perf
+} // namespace rt
+} // namespace mxrc
+
+namespace mxrc {
+namespace core {
+namespace rt {
 
 // 실시간 주기 실행기
 // SCHED_FIFO 우선순위와 절대 시간 기반 대기로 jitter 최소화
@@ -28,6 +48,7 @@ class RTExecutive {
 public:
     using ActionCallback = std::function<void(RTContext&)>;
     using GuardCondition = std::function<bool(const RTStateMachine&)>;
+    using InitializationHook = std::function<void()>;  // Production readiness: init hook
 
     // minor_cycle_ms: 최소 주기 (ms)
     // major_cycle_ms: 전체 프레임 크기 (ms)
@@ -75,6 +96,48 @@ public:
     // Heartbeat monitoring 활성화/비활성화
     void enableHeartbeatMonitoring(bool enable) { heartbeat_monitoring_enabled_ = enable; }
 
+    // Production readiness: Register initialization hooks
+    // Called before RT cycle starts, for CPU affinity/NUMA setup
+    void registerInitializationHook(const std::string& name, InitializationHook hook);
+
+    // Production readiness: Execute all initialization hooks
+    // Called at the beginning of run() before RT loop
+    void executeInitializationHooks();
+
+    // Production readiness: Performance monitoring setup
+    /**
+     * @brief Set RTMetrics for performance monitoring
+     * @param metrics RTMetrics instance (must outlive RTExecutive)
+     */
+    void setRTMetrics(RTMetrics* metrics);
+
+    /**
+     * @brief Configure CPU affinity from JSON file
+     * @param config_path Path to cpu_affinity.json
+     * @return true if successfully configured
+     */
+    bool configureCPUAffinity(const std::string& config_path);
+
+    /**
+     * @brief Configure NUMA binding from JSON file
+     * @param config_path Path to numa_binding.json
+     * @return true if successfully configured
+     */
+    bool configureNUMABinding(const std::string& config_path);
+
+    /**
+     * @brief Configure performance monitor from JSON file
+     * @param config_path Path to perf_monitor.json
+     * @return true if successfully configured
+     */
+    bool configurePerfMonitor(const std::string& config_path);
+
+    /**
+     * @brief Get performance monitor instance
+     * @return PerfMonitor pointer (may be nullptr if not configured)
+     */
+    mxrc::rt::perf::PerfMonitor* getPerfMonitor() { return getPerfMonitorImpl(); }
+
 private:
     // Non-RT Heartbeat 체크 및 SAFE_MODE 전환
     void checkHeartbeat();
@@ -118,6 +181,25 @@ private:
         uint32_t next_slot;
     };
     std::vector<std::vector<ActionSlot>> schedule_;
+
+    // Production readiness: Initialization hooks
+    struct InitHook {
+        std::string name;
+        InitializationHook hook;
+    };
+    std::vector<InitHook> init_hooks_;
+
+    // Production readiness: Performance monitoring
+    // Using void* to avoid exposing implementation details in header
+    void* cpu_affinity_mgr_impl_;
+    void* numa_binding_impl_;
+    void* perf_monitor_impl_;
+    RTMetrics* rt_metrics_;  // Non-owning pointer, managed by caller
+
+    // Helper methods for type-safe access
+    mxrc::rt::perf::CPUAffinityManager* getCPUAffinityMgr();
+    mxrc::rt::perf::NUMABinding* getNUMABinding();
+    mxrc::rt::perf::PerfMonitor* getPerfMonitorImpl();
 };
 
 } // namespace rt

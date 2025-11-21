@@ -113,7 +113,6 @@ out/
 .gemini/**/*.log
 
 build/generated/
-
 build/generated/
 
 build/generated/
@@ -137,3 +136,12 @@ build/generated/
 build/generated/
 
 build/generated/
+
+build/generated/
+
+build/generated/
+
+build/generated/
+
+build/generated/
+.cache/

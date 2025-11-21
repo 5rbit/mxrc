@@ -1,0 +1,25 @@
+{
+  "process_name": "mxrc-rt",
+  "health_check_interval_ms": 1000,
+  "health_check_timeout_ms": 500,
+  "failure_threshold": 3,
+  "restart_delay_ms": 100,
+  "max_restart_count": 5,
+  "restart_window_sec": 60,
+  "enable_state_recovery": true,
+  "checkpoint_interval_sec": 60,
+  "enable_leader_election": false,
+
+  "_comments": {
+    "process_name": "Target process name to monitor",
+    "health_check_interval_ms": "Health check interval in milliseconds (must be > health_check_timeout_ms)",
+    "health_check_timeout_ms": "Health check timeout in milliseconds (must be < health_check_interval_ms)",
+    "failure_threshold": "Number of consecutive failures before triggering failover (must be >= 1)",
+    "restart_delay_ms": "Delay before restarting process in milliseconds",
+    "max_restart_count": "Maximum restart count within time window (must be >= 1)",
+    "restart_window_sec": "Time window for restart count in seconds",
+    "enable_state_recovery": "Whether to recover from checkpoint on restart",
+    "checkpoint_interval_sec": "Checkpoint creation interval in seconds (must be > 0 if enable_state_recovery is true)",
+    "enable_leader_election": "Enable leader election in distributed environment (Bully algorithm)"
+  }
+}

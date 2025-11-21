@@ -475,6 +475,10 @@ add_executable(run_tests
     src/core/ha/StateCheckpoint.cpp
     src/core/ha/FailoverManager.cpp
     src/core/ha/ProcessMonitor.cpp
+    # Production readiness: High Availability tests
+    tests/core/ha/process_monitor_test.cpp
+    tests/core/ha/failover_manager_test.cpp
+    tests/core/ha/state_checkpoint_test.cpp
 )
 
 target_include_directories(run_tests PUBLIC

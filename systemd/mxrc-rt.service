@@ -1,54 +1,46 @@
 [Unit]
-Description=MXRC RT (Real-Time) Process
-Documentation=https://github.com/mxrc/mxrc
+Description=MXRC Real-Time Process
+Documentation=https://github.com/your-org/mxrc
 After=network.target
-Requires=mxrc-nonrt.service
-Before=mxrc-nonrt.service
+Wants=mxrc-monitor.service
 
 [Service]
-Type=simple
+Type=notify
 ExecStart=/usr/local/bin/mxrc-rt
-Restart=always
-RestartSec=1
+Restart=on-failure
+RestartSec=5s
+WatchdogSec=10s
+TimeoutStartSec=30s
+TimeoutStopSec=30s
 
-# RT 스케줄링 권한
-# CAP_SYS_NICE: RT 우선순위 설정 권한
-# CAP_IPC_LOCK: 메모리 잠금 권한 (mlockall)
-AmbientCapabilities=CAP_SYS_NICE CAP_IPC_LOCK
-SecureBits=keep-caps
+# Real-time scheduling (requires CAP_SYS_NICE)
+CPUSchedulingPolicy=fifo
+CPUSchedulingPriority=80
 
-# 프로세스 제한
-LimitRTPRIO=99
+# CPU affinity for RT cores (cores 2-3)
+CPUAffinity=2 3
+
+# Memory locking for RT performance
 LimitMEMLOCK=infinity
-LimitNICE=-20
 
-# CPU 친화성 (CPU 1번에 고정)
-CPUAffinity=1
+# NUMA policy
+NUMAPolicy=bind
+NUMAMask=0
 
-# 보안 설정
-# 최소 권한 원칙을 따르되 RT 동작에 필요한 권한만 부여
-ProtectSystem=strict
-ProtectHome=yes
-PrivateTmp=yes
-NoNewPrivileges=yes
-
-# 공유 메모리 접근 허용
-ProtectKernelTunables=yes
-ProtectKernelModules=yes
-ProtectControlGroups=yes
-RestrictRealtime=no
-
-# 로깅
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=mxrc-rt
-
-# 실행 사용자/그룹
+# User and group
 User=mxrc
 Group=mxrc
 
-# 작업 디렉토리
-WorkingDirectory=/var/lib/mxrc
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/mxrc /var/log/mxrc /tmp/mxrc
+
+# Capabilities
+AmbientCapabilities=CAP_SYS_NICE CAP_IPC_LOCK
+CapabilityBoundingSet=CAP_SYS_NICE CAP_IPC_LOCK
 
 [Install]
 WantedBy=multi-user.target

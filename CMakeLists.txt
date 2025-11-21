@@ -84,6 +84,12 @@ add_executable(mxrc
     src/core/rt/RTMetrics.cpp
     src/core/monitoring/MetricsCollector.cpp
     src/core/monitoring/MetricsServer.cpp
+    src/core/monitoring/StructuredLogger.cpp
+    # Production readiness: Tracing
+    src/core/tracing/SpanContext.cpp
+    src/core/tracing/TracerProvider.cpp
+    src/core/tracing/EventBusTracer.cpp
+    src/core/tracing/RTCycleTracer.cpp
 )
 
 # Link dependencies
@@ -141,6 +147,7 @@ target_include_directories(mxrc PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/rt/ipc
     ${PROJECT_SOURCE_DIR}/src/core/ha
     ${PROJECT_SOURCE_DIR}/src/core/monitoring
+    ${PROJECT_SOURCE_DIR}/src/core/tracing
 )
 
 # ===========================
@@ -315,11 +322,17 @@ add_executable(rt
     src/core/rt/RTMetrics.cpp
     src/core/monitoring/MetricsCollector.cpp
     src/core/monitoring/MetricsServer.cpp
+    src/core/monitoring/StructuredLogger.cpp
     # Production readiness: High Availability
     src/core/ha/HealthCheckServer.cpp
     src/core/ha/ProcessMonitor.cpp
     src/core/ha/StateCheckpoint.cpp
     src/core/ha/FailoverManager.cpp
+    # Production readiness: Tracing
+    src/core/tracing/SpanContext.cpp
+    src/core/tracing/TracerProvider.cpp
+    src/core/tracing/EventBusTracer.cpp
+    src/core/tracing/RTCycleTracer.cpp
 )
 
 # Link dependencies for rt
@@ -352,6 +365,7 @@ target_include_directories(rt PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/event/util
     ${PROJECT_SOURCE_DIR}/src/core/ha
     ${PROJECT_SOURCE_DIR}/src/core/monitoring
+    ${PROJECT_SOURCE_DIR}/src/core/tracing
     ${CMAKE_BINARY_DIR}/generated
 )
 
@@ -414,6 +428,7 @@ add_executable(run_tests
     tests/unit/monitoring/MetricsCollector_test.cpp
     tests/unit/monitoring/MetricsServer_test.cpp
     tests/unit/monitoring/RTMetrics_test.cpp
+    tests/unit/monitoring/structured_logger_test.cpp
     tests/integration/monitoring/monitoring_integration_test.cpp
     examples/event_monitoring/ExecutionTimeCollector.cpp
     examples/event_monitoring/StateTransitionLogger.cpp
@@ -458,6 +473,7 @@ add_executable(run_tests
     # Monitoring
     src/core/monitoring/MetricsCollector.cpp
     src/core/monitoring/MetricsServer.cpp
+    src/core/monitoring/StructuredLogger.cpp
     src/core/rt/RTMetrics.cpp
     # Production readiness: Performance tests
     tests/unit/perf/CPUAffinityManager_test.cpp
@@ -479,6 +495,17 @@ add_executable(run_tests
     tests/core/ha/process_monitor_test.cpp
     tests/core/ha/failover_manager_test.cpp
     tests/core/ha/state_checkpoint_test.cpp
+    # Production readiness: Tracing
+    src/core/tracing/SpanContext.cpp
+    src/core/tracing/TracerProvider.cpp
+    src/core/tracing/EventBusTracer.cpp
+    src/core/tracing/RTCycleTracer.cpp
+    # Production readiness: Tracing tests
+    tests/unit/tracing/TracerProvider_test.cpp
+    tests/unit/tracing/SpanContext_test.cpp
+    tests/unit/tracing/EventBusTracer_test.cpp
+    tests/unit/tracing/RTCycleTracer_test.cpp
+    tests/integration/tracing/tracing_integration_test.cpp
 )
 
 target_include_directories(run_tests PUBLIC
@@ -532,6 +559,9 @@ target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/tests/unit/monitoring
     ${PROJECT_SOURCE_DIR}/tests/integration/monitoring
     ${PROJECT_SOURCE_DIR}/src/core/ha
+    ${PROJECT_SOURCE_DIR}/src/core/tracing
+    ${PROJECT_SOURCE_DIR}/tests/unit/tracing
+    ${PROJECT_SOURCE_DIR}/tests/integration/tracing
 )
 
 

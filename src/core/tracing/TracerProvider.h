@@ -241,5 +241,24 @@ inline std::string spanStatusToString(SpanStatus status) {
     }
 }
 
+/**
+ * @brief Get global tracer provider instance
+ *
+ * Returns the global singleton tracer provider.
+ * Creates one if it doesn't exist.
+ *
+ * @return std::shared_ptr<ITracerProvider> Global tracer provider
+ */
+std::shared_ptr<ITracerProvider> getGlobalTracerProvider();
+
+/**
+ * @brief Set global tracer provider instance
+ *
+ * Allows replacing the default tracer provider with a custom one.
+ *
+ * @param provider Custom tracer provider
+ */
+void setGlobalTracerProvider(std::shared_ptr<ITracerProvider> provider);
+
 } // namespace tracing
 } // namespace mxrc

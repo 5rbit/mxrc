@@ -37,7 +37,19 @@ struct StructuredLogEvent {
     std::string mxrc_task_id;       // Task ID
     std::string mxrc_sequence_id;   // Sequence ID
     std::string mxrc_action_id;     // Action ID
-    double mxrc_cycle_time_us;      // RT cycle time in microseconds
+    double mxrc_cycle_time_us = 0.0;      // RT cycle time in microseconds
+
+    /**
+     * @brief Convert to JSON string
+     * @return std::string JSON representation
+     */
+    std::string toJson() const;
+
+    /**
+     * @brief Validate required fields
+     * @return bool True if all required fields are valid
+     */
+    bool isValid() const;
 };
 
 /**
@@ -193,6 +205,61 @@ inline std::string getIso8601Timestamp() {
 
     return std::string(buffer) + "." + std::to_string(ms.count()) + "Z";
 }
+
+// ============================================================================
+// Thread-local trace context management
+// ============================================================================
+
+/**
+ * @brief Simple trace context for logging
+ *
+ * Note: This is a lightweight version for logging only.
+ * For full distributed tracing, use mxrc::tracing::TraceContext.
+ */
+struct LogTraceContext {
+    std::string trace_id;
+    std::string span_id;
+};
+
+/**
+ * @brief Get current thread's trace context
+ */
+LogTraceContext getThreadTraceContext();
+
+/**
+ * @brief Set current thread's trace context
+ * @param trace_id Trace ID (32 hex chars)
+ * @param span_id Span ID (16 hex chars)
+ */
+void setThreadTraceContext(const std::string& trace_id, const std::string& span_id);
+
+/**
+ * @brief Clear current thread's trace context
+ */
+void clearThreadTraceContext();
+
+// ============================================================================
+// Factory function
+// ============================================================================
+
+/**
+ * @brief Create a structured logger instance
+ *
+ * @param logger_name Logger name (e.g., "mxrc.rt")
+ * @param log_file_path Path to log file (empty for console only)
+ * @param max_file_size Maximum file size before rotation (default: 10MB)
+ * @param max_files Maximum number of rotated files (default: 3)
+ * @param async_logging Enable async logging with ring buffer (default: true)
+ * @param async_queue_size Size of async queue (default: 8192)
+ * @return std::shared_ptr<IStructuredLogger> Structured logger instance
+ */
+std::shared_ptr<IStructuredLogger> createStructuredLogger(
+    const std::string& logger_name,
+    const std::string& log_file_path = "",
+    size_t max_file_size = 10 * 1024 * 1024,  // 10MB
+    size_t max_files = 3,
+    bool async_logging = true,
+    size_t async_queue_size = 8192);
 
 } // namespace monitoring
 } // namespace mxrc

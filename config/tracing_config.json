@@ -1,0 +1,82 @@
+{
+  "tracing": {
+    "enabled": true,
+    "provider": "lightweight",
+    "service_name": "mxrc",
+    "service_version": "1.0.0",
+
+    "sampling": {
+      "strategy": "probabilistic",
+      "default_rate": 0.1,
+      "rt_cycle_rate": 0.05,
+      "event_bus_rate": 0.1
+    },
+
+    "exporters": {
+      "console": {
+        "enabled": true,
+        "log_level": "debug"
+      },
+      "file": {
+        "enabled": false,
+        "path": "/var/log/mxrc/traces/",
+        "max_file_size_mb": 100,
+        "rotation_policy": "daily"
+      },
+      "otlp": {
+        "enabled": false,
+        "endpoint": "http://localhost:4317",
+        "protocol": "grpc",
+        "timeout_ms": 5000,
+        "compression": "gzip"
+      }
+    },
+
+    "instrumentation": {
+      "rt_executive": {
+        "enabled": true,
+        "trace_cycles": true,
+        "trace_actions": true,
+        "trace_timing": true,
+        "sampling_rate": 0.05
+      },
+      "event_bus": {
+        "enabled": true,
+        "trace_publish": true,
+        "trace_dispatch": true,
+        "sampling_rate": 0.1
+      },
+      "datastore": {
+        "enabled": false,
+        "trace_reads": false,
+        "trace_writes": false,
+        "sampling_rate": 0.01
+      }
+    },
+
+    "resource_attributes": {
+      "service.name": "mxrc",
+      "service.namespace": "realtime-control",
+      "service.instance.id": "mxrc-rt-01",
+      "deployment.environment": "production",
+      "host.name": "auto",
+      "process.runtime.name": "cpp",
+      "process.runtime.version": "20"
+    },
+
+    "performance": {
+      "max_queue_size": 2048,
+      "batch_timeout_ms": 1000,
+      "max_export_batch_size": 512,
+      "max_export_timeout_ms": 30000,
+      "schedule_delay_ms": 5000
+    },
+
+    "limits": {
+      "max_attributes_per_span": 128,
+      "max_events_per_span": 128,
+      "max_links_per_span": 128,
+      "max_attribute_value_length": 4096
+    }
+  }
+}

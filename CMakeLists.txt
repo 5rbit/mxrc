@@ -317,6 +317,7 @@ add_executable(rt
     src/core/monitoring/MetricsServer.cpp
     # Production readiness: High Availability
     src/core/ha/HealthCheckServer.cpp
+    src/core/ha/ProcessMonitor.cpp
 )
 
 # Link dependencies for rt
@@ -469,6 +470,7 @@ add_executable(run_tests
     src/core/config/ConfigLoader.cpp
     # Production readiness: High Availability
     src/core/ha/HealthCheckServer.cpp
+    src/core/ha/ProcessMonitor.cpp
 )
 
 target_include_directories(run_tests PUBLIC

@@ -861,6 +861,97 @@ curl http://localhost:9090/metrics | grep mxrc_tracing_spans_total
 # counter가 증가해야 함
 ```
 
+### RT 성능 저하 (Deadline miss 증가)
+
+**증상**: `mxrc_rt_deadline_miss_rate` 증가, cycle time 지연
+
+**원인 분석**:
+```bash
+# 1. CPU affinity 확인
+taskset -cp <PID>
+# 출력: 2,3 이어야 함
+
+# 2. NUMA 로컬 메모리 접근율 확인
+curl http://localhost:9090/metrics | grep mxrc_numa_local_memory_percent
+# 출력: > 95% 이어야 함
+
+# 3. Logging overhead 확인
+curl http://localhost:9090/metrics | grep mxrc_logging_latency_us
+# P99 < 10us 이어야 함
+
+# 4. Tracing overhead 확인
+curl http://localhost:9090/metrics | grep mxrc_tracing_sampling_rate
+# RT cycle: 5% 이하여야 함
+```
+
+**해결**:
+```bash
+# 1. CPU isolation 재확인
+cat /proc/cmdline | grep isolcpus
+
+# 2. 비동기 로깅 활성화 확인
+grep async_logging config/logging.json
+
+# 3. Tracing sampling rate 낮추기
+# config/tracing_config.json에서 rt_cycle_rate를 0.01로 변경
+
+# 4. Datastore tracing 비활성화
+# config/tracing_config.json에서 datastore.enabled=false 설정
+```
+
+**자세한 분석**: [Performance Analysis](../../performance-analysis.md)
+
+### 프로세스 메모리 사용량 증가
+
+**증상**: RSS 메모리가 계속 증가
+
+**원인**:
+- Logging queue가 가득 참
+- Tracing span이 누적됨
+- Metrics 누적
+
+**해결**:
+```bash
+# 1. 메모리 사용량 확인
+ps aux | grep rt_process
+# RSS 컬럼 확인
+
+# 2. Logging queue 크기 확인
+# async_queue_size=8192 설정 확인
+
+# 3. Metrics reset (필요시)
+curl -X POST http://localhost:9090/metrics/reset
+
+# 4. 프로세스 재시작
+sudo systemctl restart mxrc-rt.service
+```
+
+### Health Check API 응답 없음
+
+**증상**: `/health` 엔드포인트 타임아웃
+
+**해결**:
+```bash
+# 1. 포트 확인
+netstat -tuln | grep 8080
+# LISTEN 상태여야 함
+
+# 2. 프로세스 상태 확인
+ps aux | grep rt_process
+
+# 3. Health check server 로그 확인
+journalctl -u mxrc-rt.service | grep HealthCheckServer
+
+# 4. 방화벽 확인
+sudo iptables -L -n | grep 8080
+```
+
+### 더 많은 문제 해결 방법
+
+- **Configuration Guide**: [../../configuration-guide.md](../../configuration-guide.md)
+- **Performance Analysis**: [../../performance-analysis.md](../../performance-analysis.md)
+- **API Reference**: [../../api-reference.md](../../api-reference.md)
+
 ---
 
 ## 다음 단계
@@ -884,13 +975,27 @@ curl http://localhost:9090/metrics | grep mxrc_tracing_spans_total
 
 ## 참조
 
+### Feature Documentation
+
 - **Specification**: [spec.md](spec.md)
 - **Implementation Plan**: [plan.md](plan.md)
 - **Research**: [research.md](research.md)
 - **Data Model**: [data-model.md](data-model.md)
-- **API Contracts**:
-  - [health-check-api.yaml](contracts/health-check-api.yaml)
-  - [metrics-api.yaml](contracts/metrics-api.yaml)
+
+### API and Configuration
+
+- **API Reference**: [../../api-reference.md](../../api-reference.md) - Complete HTTP API documentation
+- **Configuration Guide**: [../../configuration-guide.md](../../configuration-guide.md) - All JSON config files explained
+- **Health Check API**: [contracts/health-check-api.yaml](contracts/health-check-api.yaml) - OpenAPI spec
+- **Metrics API**: [contracts/metrics-api.yaml](contracts/metrics-api.yaml) - OpenAPI spec
+
+### Performance and Security
+
+- **Performance Analysis**: [../../performance-analysis.md](../../performance-analysis.md) - Overhead analysis and recommendations
+- **Security Considerations**: See Performance Analysis document, Section 7
+
+### Project Standards
+
 - **Constitution**: `.specify/memory/constitution.md`
 
 ---

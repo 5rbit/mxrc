@@ -14,6 +14,11 @@ find_package(GTest REQUIRED)
 find_package(TBB REQUIRED)
 find_package(nlohmann_json 3.11.0 REQUIRED)
 
+# systemd dependency for process management
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(SYSTEMD REQUIRED libsystemd)
+message(STATUS "systemd found: ${SYSTEMD_LIBRARIES}")
+
 # Production readiness dependencies
 find_library(NUMA_LIBRARY NAMES numa)
 find_path(NUMA_INCLUDE_DIR NAMES numa.h)
@@ -99,6 +104,7 @@ target_link_libraries(mxrc PRIVATE
     GTest::Main
     TBB::tbb
     nlohmann_json::nlohmann_json
+    ${SYSTEMD_LIBRARIES}
 )
 
 # Link NUMA if found
@@ -148,6 +154,12 @@ target_include_directories(mxrc PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/ha
     ${PROJECT_SOURCE_DIR}/src/core/monitoring
     ${PROJECT_SOURCE_DIR}/src/core/tracing
+    ${PROJECT_SOURCE_DIR}/src/core/systemd
+    ${PROJECT_SOURCE_DIR}/src/core/systemd/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/systemd/impl
+    ${PROJECT_SOURCE_DIR}/src/core/systemd/util
+    ${PROJECT_SOURCE_DIR}/src/core/systemd/dto
+    ${SYSTEMD_INCLUDE_DIRS}
 )
 
 # ===========================
@@ -260,6 +272,7 @@ target_link_libraries(nonrt PRIVATE
     TBB::tbb
     nlohmann_json::nlohmann_json
     Threads::Threads
+    ${SYSTEMD_LIBRARIES}
 )
 
 # Enable Address Sanitizer
@@ -296,6 +309,12 @@ target_include_directories(nonrt PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/rt
     ${PROJECT_SOURCE_DIR}/src/core/rt/util
     ${PROJECT_SOURCE_DIR}/src/core/rt/ipc
+    ${PROJECT_SOURCE_DIR}/src/core/systemd
+    ${PROJECT_SOURCE_DIR}/src/core/systemd/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/systemd/impl
+    ${PROJECT_SOURCE_DIR}/src/core/systemd/util
+    ${PROJECT_SOURCE_DIR}/src/core/systemd/dto
+    ${SYSTEMD_INCLUDE_DIRS}
 )
 
 # ===========================
@@ -340,6 +359,7 @@ target_link_libraries(rt PRIVATE
     spdlog::spdlog
     Threads::Threads
     nlohmann_json::nlohmann_json
+    ${SYSTEMD_LIBRARIES}
 )
 
 # Link NUMA if found
@@ -366,6 +386,12 @@ target_include_directories(rt PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/ha
     ${PROJECT_SOURCE_DIR}/src/core/monitoring
     ${PROJECT_SOURCE_DIR}/src/core/tracing
+    ${PROJECT_SOURCE_DIR}/src/core/systemd
+    ${PROJECT_SOURCE_DIR}/src/core/systemd/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/systemd/impl
+    ${PROJECT_SOURCE_DIR}/src/core/systemd/util
+    ${PROJECT_SOURCE_DIR}/src/core/systemd/dto
+    ${SYSTEMD_INCLUDE_DIRS}
     ${CMAKE_BINARY_DIR}/generated
 )
 
@@ -506,6 +532,13 @@ add_executable(run_tests
     tests/unit/tracing/EventBusTracer_test.cpp
     tests/unit/tracing/RTCycleTracer_test.cpp
     tests/integration/tracing/tracing_integration_test.cpp
+    # systemd unit tests
+    tests/unit/systemd/systemd_util_test.cpp
+    tests/unit/systemd/watchdog_notifier_test.cpp
+    tests/unit/systemd/watchdog_timer_test.cpp
+    src/core/systemd/util/SystemdUtil.cpp
+    src/core/systemd/util/WatchdogTimer.cpp
+    src/core/systemd/impl/SdNotifyWatchdog.cpp
 )
 
 target_include_directories(run_tests PUBLIC
@@ -562,6 +595,14 @@ target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/tracing
     ${PROJECT_SOURCE_DIR}/tests/unit/tracing
     ${PROJECT_SOURCE_DIR}/tests/integration/tracing
+    ${PROJECT_SOURCE_DIR}/src/core/systemd
+    ${PROJECT_SOURCE_DIR}/src/core/systemd/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/systemd/impl
+    ${PROJECT_SOURCE_DIR}/src/core/systemd/util
+    ${PROJECT_SOURCE_DIR}/src/core/systemd/dto
+    ${PROJECT_SOURCE_DIR}/tests/unit/systemd
+    ${PROJECT_SOURCE_DIR}/tests/integration/systemd
+    ${SYSTEMD_INCLUDE_DIRS}
 )
 
 
@@ -572,6 +613,7 @@ target_link_libraries(run_tests PRIVATE
     GTest::Main
     TBB::tbb
     nlohmann_json::nlohmann_json
+    ${SYSTEMD_LIBRARIES}
 )
 
 # Link NUMA if found

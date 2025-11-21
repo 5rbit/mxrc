@@ -7,13 +7,19 @@ Wants=mxrc-monitor.service
 [Service]
 Type=notify
 ExecStart=/usr/local/bin/mxrc-rt
+
+# Watchdog configuration (User Story 2)
+WatchdogSec=30s
 Restart=on-failure
 RestartSec=5s
-WatchdogSec=10s
+StartLimitBurst=5
+StartLimitIntervalSec=60s
+
+# Service timeouts
 TimeoutStartSec=30s
 TimeoutStopSec=30s
 
-# Real-time scheduling (requires CAP_SYS_NICE)
+# Real-time scheduling (User Story 1)
 CPUSchedulingPolicy=fifo
 CPUSchedulingPriority=80
 

@@ -69,6 +69,9 @@ bool EventBus::publish(std::shared_ptr<IEvent> event) {
         return false;
     }
 
+    spdlog::debug("[EventBus] Publishing event: type={}, id={}",
+                  event->getTypeName(), event->getEventId());
+
     // Production readiness: Notify observers before publish
     notifyBeforePublish(event);
 
@@ -84,11 +87,16 @@ bool EventBus::publish(std::shared_ptr<IEvent> event) {
         now.time_since_epoch()).count();
     prioritized.sequence_num = sequenceCounter_.fetch_add(1, std::memory_order_relaxed);
 
+    spdlog::debug("[EventBus] Created PrioritizedEvent: type={}, priority={}, seq={}",
+                  prioritized.type, static_cast<int>(prioritized.priority), prioritized.sequence_num);
+
     // Mutex로 보호하여 여러 생산자가 안전하게 publish 가능
     std::lock_guard<std::mutex> lock(publishMutex_);
 
     // Push to priority queue
     bool success = eventQueue_->push(std::move(prioritized));
+
+    spdlog::debug("[EventBus] Push to queue: success={}", success);
 
     if (success) {
         stats_.publishedEvents.fetch_add(1, std::memory_order_relaxed);
@@ -142,11 +150,17 @@ void EventBus::dispatchLoop() {
         // 큐에서 이벤트 꺼내기 (우선순위 순서로)
         auto prioritized = eventQueue_->pop();
         if (prioritized.has_value()) {
+            spdlog::debug("[EventBus] Popped event from queue: type={}, priority={}",
+                          prioritized->type, static_cast<int>(prioritized->priority));
+
             // Extract IEvent from PrioritizedEvent payload
             try {
                 auto event = std::get<std::shared_ptr<IEvent>>(prioritized->payload);
                 if (event) {
+                    spdlog::debug("[EventBus] Extracted IEvent: type={}, id={}",
+                                  event->getTypeName(), event->getEventId());
                     dispatchToSubscribers(event);
+                    spdlog::debug("[EventBus] Dispatched event: {}", event->getEventId());
                 } else {
                     spdlog::error("Null IEvent extracted from PrioritizedEvent");
                 }
@@ -186,12 +200,15 @@ void EventBus::dispatchToSubscribers(std::shared_ptr<IEvent> event) {
     notifyBeforeDispatch(event);
 
     auto subscriptions = subscriptionManager_.getAllSubscriptions();
+    spdlog::debug("[EventBus] Dispatching to {} subscribers for event: {}",
+                  subscriptions.size(), event->getEventId());
     size_t subscriber_count = 0;
 
     for (const auto& sub : subscriptions) {
         try {
             // 필터 조건 확인
             if (sub.filter(event)) {
+                spdlog::debug("[EventBus] Calling subscriber callback for event: {}", event->getEventId());
                 sub.callback(event);
                 stats_.processedEvents.fetch_add(1, std::memory_order_relaxed);
                 subscriber_count++;
@@ -206,6 +223,9 @@ void EventBus::dispatchToSubscribers(std::shared_ptr<IEvent> event) {
                          event->getTypeName(), event->getEventId());
         }
     }
+
+    spdlog::debug("[EventBus] Dispatched to {} subscribers for event: {}",
+                  subscriber_count, event->getEventId());
 
     // Production readiness: Notify observers after dispatch
     notifyAfterDispatch(event, subscriber_count);

@@ -268,7 +268,7 @@ TEST_F(EventFlowTest, ErrorPropagationPublishesFailureEvents) {
     ExecutionContext context;
     auto result = sequenceEngine_->execute(seqDef, context);
 
-    ASSERT_TRUE(waitForEventCount(4, 3000));  // SEQ_START + STEP_START + ACT_FAILED + SEQ_FAILED
+    ASSERT_TRUE(waitForEventCount(5, 5000));  // SEQ_START + STEP_START + ACT_STARTED + ACT_FAILED + SEQ_FAILED
 
     // Verify failure was captured
     EXPECT_TRUE(result.isFailed());

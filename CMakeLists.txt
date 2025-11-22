@@ -447,6 +447,8 @@ add_executable(run_tests
     tests/unit/event/ThrottlingPolicy_test.cpp
     tests/unit/event/CoalescingPolicy_test.cpp
     tests/integration/event/event_flow_test.cpp
+    tests/integration/event/priority_integration_test.cpp
+    tests/integration/event/event_storm_test.cpp
     tests/integration/event/monitoring_extension_test.cpp
     tests/integration/datastore_logging_integration_test.cpp
     tests/unit/datastore/DataStore_test.cpp

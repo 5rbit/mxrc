@@ -540,6 +540,10 @@ add_executable(run_tests
     tests/integration/systemd/cpu_quota_test.cpp
     tests/integration/systemd/memory_limit_test.cpp
     tests/integration/systemd/io_weight_test.cpp
+    # systemd integration tests (Phase 6: Service Dependencies)
+    tests/integration/systemd/service_order_test.cpp
+    tests/integration/systemd/dependency_chain_test.cpp
+    tests/integration/systemd/target_test.cpp
     src/core/systemd/util/SystemdUtil.cpp
     src/core/systemd/util/WatchdogTimer.cpp
     src/core/systemd/impl/SdNotifyWatchdog.cpp

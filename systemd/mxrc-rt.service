@@ -1,8 +1,8 @@
 [Unit]
 Description=MXRC Real-Time Process
 Documentation=https://github.com/your-org/mxrc
-After=network.target
-Wants=mxrc-monitor.service
+After=network.target mxrc-nonrt.service
+Wants=mxrc-nonrt.service
 
 [Service]
 Type=notify

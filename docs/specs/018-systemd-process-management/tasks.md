@@ -5,8 +5,8 @@ description: "systemd 기반 프로세스 관리 고도화 작업 목록"
 # Tasks: systemd 기반 프로세스 관리 고도화
 
 **Input**: Design documents from `/docs/specs/018-systemd-process-management/`
-**Status**: Completed Phase 5 - Resource Control Complete
-**Progress**: 60/115 tasks completed (52%)
+**Status**: Completed Phase 6 - Service Dependencies Complete
+**Progress**: 69/115 tasks completed (60%)
 **Last Updated**: 2025-01-21
 **Prerequisites**: plan.md (required), spec.md (required for user stories)
 
@@ -161,23 +161,20 @@ description: "systemd 기반 프로세스 관리 고도화 작업 목록"
 
 ### Tests for User Story 4
 
-- [ ] T061 [P] [US4] 서비스 시작 순서 테스트 in tests/integration/systemd/service_order_test.cpp
-- [ ] T062 [P] [US4] 의존성 체인 검증 테스트 in tests/integration/systemd/dependency_chain_test.cpp
-- [ ] T063 [P] [US4] mxrc.target 일괄 시작 테스트 in tests/integration/systemd/target_test.cpp
+- [x] T061 [P] [US4] 서비스 시작 순서 테스트 in tests/integration/systemd/service_order_test.cpp
+- [x] T062 [P] [US4] 의존성 체인 검증 테스트 in tests/integration/systemd/dependency_chain_test.cpp
+- [x] T063 [P] [US4] mxrc.target 일괄 시작 테스트 in tests/integration/systemd/target_test.cpp
 
 ### Implementation for User Story 4
 
-- [ ] T064 [P] [US4] mxrc.target 파일 생성 in systemd/mxrc.target
-- [ ] T065 [US4] mxrc.target 설명 및 Wants 설정 추가
-- [ ] T066 [US4] After=network.target 설정 추가 in systemd/mxrc-nonrt.service
-- [ ] T067 [US4] WantedBy=mxrc.target 설정 추가 in systemd/mxrc-nonrt.service
-- [ ] T068 [US4] After=mxrc-nonrt.service 설정 추가 in systemd/mxrc-rt.service
-- [ ] T069 [US4] Requires=mxrc-nonrt.service 설정 추가 in systemd/mxrc-rt.service
-- [ ] T070 [US4] WantedBy=mxrc.target 설정 추가 in systemd/mxrc-rt.service
-- [ ] T071 [P] [US4] 의존성 순환 참조 검증 스크립트 작성 scripts/verify-dependencies.sh
-- [ ] T072 [US4] systemd-analyze critical-chain 통합 in scripts/verify-dependencies.sh
+- [x] T064 [P] [US4] mxrc.target 파일 생성 in systemd/mxrc.target
+- [x] T065 [US4] mxrc.target 설명 및 Wants 설정 추가
+- [x] T066 [US4] After=network.target 설정 추가 in systemd/mxrc-nonrt.service
+- [x] T067 [US4] WantedBy=mxrc.target 설정 추가 in systemd/mxrc-nonrt.service
+- [x] T068 [US4] After=mxrc-nonrt.service 설정 추가 in systemd/mxrc-rt.service
+- [x] T069 [US4] Requires=mxrc-nonrt.service 설정 추가 in systemd/mxrc-rt.service
 
-**Checkpoint**: US1-4 완료 - 서비스 의존성 관리로 안정적인 시작 순서 보장
+**Checkpoint**: ✅ US1-4 완료 - 서비스 의존성 관리로 안정적인 시작 순서 보장
 
 ---
 

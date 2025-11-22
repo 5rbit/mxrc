@@ -8,6 +8,11 @@ Wants=mxrc-nonrt.service
 Type=notify
 ExecStart=/usr/local/bin/mxrc-rt
 
+# journald 구조화 로깅 (User Story 6)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mxrc-rt
+
 # Watchdog configuration (User Story 2)
 WatchdogSec=30s
 Restart=on-failure

@@ -549,10 +549,15 @@ add_executable(run_tests
     tests/integration/systemd/metrics_collection_test.cpp
     tests/integration/systemd/prometheus_format_test.cpp
     tests/integration/systemd/metrics_endpoint_test.cpp
+    # systemd integration tests (Phase 8: journald Integration)
+    tests/integration/systemd/journald_logging_test.cpp
+    tests/integration/systemd/structured_logging_test.cpp
+    tests/integration/systemd/log_query_test.cpp
     src/core/systemd/util/SystemdUtil.cpp
     src/core/systemd/util/WatchdogTimer.cpp
     src/core/systemd/impl/SdNotifyWatchdog.cpp
     src/systemd/SystemdMetricsCollector.cpp
+    src/systemd/JournaldLogger.cpp
 )
 
 target_include_directories(run_tests PUBLIC

@@ -2,9 +2,10 @@
 
 **Feature Branch**: `022-fix-architecture-issues`
 **Created**: 2025-01-22
-**Status**: Tasks Ready
-**Progress**: 3/5 (Spec ✅ → Plan ✅ → Tasks ✅ → Implementation → Completed)
+**Status**: In Progress (MVP P1 Complete)
+**Progress**: 4/5 (Spec ✅ → Plan ✅ → Tasks ✅ → Implementation 🔄 → Completed)
 **Last Updated**: 2025-01-22
+**MVP Status**: Phase 0-2 완료 (12/35 tasks, P1 CRITICAL 완료)
 **Input**: User description: "Architecture improvements from research 006: fix DataStore God Object, EventBus stability, HA split-brain, and systemd race condition"
 
 ---

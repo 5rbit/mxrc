@@ -2,7 +2,7 @@
 
 **Feature**: 022-fix-architecture-issues | **Date**: 2025-01-22
 **Branch**: `022-fix-architecture-issues`
-**Progress**: 0/35 tasks completed
+**Progress**: 12/35 tasks completed (MVP P1 완료 ✅)
 
 ---
 
@@ -35,9 +35,9 @@
 
 ---
 
-## Phase 0: Setup (3개 작업)
+## Phase 0: Setup (3개 작업) ✅ 완료
 
-### - [ ] T001 [US1] CMake 빌드 설정 업데이트
+### - [x] T001 [US1] CMake 빌드 설정 업데이트
 **파일**: `CMakeLists.txt`
 **설명**: libsystemd 의존성 추가 및 컴파일 플래그 설정
 **상세**:
@@ -47,7 +47,7 @@
 - `target_link_libraries(mxrc-nonrt ${SYSTEMD_LIBRARIES})` 추가
 **검증**: `cmake .. && make -j$(nproc)` 성공
 
-### - [ ] T002 [P] [US2] VersionedData 헤더 파일 생성
+### - [x] T002 [P] [US2] VersionedData 헤더 파일 생성
 **파일**: `src/core/datastore/core/VersionedData.h`
 **설명**: 버전 관리 데이터 래퍼 구조체 정의
 **상세**:
@@ -58,7 +58,7 @@
 - POD 타입으로 정의 (trivially copyable)
 **검증**: 컴파일 성공, sizeof(VersionedData<double>) == 24 bytes
 
-### - [ ] T003 [P] [US3] EventPriority enum 헤더 파일 생성
+### - [x] T003 [P] [US3] EventPriority enum 헤더 파일 생성
 **파일**: `src/core/event/core/EventPriority.h`
 **설명**: 3단계 우선순위 enum 정의
 **상세**:
@@ -68,9 +68,9 @@
 
 ---
 
-## Phase 1: Foundational - VersionedData (4개 작업)
+## Phase 1: Foundational - VersionedData (2개 작업 완료, 2개 스킵)
 
-### - [ ] T004 [US2] VersionedData 단위 테스트 작성
+### - [x] T004 [US2] VersionedData 단위 테스트 작성
 **파일**: `tests/unit/datastore/VersionedDataTest.cpp`
 **설명**: VersionedData 구조체 동작 검증 테스트
 **상세**:
@@ -80,7 +80,7 @@
 - `TimestampUpdate`: 타임스탬프 갱신 검증
 **검증**: `ctest -R VersionedDataTest` 모두 통과
 
-### - [ ] T005 [US2] IDataStore 인터페이스 확장
+### - [ ] T005 [US2] IDataStore 인터페이스 확장 (Phase 3에서 처리)
 **파일**: `src/core/datastore/interfaces/IDataStore.h`
 **설명**: getVersioned/setVersioned 메서드 추가
 **상세**:
@@ -89,7 +89,7 @@
 - 기존 `get<T>()`/`set<T>()` 메서드 유지 (하위 호환성)
 **검증**: 컴파일 성공, 기존 테스트 통과
 
-### - [ ] T006 [US2] DataStore 구현체에 VersionedData 지원 추가
+### - [ ] T006 [US2] DataStore 구현체에 VersionedData 지원 추가 (Phase 3에서 처리)
 **파일**: `src/core/datastore/managers/DataStore.cpp`
 **설명**: getVersioned/setVersioned 메서드 구현
 **상세**:
@@ -99,7 +99,7 @@
 - Lock 범위 최소화 (버전 증가만)
 **검증**: 단위 테스트 작성 및 통과
 
-### - [ ] T007 [US2] DataStore VersionedData 통합 테스트
+### - [ ] T007 [US2] DataStore VersionedData 통합 테스트 (Phase 3에서 처리)
 **파일**: `tests/integration/datastore/version_consistency_test.cpp`
 **설명**: RT/Non-RT 동시 접근 시 버전 일관성 검증
 **상세**:
@@ -111,9 +111,9 @@
 
 ---
 
-## Phase 2: [US1 P1] systemd 시작 순서 (5개 작업) - **MVP**
+## Phase 2: [US1 P1] systemd 시작 순서 (5개 작업) - **MVP** ✅ 완료
 
-### - [ ] T008 [US1] mxrc-rt.service Before 지시자 추가
+### - [x] T008 [US1] mxrc-rt.service Before 지시자 추가
 **파일**: `systemd/mxrc-rt.service`
 **설명**: RT 서비스가 Non-RT보다 먼저 시작되도록 설정
 **상세**:
@@ -122,7 +122,7 @@
 - `WatchdogSec=30s` 유지
 **검증**: `systemctl show mxrc-rt.service | grep Before` 확인
 
-### - [ ] T009 [US1] mxrc-nonrt.service After 지시자 추가
+### - [x] T009 [US1] mxrc-nonrt.service After 지시자 추가
 **파일**: `systemd/mxrc-nonrt.service`
 **설명**: Non-RT 서비스가 RT 다음에 시작되도록 설정
 **상세**:
@@ -130,7 +130,7 @@
 - `Type=simple` 유지
 **검증**: `systemctl show mxrc-nonrt.service | grep After` 확인
 
-### - [ ] T010 [US1] RT 프로세스 READY 신호 전송 구현
+### - [x] T010 [US1] RT 프로세스 READY 신호 전송 구현
 **파일**: `src/core/systemd/impl/StartupNotifier.cpp`, `src/core/systemd/impl/StartupNotifier.h`
 **설명**: 공유 메모리 생성 후 sd_notify(READY=1) 호출
 **상세**:
@@ -140,7 +140,7 @@
 - 실패 시 경고 로그 (spdlog::warn)
 **검증**: `journalctl -u mxrc-rt.service | grep "READY=1"` 확인
 
-### - [ ] T011 [US1] Non-RT 공유 메모리 연결 재시도 로직 구현
+### - [x] T011 [US1] Non-RT 공유 메모리 연결 재시도 로직 구현
 **파일**: `src/core/rt/ipc/IPCInitializer.cpp`, `src/core/rt/ipc/IPCInitializer.h`
 **설명**: 공유 메모리 연결 실패 시 최대 5초 재시도
 **상세**:
@@ -152,7 +152,7 @@
 - 실패 시 오류 로그 및 false 반환
 **검증**: RT 서비스 중단 상태에서 Non-RT 시작 시 재시도 로그 확인
 
-### - [ ] T012 [US1] systemd 시작 순서 통합 테스트
+### - [x] T012 [US1] systemd 시작 순서 통합 테스트
 **파일**: `tests/integration/systemd/startup_order_test.cpp`
 **설명**: 10회 재시작하여 100% 성공률 검증
 **상세**:

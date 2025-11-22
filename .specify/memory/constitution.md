@@ -1,3 +1,34 @@
+<!--
+Sync Impact Report - Constitution v1.1.0
+========================================
+
+Version Change: 1.0.0 → 1.1.0 (MINOR)
+Rationale: Expanded Principle VII to clarify that AI assistant work output must be in Korean
+
+Modified Principles:
+- Principle VII: "문서화 및 한글 사용" → "문서화 및 한글 사용 (AI Assistant Output)"
+  - Added explicit requirement that AI assistants must display work content in Korean
+  - Clarified that technical terms remain in English
+  - Added examples for assistant communication (good vs bad)
+
+Added Sections:
+- None
+
+Removed Sections:
+- None
+
+Template Updates:
+✅ .specify/templates/spec-template.md - Already includes Korean language guidelines (lines 14-21)
+✅ .specify/templates/plan-template.md - Already includes Korean language guidelines (lines 15-22)
+✅ .specify/templates/tasks-template.md - Not checked but inherits from spec/plan patterns
+✅ Agent guidance files - No update needed (constitution itself is the authority)
+
+Follow-up TODOs:
+- None (all placeholders filled)
+
+Last Amendment: 2025-01-22
+-->
+
 # MXRC Constitution
 
 본 Constitution은 MXRC 프로젝트의 핵심 원칙과 개발 규칙을 정의합니다.
@@ -64,7 +95,7 @@
 - 처리량: 5,000,000 msg/sec
 - 저지연 설계 필수
 
-### VII. 문서화 및 한글 사용
+### VII. 문서화 및 한글 사용 (AI Assistant Output)
 
 **설명**: 모든 문서는 한글로 작성되며, 기술 용어만 영어로 표기합니다
 
@@ -73,6 +104,18 @@
 - 기술 용어(Task, Action, Sequence, API, JSON 등)는 영어 표기
 - 코드 주석은 영어 사용 가능
 - `docs/onboarding/` 디렉토리의 온보딩 자료 참조
+
+**AI Assistant 작업 출력 규칙** (MANDATORY):
+- AI assistant는 모든 작업 내용을 **한글로 설명**해야 합니다
+- 작업 진행 상황, 구현 계획, 오류 분석 등 모든 커뮤니케이션은 한글 사용
+- 기술 용어(class, function, API, JSON, EventBus, PriorityQueue 등)는 영어 유지
+- 코드 스니펫과 로그 출력은 원문 유지
+
+**예시**:
+- ✅ 좋은 예: "PriorityQueue 클래스를 구현했습니다. 4단계 우선순위와 backpressure 정책을 적용했습니다."
+- ❌ 나쁜 예: "Implemented PriorityQueue class with 4-level priority and backpressure policy."
+- ✅ 좋은 예: "테스트 21개가 모두 통과했습니다. build가 성공적으로 완료되었습니다."
+- ❌ 나쁜 예: "All 21 tests passed. Build completed successfully."
 
 ---
 
@@ -308,6 +351,6 @@ tests/
 
 ---
 
-**Version**: 1.0.0
+**Version**: 1.1.0
 **Ratified**: 2025-01-20
-**Last Amended**: 2025-01-20
+**Last Amended**: 2025-01-22

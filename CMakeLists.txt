@@ -71,6 +71,7 @@ add_executable(mxrc
     src/core/event/core/EventBus.cpp
     src/core/event/core/PriorityQueue.cpp
     src/core/event/adapters/DataStoreEventAdapter.cpp
+    src/core/event/adapters/ThrottlingPolicy.cpp
     src/core/datastore/DataStore.cpp
     # DataStore manager classes
     src/core/datastore/managers/ExpirationManager.cpp
@@ -440,6 +441,7 @@ add_executable(run_tests
     tests/unit/event/DataStoreEventAdapter_test.cpp
     tests/unit/event/PrioritizedEvent_test.cpp
     tests/unit/event/PriorityQueue_test.cpp
+    tests/unit/event/ThrottlingPolicy_test.cpp
     tests/integration/event/event_flow_test.cpp
     tests/integration/event/monitoring_extension_test.cpp
     tests/integration/datastore_logging_integration_test.cpp
@@ -498,6 +500,7 @@ add_executable(run_tests
     src/core/event/core/EventBus.cpp
     src/core/event/core/PriorityQueue.cpp
     src/core/event/adapters/DataStoreEventAdapter.cpp
+    src/core/event/adapters/ThrottlingPolicy.cpp
     src/core/datastore/DataStore.cpp
     src/core/datastore/managers/ExpirationManager.cpp
     src/core/datastore/managers/MetricsCollector.cpp

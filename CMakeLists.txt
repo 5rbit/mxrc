@@ -555,6 +555,9 @@ add_executable(run_tests
     tests/unit/systemd/systemd_util_test.cpp
     tests/unit/systemd/watchdog_notifier_test.cpp
     tests/unit/systemd/watchdog_timer_test.cpp
+    # systemd integration tests (Feature 022: P1 Startup Order)
+    tests/integration/systemd/startup_order_test.cpp
+    tests/integration/systemd/retry_logic_test.cpp
     # systemd integration tests (Phase 5: Resource Control)
     tests/integration/systemd/cpu_quota_test.cpp
     tests/integration/systemd/memory_limit_test.cpp

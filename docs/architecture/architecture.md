@@ -124,6 +124,69 @@ src/core/
 -   **DataStore**: Intel TBB의 `concurrent_hash_map`을 공유 메모리에 배치하여, 프로세스 간에 고성능으로 데이터를 동시 접근할 수 있게 설계되었습니다. `weak_ptr` 기반의 Observer 패턴을 통해 데이터 변경을 안전하게 통지합니다.
 -   **EventBus**: Boost.Lockfree의 SPSC(Single-Producer, Single-Consumer) 큐를 사용하여, RT 프로세스에서 Non-RT 프로세스로의 로그/이벤트 전달과 같이 방향성이 있는 통신을 Lock-Free로 구현하여 성능을 극대화합니다.
 
+#### 5.2.1. DataStore Accessor Pattern (Feature 022 P2)
+
+DataStore에 직접 접근(`datastore->get<double>("sensor.temperature")`)하는 방식은 다음과 같은 문제가 있습니다:
+
+-   **타입 안전성 부족**: 문자열 키 기반 접근으로 컴파일 타임 타입 체킹 불가
+-   **키 오타 위험**: 런타임에 잘못된 키로 인한 에러 발생 가능
+-   **도메인 격리 부족**: 센서/로봇/태스크 데이터가 모두 flat한 키 공간에 섞여 있음
+
+**Accessor Pattern**은 이러한 문제를 해결하기 위해 **도메인별 타입 안전 인터페이스**를 제공합니다:
+
+**핵심 설계 원칙**:
+-   **I-prefix 인터페이스**: `IDataAccessor`, `ISensorDataAccessor`, `IRobotStateAccessor`, `ITaskStatusAccessor`
+-   **도메인 격리**: 각 Accessor는 특정 도메인 (sensor.*, robot_state.*, task_status.*)만 접근
+-   **타입 안전성**: 템플릿 기반 타입 체크로 컴파일 타임에 타입 검증
+-   **VersionedData 지원**: 모든 읽기 연산은 `VersionedData<T>` 반환으로 torn-read 감지 가능
+-   **RAII 준수**: Accessor는 DataStore의 non-owning 참조만 보유하여 생명주기 명확화
+-   **RT 안전성**: 모든 메서드는 `inline` 선언으로 함수 호출 오버헤드 제거
+
+**주요 Accessor 구현체**:
+
+1.  **SensorDataAccessor** (`src/core/datastore/impl/SensorDataAccessor.h`)
+    -   센서 데이터 접근 (temperature, pressure, humidity, vibration, current)
+    -   사용 예: `sensorAccessor->getTemperature()` → `VersionedData<double>`
+
+2.  **RobotStateAccessor** (`src/core/datastore/impl/RobotStateAccessor.h`)
+    -   로봇 상태 접근 (position, velocity, joint angles/velocities)
+    -   `Vector3d` 구조체 사용 (Eigen 대체, RT-safe POD 타입)
+    -   사용 예: `robotAccessor->getPosition()` → `VersionedData<Vector3d>`
+
+3.  **TaskStatusAccessor** (`src/core/datastore/impl/TaskStatusAccessor.h`)
+    -   태스크 상태 접근 (state, progress, error_code)
+    -   입력 검증 예: `setProgress(0.5)` 범위 [0.0, 1.0] 체크
+    -   사용 예: `taskAccessor->getTaskState()` → `VersionedData<TaskState>`
+
+**성능 특성** (TBB concurrent_hash_map 기반, Feature 022 P2):
+-   Getter 지연: ~450ns (목표: <60ns, 향후 lock-free DataStore 최적화 필요)
+-   Setter 지연: ~900ns (목표: <110ns, 향후 lock-free DataStore 최적화 필요)
+-   Version 체크: ~10ns (목표: <10ns, 현재 달성)
+
+**사용 패턴**:
+
+```cpp
+// RT Path: 최신 값 바로 사용 (버전 체크 생략)
+auto temp = sensorAccessor->getTemperature();
+if (temp.value > 80.0) {
+    // 과열 처리
+}
+
+// Non-RT Path: 버전 일관성 체크 (torn-read 방지)
+VersionedData<Vector3d> pos1, pos2;
+int retries = 0;
+do {
+    pos1 = robotAccessor->getPosition();
+    auto vel = robotAccessor->getVelocity();
+    pos2 = robotAccessor->getPosition();
+} while (!pos1.isConsistentWith(pos2) && ++retries < 3);
+```
+
+**마이그레이션 가이드**:
+-   직접 접근: `datastore->get<double>("sensor.temperature")` → `sensorAccessor->getTemperature()`
+-   직접 쓰기: `datastore->set("sensor.temperature", 25.0)` → `sensorAccessor->setTemperature(25.0)`
+-   버전 체크: `datastore->getVersion("sensor.temperature")` → `sensorAccessor->getTemperature().version`
+
 ### 5.3. 비실시간 모듈 (in Non-RT Process)
 -   **Monitoring**: `DataStore`의 주요 상태 값들을 주기적으로 읽어와 Prometheus 형식의 메트릭으로 변환하고, 외부에서 수집할 수 있도록 HTTP 엔드포인트를 제공합니다.
 -   **Logging**: RT 프로세스로부터 `EventBus`를 통해 전달받은 고속의 로그 메시지를 파일 시스템이나 콘솔에 안전하게 기록하는 역할을 전담합니다.

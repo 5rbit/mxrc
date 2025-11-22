@@ -4,6 +4,7 @@
 #include "core/rt/ipc/SharedMemoryData.h"
 #include "core/event/core/EventBus.h"
 #include <spdlog/spdlog.h>
+#include <systemd/sd-daemon.h>
 #include <csignal>
 #include <atomic>
 #include <memory>
@@ -64,6 +65,17 @@ int main(int argc, char** argv) {
     executive->enableHeartbeatMonitoring(true);
 
     spdlog::info("RT Executive initialized successfully");
+
+    // Feature 022 P1: Notify systemd that RT is READY (shared memory created)
+    // Non-RT process can now safely connect via retry logic
+    int notify_result = sd_notify(0, "READY=1\nSTATUS=RT shared memory ready");
+    if (notify_result > 0) {
+        spdlog::info("systemd notified: RT process ready (shared memory available)");
+    } else if (notify_result == 0) {
+        spdlog::debug("systemd notification not sent (not running under systemd)");
+    } else {
+        spdlog::warn("systemd notification failed: {}", strerror(-notify_result));
+    }
 
     // EventBus 시작
     event_bus->start();

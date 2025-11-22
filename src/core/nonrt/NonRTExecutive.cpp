@@ -48,26 +48,41 @@ NonRTExecutive::~NonRTExecutive() {
 }
 
 int NonRTExecutive::init() {
-    // 공유 메모리 연결
+    // 공유 메모리 연결 (Feature 022: P1 Retry Logic)
+    // RT 프로세스가 먼저 시작하고 공유 메모리를 생성할 때까지 대기
     shm_region_ = std::make_unique<rt::ipc::SharedMemoryRegion>();
 
-    if (shm_region_->open(shm_name_) != 0) {
-        spdlog::error("Failed to open shared memory: {}", shm_name_);
-        return -1;
+    const int MAX_RETRIES = 50;          // 5 seconds (100ms × 50)
+    const int RETRY_INTERVAL_MS = 100;   // 100ms fixed interval
+
+    for (int attempt = 0; attempt < MAX_RETRIES; ++attempt) {
+        if (shm_region_->open(shm_name_) == 0) {
+            // 공유 메모리 연결 성공
+            shm_data_ = static_cast<rt::ipc::SharedMemoryData*>(shm_region_->getPtr());
+            if (!shm_data_) {
+                spdlog::error("Invalid shared memory pointer");
+                return -1;
+            }
+
+            // 초기 heartbeat 설정
+            uint64_t now_ns = rt::util::getMonotonicTimeNs();
+            shm_data_->nonrt_heartbeat_ns.store(now_ns, std::memory_order_release);
+
+            spdlog::info("NonRTExecutive initialized: shm={} (attempt {})", shm_name_, attempt + 1);
+            return 0;
+        }
+
+        // 연결 실패 - 재시도
+        if (attempt < MAX_RETRIES - 1) {
+            spdlog::debug("Waiting for RT shared memory... (attempt {}/{})", attempt + 1, MAX_RETRIES);
+            std::this_thread::sleep_for(std::chrono::milliseconds(RETRY_INTERVAL_MS));
+        }
     }
 
-    shm_data_ = static_cast<rt::ipc::SharedMemoryData*>(shm_region_->getPtr());
-    if (!shm_data_) {
-        spdlog::error("Invalid shared memory pointer");
-        return -1;
-    }
-
-    // 초기 heartbeat 설정
-    uint64_t now_ns = rt::util::getMonotonicTimeNs();
-    shm_data_->nonrt_heartbeat_ns.store(now_ns, std::memory_order_release);
-
-    spdlog::info("NonRTExecutive initialized: shm={}", shm_name_);
-    return 0;
+    // 최대 재시도 횟수 초과
+    spdlog::error("Failed to connect to shared memory after {} attempts ({} seconds)",
+                  MAX_RETRIES, MAX_RETRIES * RETRY_INTERVAL_MS / 1000);
+    return -1;
 }
 
 int NonRTExecutive::run() {

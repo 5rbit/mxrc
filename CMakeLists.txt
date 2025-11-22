@@ -14,6 +14,14 @@ find_package(GTest REQUIRED)
 find_package(TBB REQUIRED)
 find_package(nlohmann_json 3.11.0 REQUIRED)
 
+# Boost.Lockfree for lock-free data structures (Feature 022)
+find_package(Boost 1.65 QUIET)
+if(Boost_FOUND)
+    message(STATUS "Boost found: ${Boost_INCLUDE_DIRS}")
+else()
+    message(WARNING "Boost not found. Install with: sudo apt install libboost-dev")
+endif()
+
 # systemd dependency for process management
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SYSTEMD REQUIRED libsystemd)
@@ -106,6 +114,9 @@ target_link_libraries(mxrc PRIVATE
     nlohmann_json::nlohmann_json
     ${SYSTEMD_LIBRARIES}
 )
+if(Boost_FOUND)
+    target_link_libraries(mxrc PRIVATE Boost::boost)
+endif()
 
 # Link NUMA if found
 if(NUMA_FOUND)
@@ -275,6 +286,9 @@ target_link_libraries(nonrt PRIVATE
     Threads::Threads
     ${SYSTEMD_LIBRARIES}
 )
+if(Boost_FOUND)
+    target_link_libraries(nonrt PRIVATE Boost::boost)
+endif()
 
 # Enable Address Sanitizer
 target_compile_options(nonrt PRIVATE -fsanitize=address -fno-omit-frame-pointer)
@@ -362,6 +376,9 @@ target_link_libraries(rt PRIVATE
     nlohmann_json::nlohmann_json
     ${SYSTEMD_LIBRARIES}
 )
+if(Boost_FOUND)
+    target_link_libraries(rt PRIVATE Boost::boost)
+endif()
 
 # Link NUMA if found
 if(NUMA_FOUND)
@@ -429,6 +446,7 @@ add_executable(run_tests
     tests/unit/datastore/MetricsCollector_test.cpp
     tests/unit/datastore/AccessControlManager_test.cpp
     tests/unit/datastore/LogManager_test.cpp
+    tests/unit/datastore/VersionedData_test.cpp
     tests/unit/logging/BagMessage_test.cpp
     tests/unit/logging/Serializer_test.cpp
     tests/unit/logging/FileUtils_test.cpp
@@ -642,6 +660,9 @@ target_link_libraries(run_tests PRIVATE
     nlohmann_json::nlohmann_json
     ${SYSTEMD_LIBRARIES}
 )
+if(Boost_FOUND)
+    target_link_libraries(run_tests PRIVATE Boost::boost)
+endif()
 
 # Link NUMA if found
 if(NUMA_FOUND)

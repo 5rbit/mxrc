@@ -1,8 +1,7 @@
 [Unit]
 Description=MXRC Non-RT Executive - Non-Realtime Control Process
 Documentation=https://github.com/your-org/mxrc
-After=network.target
-Before=mxrc-rt.service
+After=network.target mxrc-rt.service
 
 [Service]
 Type=simple

@@ -24,6 +24,11 @@ CPUQuota=100%
 MemoryMax=1G
 IOWeight=100
 
+# Resource accounting (User Story 5: Prometheus metrics)
+CPUAccounting=true
+MemoryAccounting=true
+IOAccounting=true
+
 # User and group
 User=mxrc
 Group=mxrc

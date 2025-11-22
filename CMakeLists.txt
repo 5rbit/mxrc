@@ -119,6 +119,7 @@ target_link_libraries(mxrc PRIVATE -fsanitize=address)
 
 # Include directories
 target_include_directories(mxrc PUBLIC
+    ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/src
     ${PROJECT_SOURCE_DIR}/src/core/action
     ${PROJECT_SOURCE_DIR}/src/core/action/interfaces
@@ -544,12 +545,18 @@ add_executable(run_tests
     tests/integration/systemd/service_order_test.cpp
     tests/integration/systemd/dependency_chain_test.cpp
     tests/integration/systemd/target_test.cpp
+    # systemd integration tests (Phase 7: Prometheus Metrics)
+    tests/integration/systemd/metrics_collection_test.cpp
+    tests/integration/systemd/prometheus_format_test.cpp
+    tests/integration/systemd/metrics_endpoint_test.cpp
     src/core/systemd/util/SystemdUtil.cpp
     src/core/systemd/util/WatchdogTimer.cpp
     src/core/systemd/impl/SdNotifyWatchdog.cpp
+    src/systemd/SystemdMetricsCollector.cpp
 )
 
 target_include_directories(run_tests PUBLIC
+    ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/src
     ${PROJECT_SOURCE_DIR}/src/core/action
     ${PROJECT_SOURCE_DIR}/src/core/action/interfaces
@@ -610,6 +617,7 @@ target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/systemd/dto
     ${PROJECT_SOURCE_DIR}/tests/unit/systemd
     ${PROJECT_SOURCE_DIR}/tests/integration/systemd
+    ${PROJECT_SOURCE_DIR}/include/mxrc/systemd
     ${SYSTEMD_INCLUDE_DIRS}
 )
 

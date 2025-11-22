@@ -366,14 +366,39 @@ systemctl show mxrc-rt.service --property=WatchdogTimestampMonotonic
 ### 3. Prometheus 메트릭 확인
 
 ```bash
-# Prometheus 엔드포인트 접속
-curl http://localhost:9090/metrics | grep systemd_service
+# Prometheus 메트릭 서비스 시작
+sudo systemctl start mxrc-metrics.service
+
+# Prometheus 엔드포인트 접속 (포트 9100)
+curl http://localhost:9100/metrics
 
 # 출력 예시:
-# systemd_service_active_state{service="mxrc-rt",state="active"} 1 1705862400000
-# systemd_service_restart_count{service="mxrc-rt"} 0 1705862400000
-# systemd_service_cpu_usage_nsec{service="mxrc-rt"} 125000000 1705862400000
-# systemd_service_memory_current_bytes{service="mxrc-rt"} 134217728 1705862400000
+# HELP mxrc_service_state Service state (1=active, 0=inactive)
+# TYPE mxrc_service_state gauge
+# mxrc_service_state{service="mxrc-rt"} 1
+# mxrc_service_state{service="mxrc-nonrt"} 1
+#
+# HELP mxrc_cpu_usage_seconds_total Total CPU time in seconds
+# TYPE mxrc_cpu_usage_seconds_total counter
+# mxrc_cpu_usage_seconds_total{service="mxrc-rt"} 123.456789
+# mxrc_cpu_usage_seconds_total{service="mxrc-nonrt"} 45.678901
+#
+# HELP mxrc_memory_bytes Memory usage in bytes
+# TYPE mxrc_memory_bytes gauge
+# mxrc_memory_bytes{service="mxrc-rt"} 2147483648
+# mxrc_memory_bytes{service="mxrc-nonrt"} 1073741824
+#
+# HELP mxrc_restart_count_total Number of service restarts
+# TYPE mxrc_restart_count_total counter
+# mxrc_restart_count_total{service="mxrc-rt"} 0
+# mxrc_restart_count_total{service="mxrc-nonrt"} 0
+
+# Health check 엔드포인트
+curl http://localhost:9100/health
+# 출력: OK
+
+# 수동으로 메트릭 수집 스크립트 실행
+python3 scripts/prometheus-exporter.py
 ```
 
 ### 4. journald 구조화 로깅 확인

@@ -1,9 +1,9 @@
 # Quickstart: systemd 기반 프로세스 관리 고도화
 
 **Feature**: 018-systemd-process-management
-**Phase**: Phase 1 - Design
-**Status**: Completed
-**Last Updated**: 2025-01-21
+**Phase**: Phase 11 - Documentation Polish (Final)
+**Status**: Production Ready
+**Last Updated**: 2025-01-22
 
 ---
 
@@ -416,6 +416,107 @@ journalctl SERVICE=mxrc-rt -o json-pretty
 
 ---
 
+## 부팅 최적화 (User Story 8)
+
+MXRC 서비스는 빠른 부팅 시간을 위해 최적화되어 있습니다.
+
+### 1. Type=notify로 빠른 시작
+
+RT 서비스는 `Type=notify`로 설정되어 있어, sd_notify()로 준비 완료 신호를 보내면 즉시 다른 서비스들이 시작됩니다:
+
+```bash
+# RT 서비스 Type 확인
+systemctl show mxrc-rt.service --property=Type
+# 출력: Type=notify
+
+# Non-RT 서비스는 Type=simple (더 빠른 시작)
+systemctl show mxrc-nonrt.service --property=Type
+# 출력: Type=simple
+```
+
+### 2. 최소한의 의존성
+
+불필요한 부팅 지연을 방지하기 위해 필수 의존성만 설정되어 있습니다:
+
+```bash
+# RT 서비스 의존성 확인
+systemctl show mxrc-rt.service --property=After
+# 출력: After=network.target mxrc-nonrt.service
+
+# Non-RT 서비스 의존성 확인
+systemctl show mxrc-nonrt.service --property=After
+# 출력: After=network.target
+```
+
+**주의**: `multi-user.target`, `graphical.target` 등 불필요한 의존성은 제거되어 있습니다.
+
+### 3. 타임아웃 설정
+
+모든 서비스는 적절한 타임아웃이 설정되어 있어 부팅 블로킹을 방지합니다:
+
+```bash
+# 시작 타임아웃 확인 (30초 이하)
+systemctl show mxrc-rt.service --property=TimeoutStartUSec
+# 출력: TimeoutStartUSec=30s
+
+systemctl show mxrc-nonrt.service --property=TimeoutStartUSec
+# 출력: TimeoutStartUSec=30s
+```
+
+### 4. 부팅 시간 측정
+
+```bash
+# systemd 부팅 분석
+systemd-analyze blame | grep mxrc
+# 출력 예시:
+#   1.234s mxrc-rt.service
+#   0.567s mxrc-nonrt.service
+#   0.123s mxrc-monitor.service
+
+# 전체 부팅 시간 확인
+systemd-analyze
+# 출력:
+# Startup finished in 2.345s (kernel) + 3.456s (userspace) = 5.801s
+
+# Critical chain 분석 (부팅 경로)
+systemd-analyze critical-chain mxrc-rt.service
+# 출력:
+# mxrc-rt.service +1.234s
+# └─mxrc-nonrt.service @0.567s +0.567s
+#   └─network.target @0.123s
+#     └─NetworkManager.service @0.050s +0.073s
+```
+
+### 5. 부팅 최적화 팁
+
+**sd_notify() 호출 타이밍**:
+```cpp
+// 초기화 완료 후 즉시 sd_notify 호출
+void RTExecutive::initialize() {
+    // 필수 초기화만 수행
+    initializeRT();
+    initializeIPC();
+
+    // 준비 완료 신호 (부팅 지연 최소화)
+    sd_notify(0, "READY=1");
+
+    // 나머지 초기화는 백그라운드에서
+    initializeMonitoring();
+    initializeMetrics();
+}
+```
+
+**부팅 병렬화**:
+```bash
+# mxrc-nonrt.service와 mxrc-rt.service는 순차 실행
+# (Before/After 의존성)
+
+# mxrc-monitor.service는 병렬 실행 가능
+# (의존성 없음, 독립적으로 시작)
+```
+
+---
+
 ## 성능 검증
 
 ### 1. RT Jitter 측정
@@ -446,6 +547,139 @@ sudo perf stat -e cycles,instructions ./mxrc-rt --benchmark-watchdog
 sudo strace -T -e trace=sendmsg ./mxrc-rt
 
 # 목표: < 1ms
+```
+
+---
+
+## 보안 강화 (User Story 7)
+
+MXRC 서비스는 다층 보안(Defense in Depth) 원칙을 따릅니다.
+
+### 1. 최소 권한 원칙 (Principle of Least Privilege)
+
+**Capabilities 제한**:
+```bash
+# RT 프로세스: 필요한 capability만 허용
+systemctl show mxrc-rt.service --property=AmbientCapabilities
+# 출력: AmbientCapabilities=CAP_SYS_NICE CAP_IPC_LOCK
+
+systemctl show mxrc-rt.service --property=CapabilityBoundingSet
+# 출력: CapabilityBoundingSet=CAP_SYS_NICE CAP_IPC_LOCK
+
+# Non-RT 프로세스: capability 없음
+systemctl show mxrc-nonrt.service --property=AmbientCapabilities
+# 출력: AmbientCapabilities= (비어있음)
+```
+
+**User/Group 격리**:
+```bash
+# 전용 시스템 사용자로 실행 (root 아님)
+systemctl show mxrc-rt.service --property=User
+# 출력: User=mxrc
+
+systemctl show mxrc-rt.service --property=Group
+# 출력: Group=mxrc
+
+# 사용자 확인
+id mxrc
+# 출력: uid=999(mxrc) gid=999(mxrc) groups=999(mxrc)
+```
+
+### 2. 파일시스템 격리
+
+**ProtectSystem=strict**:
+```bash
+# /usr, /boot, /efi를 읽기 전용으로 마운트
+systemctl show mxrc-rt.service --property=ProtectSystem
+# 출력: ProtectSystem=strict
+
+# /var, /etc도 읽기 전용 (ReadWritePaths 예외)
+```
+
+**ReadWritePaths 최소화**:
+```bash
+# 필요한 경로만 쓰기 허용
+systemctl show mxrc-rt.service --property=ReadWritePaths
+# 출력: ReadWritePaths=/var/lib/mxrc /var/log/mxrc /tmp/mxrc
+
+# 다른 경로는 모두 읽기 전용
+```
+
+**ProtectHome**:
+```bash
+# 홈 디렉토리 접근 차단
+systemctl show mxrc-rt.service --property=ProtectHome
+# 출력: ProtectHome=yes
+```
+
+**PrivateTmp**:
+```bash
+# 격리된 /tmp 사용 (다른 프로세스와 분리)
+systemctl show mxrc-rt.service --property=PrivateTmp
+# 출력: PrivateTmp=yes
+```
+
+### 3. 권한 상승 방지
+
+**NoNewPrivileges**:
+```bash
+# setuid/setgid 실행 방지
+systemctl show mxrc-rt.service --property=NoNewPrivileges
+# 출력: NoNewPrivileges=yes
+
+# 자식 프로세스가 더 높은 권한을 가질 수 없음
+```
+
+### 4. 보안 검증
+
+**systemd-analyze security**:
+```bash
+# 보안 점수 확인 (목표: ≥ 8.0/10.0)
+systemd-analyze security mxrc-rt.service
+
+# 출력 예시:
+# NAME                  DESCRIPTION                  EXPOSURE
+# ✓ PrivateDevices=     Service has no access to hardware devices
+# ✓ ProtectClock=       Service cannot write to the system clock
+# ✓ ProtectKernelLogs=  Service cannot read from or write to the kernel log ring buffer
+# ✓ ProtectKernelModules= Service cannot load or read kernel modules
+# ✓ ProtectKernelTunables= Service cannot alter kernel tunables
+# ✓ ProtectControlGroups= Service cannot modify the control group file system
+# ✓ ProtectHome=        Service has no access to home directories
+# ✓ ProtectSystem=      Service has strict read-only access to the OS file hierarchy
+# ✓ NoNewPrivileges=    Service processes cannot acquire new privileges
+# ✓ PrivateTmp=         Service has a private /tmp/ and /var/tmp/ directories
+# ...
+# → Overall exposure level for mxrc-rt.service: 8.2 (OK) 🙂
+```
+
+### 5. 보안 모니터링
+
+**실패한 권한 요청 추적**:
+```bash
+# 권한 관련 오류 모니터링
+journalctl -u mxrc-rt.service | grep -i "permission denied"
+journalctl -u mxrc-rt.service | grep -i "operation not permitted"
+
+# Seccomp 위반 (syscall 차단)
+journalctl -xe | grep SECCOMP
+
+# Capability 부족 오류
+journalctl -u mxrc-rt.service | grep -i "capability"
+```
+
+**침입 탐지 (Audit)**:
+```bash
+# auditd 활성화 (선택적)
+sudo apt-get install -y auditd
+
+# mxrc 프로세스 감사 규칙 추가
+sudo auditctl -w /usr/local/bin/mxrc-rt -p x -k mxrc_exec
+sudo auditctl -w /etc/mxrc/ -p wa -k mxrc_config
+
+# 감사 로그 확인
+sudo ausearch -k mxrc_exec
+sudo ausearch -k mxrc_config
 ```
 
 ---

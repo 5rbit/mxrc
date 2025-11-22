@@ -48,6 +48,15 @@ struct VersionedData {
         : value{val}, version{1}, timestamp_ns{getCurrentTimestampNs()} {}
 
     /**
+     * @brief Construct with value, version, and timestamp (Feature 022: P2 Accessor Pattern)
+     * @param val Initial value
+     * @param ver Initial version
+     * @param ts_ns Initial timestamp in nanoseconds
+     */
+    VersionedData(const T& val, uint64_t ver, uint64_t ts_ns)
+        : value{val}, version{ver}, timestamp_ns{ts_ns} {}
+
+    /**
      * @brief Copy constructor (non-atomic copy)
      * @param other Source VersionedData
      */

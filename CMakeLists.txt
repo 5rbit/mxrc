@@ -447,6 +447,7 @@ add_executable(run_tests
     tests/unit/datastore/AccessControlManager_test.cpp
     tests/unit/datastore/LogManager_test.cpp
     tests/unit/datastore/VersionedData_test.cpp
+    tests/unit/datastore/accessor_benchmark.cpp
     tests/unit/logging/BagMessage_test.cpp
     tests/unit/logging/Serializer_test.cpp
     tests/unit/logging/FileUtils_test.cpp

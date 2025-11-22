@@ -557,6 +557,8 @@ add_executable(run_tests
     tests/integration/systemd/security_hardening_test.cpp
     tests/integration/systemd/capability_test.cpp
     tests/integration/systemd/filesystem_restriction_test.cpp
+    # Phase 10: Boot Optimization (User Story 8)
+    tests/integration/systemd/boot_time_test.cpp
     src/core/systemd/util/SystemdUtil.cpp
     src/core/systemd/util/WatchdogTimer.cpp
     src/core/systemd/impl/SdNotifyWatchdog.cpp

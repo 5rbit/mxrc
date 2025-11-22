@@ -553,6 +553,10 @@ add_executable(run_tests
     tests/integration/systemd/journald_logging_test.cpp
     tests/integration/systemd/structured_logging_test.cpp
     tests/integration/systemd/log_query_test.cpp
+    # systemd integration tests (Phase 9: Security Hardening)
+    tests/integration/systemd/security_hardening_test.cpp
+    tests/integration/systemd/capability_test.cpp
+    tests/integration/systemd/filesystem_restriction_test.cpp
     src/core/systemd/util/SystemdUtil.cpp
     src/core/systemd/util/WatchdogTimer.cpp
     src/core/systemd/impl/SdNotifyWatchdog.cpp

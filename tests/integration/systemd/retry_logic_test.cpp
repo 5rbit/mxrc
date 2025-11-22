@@ -269,8 +269,4 @@ TEST_F(RetryLogicTest, Retry_SucceedsAfterRT_CrashAndRestart) {
     spdlog::info("Non-RT successfully connected after RT crash and restart");
 }
 
-// Main
-int main(int argc, char** argv) {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}
+// Main is provided by the run_tests executable

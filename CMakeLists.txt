@@ -515,6 +515,8 @@ add_executable(run_tests
     src/core/rt/ipc/SharedMemory.cpp
     src/core/rt/util/TimeUtils.cpp
     src/core/rt/util/ScheduleCalculator.cpp
+    # Non-RT Executive (for integration tests)
+    src/core/nonrt/NonRTExecutive.cpp
     # Monitoring
     src/core/monitoring/MetricsCollector.cpp
     src/core/monitoring/MetricsServer.cpp

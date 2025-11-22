@@ -4,8 +4,12 @@
 #include <variant>
 #include <cstdint>
 #include <chrono>
+#include <memory>
 
 namespace mxrc::core::event {
+
+// Forward declaration for IEvent
+class IEvent;
 
 /**
  * @brief Event priority levels for the priority queue
@@ -92,10 +96,11 @@ struct PrioritizedEvent {
      * - int: Integer values (error codes, counts, etc.)
      * - double: Floating-point values (sensor readings, metrics)
      * - std::string: String values (messages, identifiers)
+     * - std::shared_ptr<IEvent>: Legacy IEvent objects for EventBus integration
      *
      * Use std::get<T>(payload) to access the value.
      */
-    std::variant<int, double, std::string> payload;
+    std::variant<int, double, std::string, std::shared_ptr<IEvent>> payload;
 
     /**
      * @brief Event timestamp in nanoseconds (since epoch)

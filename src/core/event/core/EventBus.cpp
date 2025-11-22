@@ -10,8 +10,8 @@
 namespace mxrc::core::event {
 
 EventBus::EventBus(size_t queueCapacity)
-    : eventQueue_(queueCapacity) {
-    spdlog::info("EventBus created with queue capacity: {}", queueCapacity);
+    : eventQueue_(std::make_unique<PriorityQueue>(queueCapacity)) {
+    spdlog::info("EventBus created with PriorityQueue capacity: {}", queueCapacity);
 }
 
 EventBus::~EventBus() {
@@ -72,11 +72,23 @@ bool EventBus::publish(std::shared_ptr<IEvent> event) {
     // Production readiness: Notify observers before publish
     notifyBeforePublish(event);
 
+    // Convert IEvent to PrioritizedEvent
+    // Default priority is NORMAL, but this can be extended to extract priority from event
+    PrioritizedEvent prioritized;
+    prioritized.type = event->getTypeName();
+    prioritized.priority = EventPriority::NORMAL;  // TODO: Extract from event if available
+    prioritized.payload = event;  // Store IEvent in variant
+
+    auto now = std::chrono::system_clock::now();
+    prioritized.timestamp_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        now.time_since_epoch()).count();
+    prioritized.sequence_num = sequenceCounter_.fetch_add(1, std::memory_order_relaxed);
+
     // Mutex로 보호하여 여러 생산자가 안전하게 publish 가능
     std::lock_guard<std::mutex> lock(publishMutex_);
 
-    // 논블로킹 push 시도
-    bool success = eventQueue_.tryPush(event);
+    // Push to priority queue
+    bool success = eventQueue_->push(std::move(prioritized));
 
     if (success) {
         stats_.publishedEvents.fetch_add(1, std::memory_order_relaxed);
@@ -124,14 +136,23 @@ bool EventBus::unsubscribe(const SubscriptionId& subscriptionId) {
 }
 
 void EventBus::dispatchLoop() {
-    spdlog::info("EventBus dispatch loop started");
+    spdlog::info("EventBus dispatch loop started (PriorityQueue mode)");
 
     while (running_.load(std::memory_order_acquire)) {
-        std::shared_ptr<IEvent> event;
-
-        // 큐에서 이벤트 꺼내기
-        if (eventQueue_.tryPop(event)) {
-            dispatchToSubscribers(event);
+        // 큐에서 이벤트 꺼내기 (우선순위 순서로)
+        auto prioritized = eventQueue_->pop();
+        if (prioritized.has_value()) {
+            // Extract IEvent from PrioritizedEvent payload
+            try {
+                auto event = std::get<std::shared_ptr<IEvent>>(prioritized->payload);
+                if (event) {
+                    dispatchToSubscribers(event);
+                } else {
+                    spdlog::error("Null IEvent extracted from PrioritizedEvent");
+                }
+            } catch (const std::bad_variant_access& e) {
+                spdlog::error("Failed to extract IEvent from PrioritizedEvent: {}", e.what());
+            }
         } else {
             // 큐가 비어 있으면 짧게 대기
             std::this_thread::sleep_for(std::chrono::microseconds(100));
@@ -140,9 +161,17 @@ void EventBus::dispatchLoop() {
 
     // 종료 시 남은 이벤트 모두 처리
     spdlog::info("Processing remaining events before shutdown...");
-    std::shared_ptr<IEvent> event;
-    while (eventQueue_.tryPop(event)) {
-        dispatchToSubscribers(event);
+    while (auto prioritized = eventQueue_->pop()) {
+        try {
+            auto event = std::get<std::shared_ptr<IEvent>>(prioritized->payload);
+            if (event) {
+                dispatchToSubscribers(event);
+            } else {
+                spdlog::error("Null IEvent extracted from PrioritizedEvent during shutdown");
+            }
+        } catch (const std::bad_variant_access& e) {
+            spdlog::error("Failed to extract IEvent from PrioritizedEvent during shutdown: {}", e.what());
+        }
     }
 
     spdlog::info("EventBus dispatch loop stopped");

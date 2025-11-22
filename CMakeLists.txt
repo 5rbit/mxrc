@@ -267,6 +267,7 @@ add_executable(nonrt
     src/core/task/core/TriggerManager.cpp
     src/core/task/core/TaskMonitor.cpp
     src/core/event/core/EventBus.cpp
+    src/core/event/core/PriorityQueue.cpp
     src/core/event/adapters/DataStoreEventAdapter.cpp
     src/core/datastore/DataStore.cpp
     # DataStore manager classes
@@ -350,6 +351,7 @@ add_executable(rt
     src/core/rt/util/TimeUtils.cpp
     src/core/rt/util/ScheduleCalculator.cpp
     src/core/event/core/EventBus.cpp
+    src/core/event/core/PriorityQueue.cpp
     src/core/config/ConfigLoader.cpp
     # Production readiness: Performance optimization
     src/core/rt/perf/CPUAffinityManager.cpp

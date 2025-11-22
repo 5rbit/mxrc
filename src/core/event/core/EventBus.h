@@ -6,7 +6,8 @@
 
 #include "interfaces/IEventBus.h"
 #include "core/SubscriptionManager.h"
-#include "util/LockFreeQueue.h"
+#include "core/PriorityQueue.h"
+#include "core/PrioritizedEvent.h"
 #include "util/EventStats.h"
 #include <memory>
 #include <thread>
@@ -62,9 +63,11 @@ public:
 /**
  * @brief 중앙 이벤트 버스 구현
  *
- * SPSC Lock-Free Queue + Mutex 기반의 비동기 이벤트 처리 시스템입니다.
- * 여러 스레드에서 동시에 publish 가능하며 (mutex로 보호됨),
- * 큐 자체는 lock-free로 동작하여 높은 성능을 제공합니다.
+ * Priority Queue + Mutex 기반의 비동기 이벤트 처리 시스템입니다.
+ * Feature 022 Phase 4: 우선순위 기반 이벤트 처리를 지원합니다.
+ * - CRITICAL 이벤트가 NORMAL/LOW 이벤트보다 먼저 처리됩니다
+ * - Backpressure: 큐가 80% 이상 찰 때 LOW 이벤트부터 drop됩니다
+ * - CRITICAL 이벤트는 절대 drop되지 않습니다
  */
 class EventBus : public IEventBus {
 
@@ -125,12 +128,13 @@ public:
 
 private:
     // Core EventBus members
-    SPSCLockFreeQueue<std::shared_ptr<IEvent>> eventQueue_;
+    std::unique_ptr<PriorityQueue> eventQueue_;
     std::mutex publishMutex_;
     SubscriptionManager subscriptionManager_;
     EventStats stats_;
     std::thread dispatchThread_;
     std::atomic<bool> running_{false};
+    std::atomic<uint64_t> sequenceCounter_{0};  // For FIFO ordering within same priority
 
     /**
      * @brief 이벤트 디스패치 루프 (별도 스레드에서 실행)

@@ -1,0 +1,34 @@
+[Unit]
+Description=MXRC Prometheus Metrics Exporter
+Documentation=https://github.com/your-org/mxrc
+After=network.target mxrc-rt.service mxrc-nonrt.service
+Wants=mxrc-rt.service mxrc-nonrt.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/bin/prometheus-exporter.py
+
+# Restart policy
+Restart=on-failure
+RestartSec=5s
+
+# Service timeouts
+TimeoutStartSec=10s
+TimeoutStopSec=10s
+
+# User and group
+User=mxrc
+Group=mxrc
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/
+
+# Network access (localhost only)
+# Bind to 127.0.0.1:9100
+
+[Install]
+WantedBy=multi-user.target

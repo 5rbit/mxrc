@@ -34,6 +34,11 @@ CPUQuota=200%
 MemoryMax=2G
 IOWeight=500
 
+# Resource accounting (User Story 5: Prometheus metrics)
+CPUAccounting=true
+MemoryAccounting=true
+IOAccounting=true
+
 # NUMA policy
 NUMAPolicy=bind
 NUMAMask=0

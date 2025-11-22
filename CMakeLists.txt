@@ -437,6 +437,7 @@ add_executable(run_tests
     tests/unit/event/SubscriptionManager_test.cpp
     tests/unit/event/EventBus_test.cpp
     tests/unit/event/DataStoreEventAdapter_test.cpp
+    tests/unit/event/PrioritizedEvent_test.cpp
     tests/integration/event/event_flow_test.cpp
     tests/integration/event/monitoring_extension_test.cpp
     tests/integration/datastore_logging_integration_test.cpp

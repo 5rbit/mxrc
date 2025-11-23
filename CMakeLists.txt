@@ -17,6 +17,14 @@ find_package(GTest REQUIRED)
 find_package(TBB REQUIRED)
 find_package(nlohmann_json 3.11.0 REQUIRED)
 
+# Google Benchmark for performance testing (Feature 019)
+find_package(benchmark QUIET)
+if(benchmark_FOUND)
+    message(STATUS "Google Benchmark found")
+else()
+    message(WARNING "Google Benchmark not found. Install with: sudo apt install libbenchmark-dev")
+endif()
+
 # Boost.Lockfree for lock-free data structures (Feature 022)
 find_package(Boost 1.65 QUIET)
 if(Boost_FOUND)
@@ -202,6 +210,7 @@ target_include_directories(mxrc PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/event/adapters
     ${PROJECT_SOURCE_DIR}/src/core/datastore
     ${PROJECT_SOURCE_DIR}/src/core/datastore/managers
+    ${PROJECT_SOURCE_DIR}/src/core/datastore/hotkey
     ${PROJECT_SOURCE_DIR}/src/core/logging
     ${PROJECT_SOURCE_DIR}/src/core/logging/interfaces
     ${PROJECT_SOURCE_DIR}/src/core/logging/core
@@ -285,6 +294,7 @@ target_include_directories(mxrc PUBLIC
 
 # Ensure mxrc depends on schedule generation
 add_dependencies(mxrc generate_schedule)
+add_dependencies(mxrc generate_ipc_schema)
 
 # ============================================================================
 # Feature 019: IPC Schema Code Generation
@@ -718,6 +728,7 @@ add_executable(run_tests
 target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/src
+    ${CMAKE_BINARY_DIR}/generated
     ${PROJECT_SOURCE_DIR}/src/core/action
     ${PROJECT_SOURCE_DIR}/src/core/action/interfaces
     ${PROJECT_SOURCE_DIR}/src/core/action/core
@@ -740,6 +751,8 @@ target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/event/util
     ${PROJECT_SOURCE_DIR}/src/core/event/adapters
     ${PROJECT_SOURCE_DIR}/src/core/datastore
+    ${PROJECT_SOURCE_DIR}/src/core/datastore/managers
+    ${PROJECT_SOURCE_DIR}/src/core/datastore/hotkey
     ${PROJECT_SOURCE_DIR}/tests/unit/action
     ${PROJECT_SOURCE_DIR}/tests/unit/task
     ${PROJECT_SOURCE_DIR}/tests/unit/sequence
@@ -820,6 +833,16 @@ if(yaml-cpp_FOUND)
     target_link_libraries(run_tests PRIVATE yaml-cpp)
 endif()
 
+# Link Folly for tests if found (Feature 019: Hot Key Optimization)
+if(folly_FOUND)
+    target_link_libraries(run_tests PRIVATE Folly::folly)
+endif()
+
+# Link Google Benchmark for tests if found (Feature 019)
+if(benchmark_FOUND)
+    target_link_libraries(run_tests PRIVATE benchmark::benchmark)
+endif()
+
 # Link NUMA if found
 if(NUMA_FOUND)
     target_link_libraries(run_tests PRIVATE ${NUMA_LIBRARY})
@@ -837,3 +860,14 @@ endif()
 
 include(GoogleTest)
 gtest_discover_tests(run_tests)
+
+# Ensure run_tests depends on code generation
+add_dependencies(run_tests generate_ipc_schema generate_schedule)
+
+add_custom_command(
+    TARGET run_tests
+    POST_BUILD
+    COMMAND ${CMAKE_SOURCE_DIR}/scripts/count_tests.sh
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Counting all tests..."
+)

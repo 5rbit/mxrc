@@ -23,9 +23,10 @@
 // Feature 019: IPC Schema - Type-safe key constants (auto-generated)
 #include "ipc/DataStoreKeys.h"
 
-// Feature 019: Hot Key Optimization
-#include "hotkey/HotKeyCache.h"
-#include "hotkey/HotKeyConfig.h"
+// Feature 019: Hot Key Optimization (disabled - requires Folly)
+// TODO: Enable when Folly is installed
+// #include "hotkey/HotKeyCache.h"
+// #include "hotkey/HotKeyConfig.h"
 
 class Observer;
 
@@ -188,9 +189,9 @@ private:
     std::unique_ptr<mxrc::core::datastore::MetricsCollector> metrics_collector_;
     std::unique_ptr<mxrc::core::datastore::LogManager> log_manager_;
 
-    /// @brief Feature 019: Hot Key Cache (2-Tier Cache)
-    std::unique_ptr<mxrc::core::datastore::HotKeyCache> hot_key_cache_;
-    std::unique_ptr<mxrc::core::datastore::HotKeyConfig> hot_key_config_;
+    /// @brief Feature 019: Hot Key Cache (2-Tier Cache) - Disabled (requires Folly)
+    // std::unique_ptr<mxrc::core::datastore::HotKeyCache> hot_key_cache_;
+    // std::unique_ptr<mxrc::core::datastore::HotKeyConfig> hot_key_config_;
 
     /// @brief 내부 헬퍼: Observer 알림 발행
     void notifySubscribers(const SharedData& changed_data);
@@ -207,14 +208,14 @@ template<typename T>
 void DataStore::set(const std::string& id, const T& data, DataType type,
                     const DataExpirationPolicy& policy) {
     try {
-        // Feature 019: 2-Tier Cache - Hot Key fast path
-        if (hot_key_cache_ && hot_key_cache_->isHotKey(id)) {
-            if (hot_key_cache_->set(id, data)) {
-                metrics_collector_->incrementSet();
-                log_manager_->logAccess("set_hotkey", id);
-                // Also update backing store for persistence
-            }
-        }
+        // Feature 019: 2-Tier Cache - Hot Key fast path (disabled - requires Folly)
+        // if (hot_key_cache_ && hot_key_cache_->isHotKey(id)) {
+        //     if (hot_key_cache_->set(id, data)) {
+        //         metrics_collector_->incrementSet();
+        //         log_manager_->logAccess("set_hotkey", id);
+        //         // Also update backing store for persistence
+        //     }
+        // }
 
         SharedData new_data;
         new_data.id = id;
@@ -272,16 +273,16 @@ void DataStore::set(const std::string& id, const T& data, DataType type,
 template<typename T>
 T DataStore::get(const std::string& id) {
     try {
-        // Feature 019: 2-Tier Cache - Hot Key fast path
-        if (hot_key_cache_ && hot_key_cache_->isHotKey(id)) {
-            auto cached_value = hot_key_cache_->get<T>(id);
-            if (cached_value.has_value()) {
-                metrics_collector_->incrementGet();
-                log_manager_->logAccess("get_hotkey", id);
-                return cached_value.value();
-            }
-            // Cache miss - fall through to backing store
-        }
+        // Feature 019: 2-Tier Cache - Hot Key fast path (disabled - requires Folly)
+        // if (hot_key_cache_ && hot_key_cache_->isHotKey(id)) {
+        //     auto cached_value = hot_key_cache_->get<T>(id);
+        //     if (cached_value.has_value()) {
+        //         metrics_collector_->incrementGet();
+        //         log_manager_->logAccess("get_hotkey", id);
+        //         return cached_value.value();
+        //     }
+        //     // Cache miss - fall through to backing store
+        // }
 
         T result;
 

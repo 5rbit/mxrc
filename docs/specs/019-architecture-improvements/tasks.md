@@ -2,8 +2,8 @@
 
 **Input**: Design documents from `/docs/specs/019-architecture-improvements/`
 **Status**: In Progress
-**Progress**: 56/72 tasks completed (78%)
-**Last Updated**: 2025-11-23
+**Progress**: 57/72 tasks completed (79%)
+**Last Updated**: 2025-11-24
 **Prerequisites**: plan.md ✅, spec.md ✅, research.md ✅, data-model.md ✅, contracts/ ✅
 
 ---
@@ -137,7 +137,7 @@
 - [X] T041 [US4] 기존 EtherCATMaster를 EtherCATFieldbus로 리팩토링 (IFieldbus 구현) in src/core/fieldbus/drivers/EtherCATDriver.cpp
 - [X] T042 [P] [US4] Mock 필드버스 드라이버 구현 (테스트용) in src/core/fieldbus/drivers/MockDriver.cpp (이미 완료)
 - [X] T043 [US4] RTExecutive에서 IFieldbus 사용으로 전환 in src/core/rt/RTExecutive.cpp
-- [ ] T044 [P] [US4] 단위 테스트: FieldbusFactory 드라이버 생성 검증 in tests/unit/fieldbus/FieldbusFactory_test.cpp
+- [X] T044 [P] [US4] 단위 테스트: FieldbusFactory 드라이버 생성 검증 in tests/unit/fieldbus/FieldbusFactory_test.cpp (10/10 passing)
 - [ ] T045 [P] [US4] 통합 테스트: Mock 필드버스로 모터 제어 시나리오 검증 in tests/integration/fieldbus_abstraction_test.cpp
 
 **Checkpoint**: User Story 4 핵심 완료 - 필드버스 추상화 및 EtherCAT 드라이버 완료 (테스트만 남음)

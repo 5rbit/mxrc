@@ -32,6 +32,10 @@ struct SharedMemoryData;
 }
 }
 
+namespace ha {
+class HAStateMachine;
+}
+
 namespace nonrt {
 
 // Non-RT 프로세스 실행기
@@ -63,6 +67,13 @@ public:
     // 실행 중 여부
     bool isRunning() const { return running_; }
 
+    /**
+     * @brief Get HA State Machine (Feature 019 US6 - T062)
+     *
+     * @return Pointer to HAStateMachine
+     */
+    ha::HAStateMachine* getHAStateMachine() { return ha_state_machine_.get(); }
+
 private:
     // Heartbeat 갱신 스레드
     void heartbeatThread();
@@ -88,6 +99,9 @@ private:
     // 공유 메모리
     std::unique_ptr<rt::ipc::SharedMemoryRegion> shm_region_;
     rt::ipc::SharedMemoryData* shm_data_;
+
+    // HA State Machine (Feature 019 US6 - T062)
+    std::unique_ptr<ha::HAStateMachine> ha_state_machine_;
 
     // 스레드
     std::thread heartbeat_thread_;

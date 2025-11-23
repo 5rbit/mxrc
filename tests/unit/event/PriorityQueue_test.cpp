@@ -441,4 +441,162 @@ TEST_F(PriorityQueueTest, ThreadSafety_ConcurrentPushPop_NoDataLoss) {
     EXPECT_EQ(total_pushed.load(), total_popped.load());  // All pushed events should be popped
 }
 
+// ============================================================================
+// Feature 019 - US3: TTL Expiration Tests (T035)
+// ============================================================================
+
+TEST_F(PriorityQueueTest, TTL_ExpiredEvent_SkippedOnPop) {
+    // Create event with very short TTL (1ms)
+    auto event = makePrioritizedEvent("test.ttl", EventPriority::NORMAL, 100, 1);
+    event.ttl = std::chrono::milliseconds(1);
+
+    EXPECT_TRUE(queue_->push(std::move(event)));
+    EXPECT_EQ(queue_->size(), 1u);
+
+    // Wait for TTL to expire
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+
+    // Pop should skip the expired event
+    auto popped = queue_->pop();
+    EXPECT_FALSE(popped.has_value());
+    EXPECT_EQ(queue_->size(), 0u);
+    EXPECT_EQ(queue_->metrics().events_expired.load(), 1u);
+}
+
+TEST_F(PriorityQueueTest, TTL_ValidEvent_ReturnedOnPop) {
+    // Create event with long TTL (1 hour)
+    auto event = makePrioritizedEvent("test.ttl", EventPriority::NORMAL, 200, 2);
+    event.ttl = std::chrono::milliseconds(3600000);  // 1 hour
+
+    EXPECT_TRUE(queue_->push(std::move(event)));
+
+    // Pop immediately - should get the event
+    auto popped = queue_->pop();
+    ASSERT_TRUE(popped.has_value());
+    EXPECT_EQ(std::get<int>(popped->payload), 200);
+    EXPECT_EQ(queue_->metrics().events_expired.load(), 0u);
+    EXPECT_EQ(queue_->metrics().events_popped.load(), 1u);
+}
+
+TEST_F(PriorityQueueTest, TTL_NoTTL_NeverExpires) {
+    // Event without TTL should never expire
+    auto event = makePrioritizedEvent("test.no_ttl", EventPriority::NORMAL, 300, 3);
+    // ttl is nullopt by default
+
+    EXPECT_TRUE(queue_->push(std::move(event)));
+
+    // Wait a bit
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+    // Pop should still return the event
+    auto popped = queue_->pop();
+    ASSERT_TRUE(popped.has_value());
+    EXPECT_EQ(std::get<int>(popped->payload), 300);
+    EXPECT_EQ(queue_->metrics().events_expired.load(), 0u);
+}
+
+TEST_F(PriorityQueueTest, TTL_MixedEvents_OnlyExpiredSkipped) {
+    // Push 3 events: expired, valid, expired
+    auto event1 = makePrioritizedEvent("test.exp1", EventPriority::NORMAL, 1, 1);
+    event1.ttl = std::chrono::milliseconds(1);
+    auto event2 = makePrioritizedEvent("test.valid", EventPriority::NORMAL, 2, 2);
+    event2.ttl = std::chrono::milliseconds(10000);  // Long TTL
+    auto event3 = makePrioritizedEvent("test.exp2", EventPriority::NORMAL, 3, 3);
+    event3.ttl = std::chrono::milliseconds(1);
+
+    queue_->push(std::move(event1));
+    queue_->push(std::move(event2));
+    queue_->push(std::move(event3));
+
+    // Wait for short TTLs to expire
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+
+    // Pop should skip expired events and return valid one
+    auto popped = queue_->pop();
+    ASSERT_TRUE(popped.has_value());
+    EXPECT_EQ(std::get<int>(popped->payload), 2);
+    EXPECT_EQ(queue_->metrics().events_expired.load(), 2u);
+    EXPECT_EQ(queue_->metrics().events_popped.load(), 1u);
+}
+
+// ============================================================================
+// Feature 019 - US3: Coalescing Policy Tests (T032, T035)
+// ============================================================================
+
+TEST_F(PriorityQueueTest, Coalescing_SameKey_OnlyLatestReturned) {
+    // Push 3 events with same coalescing key
+    auto event1 = makePrioritizedEvent("test.status", EventPriority::NORMAL, 1, 1);
+    event1.coalescing_key = "robot.status";
+
+    auto event2 = makePrioritizedEvent("test.status", EventPriority::NORMAL, 2, 2);
+    event2.coalescing_key = "robot.status";
+
+    auto event3 = makePrioritizedEvent("test.status", EventPriority::NORMAL, 3, 3);
+    event3.coalescing_key = "robot.status";
+
+    queue_->push(std::move(event1));
+    queue_->push(std::move(event2));
+    queue_->push(std::move(event3));
+
+    EXPECT_EQ(queue_->size(), 3u);  // All events pushed
+    EXPECT_GE(queue_->metrics().events_coalesced.load(), 2u);  // 2 events marked for coalescing
+
+    // Pop should skip first two and return only the latest
+    auto popped = queue_->pop();
+    ASSERT_TRUE(popped.has_value());
+    EXPECT_EQ(std::get<int>(popped->payload), 3);  // Latest event
+
+    // Next pop should skip the coalesced events
+    auto popped2 = queue_->pop();
+    if (popped2.has_value()) {
+        // If we get an event, it should be the third one (already returned)
+        EXPECT_EQ(std::get<int>(popped2->payload), 3);
+    }
+}
+
+TEST_F(PriorityQueueTest, Coalescing_DifferentKeys_AllReturned) {
+    // Push events with different coalescing keys
+    auto event1 = makePrioritizedEvent("test.status1", EventPriority::NORMAL, 1, 1);
+    event1.coalescing_key = "robot1.status";
+
+    auto event2 = makePrioritizedEvent("test.status2", EventPriority::NORMAL, 2, 2);
+    event2.coalescing_key = "robot2.status";
+
+    queue_->push(std::move(event1));
+    queue_->push(std::move(event2));
+
+    EXPECT_EQ(queue_->metrics().events_coalesced.load(), 0u);  // No coalescing
+
+    // Pop should return both events
+    auto popped1 = queue_->pop();
+    ASSERT_TRUE(popped1.has_value());
+
+    auto popped2 = queue_->pop();
+    ASSERT_TRUE(popped2.has_value());
+
+    // Both events should have been returned
+    EXPECT_EQ(queue_->metrics().events_popped.load(), 2u);
+}
+
+TEST_F(PriorityQueueTest, Coalescing_NoKey_NoCoalescing) {
+    // Events without coalescing key should not be coalesced
+    auto event1 = makePrioritizedEvent("test.1", EventPriority::NORMAL, 1, 1);
+    auto event2 = makePrioritizedEvent("test.2", EventPriority::NORMAL, 2, 2);
+    auto event3 = makePrioritizedEvent("test.3", EventPriority::NORMAL, 3, 3);
+
+    queue_->push(std::move(event1));
+    queue_->push(std::move(event2));
+    queue_->push(std::move(event3));
+
+    EXPECT_EQ(queue_->metrics().events_coalesced.load(), 0u);
+
+    // All events should be returned
+    for (int i = 0; i < 3; ++i) {
+        auto popped = queue_->pop();
+        EXPECT_TRUE(popped.has_value());
+    }
+
+    EXPECT_EQ(queue_->metrics().events_popped.load(), 3u);
+}
+
 // Main is provided by the run_tests executable

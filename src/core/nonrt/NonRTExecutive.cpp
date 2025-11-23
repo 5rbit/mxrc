@@ -8,6 +8,7 @@
 #include "core/rt/ipc/SharedMemory.h"
 #include "core/rt/ipc/SharedMemoryData.h"
 #include "core/rt/util/TimeUtils.h"
+#include "core/ha/HAStateMachine.h"
 #include <spdlog/spdlog.h>
 #include <thread>
 #include <chrono>
@@ -40,7 +41,10 @@ NonRTExecutive::NonRTExecutive(const std::string& shm_name,
     task_executor_ = std::make_shared<task::TaskExecutor>(
         action_factory, action_executor_, sequence_engine_, event_bus_);
 
-    spdlog::info("NonRTExecutive created");
+    // Create HA State Machine (Feature 019 US6 - T062)
+    ha_state_machine_ = std::make_unique<ha::HAStateMachine>();
+
+    spdlog::info("NonRTExecutive created with HA State Machine");
 }
 
 NonRTExecutive::~NonRTExecutive() {

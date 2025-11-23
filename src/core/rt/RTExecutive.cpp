@@ -30,6 +30,7 @@ RTExecutive::RTExecutive(uint32_t minor_cycle_ms, uint32_t major_cycle_ms,
     , last_heartbeat_check_ns_(0)
     , safe_mode_enter_time_ns_(0)
     , event_bus_(event_bus)
+    , fieldbus_(nullptr)
     , cpu_affinity_mgr_impl_(new mxrc::rt::perf::CPUAffinityManager())
     , numa_binding_impl_(new mxrc::rt::perf::NUMABinding())
     , perf_monitor_impl_(new mxrc::rt::perf::PerfMonitor())
@@ -262,6 +263,12 @@ void RTExecutive::executeSlot(uint32_t slot) {
 void RTExecutive::setDataStore(RTDataStore* data_store) {
     context_.data_store = data_store;
     spdlog::info("RTDataStore attached to RTExecutive");
+}
+
+void RTExecutive::setFieldbus(fieldbus::IFieldbus* fieldbus) {
+    fieldbus_ = fieldbus;
+    spdlog::info("Fieldbus interface attached to RTExecutive (protocol: {})",
+                 fieldbus ? fieldbus->getProtocolName() : "nullptr");
 }
 
 int RTExecutive::waitUntilNextCycle(uint64_t cycle_start_ns, uint64_t cycle_duration_ns) {

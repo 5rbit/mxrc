@@ -2,7 +2,7 @@
 
 [![Build Status](https://github.com/5rbit/mxrc/actions/workflows/main.yml/badge.svg)](https://github.com/5rbit/mxrc/actions/workflows/main.yml)
 
-MXRC(Mission and eXecution Robot Controller)는 C++20 기반의 고성능, 고신뢰성 범용 로봇 제어 시스템입니다. 실시간(Real-Time) 제어의 예측성과 안정성을 보장하면서, 비실시간(Non-Real-Time) 작업의 유연성을 확보하기 위해 **듀얼-프로세스 아키텍처**를 핵심 설계로 채택했습니다.
+MXRC는 C++20 기반의 고성능, 고신뢰성 범용 로봇 제어 시스템입니다. 실시간(Real-Time) 제어의 예측성과 안정성을 보장하면서, 비실시간(Non-Real-Time) 작업의 유연성을 확보하기 위해 **듀얼-프로세스 아키텍처**를 핵심 설계로 채택했습니다.
 
 ## 주요 특징
 

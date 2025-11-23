@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <chrono>
 #include <memory>
+#include <optional>
 
 namespace mxrc::core::event {
 
@@ -119,6 +120,46 @@ struct PrioritizedEvent {
      * the one with the lower sequence number is processed first.
      */
     uint64_t sequence_num{0};
+
+    /**
+     * @brief Time-To-Live in milliseconds (optional)
+     *
+     * If set, the event will be discarded if (current_time - timestamp_ns) > ttl.
+     * Used for time-sensitive events that become irrelevant after a certain period.
+     * If nullopt, the event never expires.
+     *
+     * Feature 019 - US3: TTL expiration policy (FR-009)
+     */
+    std::optional<std::chrono::milliseconds> ttl;
+
+    /**
+     * @brief Coalescing key for event merging (optional)
+     *
+     * Events with the same coalescing_key can be merged, keeping only the latest.
+     * Used to avoid queue buildup of redundant status updates.
+     * If nullopt, coalescing is disabled for this event.
+     *
+     * Feature 019 - US3: Coalescing policy (FR-010)
+     */
+    std::optional<std::string> coalescing_key;
+
+    /**
+     * @brief Check if event has expired based on TTL
+     *
+     * @return true if TTL is set and event has expired
+     */
+    bool isExpired() const {
+        if (!ttl.has_value()) {
+            return false;  // No TTL, never expires
+        }
+
+        auto now = std::chrono::system_clock::now();
+        auto current_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            now.time_since_epoch()).count();
+
+        auto age_ms = (current_ns - timestamp_ns) / 1'000'000;
+        return age_ms > static_cast<uint64_t>(ttl->count());
+    }
 
     /**
      * @brief Comparison operator for priority queue ordering

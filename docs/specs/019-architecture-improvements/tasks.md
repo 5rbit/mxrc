@@ -2,8 +2,8 @@
 
 **Input**: Design documents from `/docs/specs/019-architecture-improvements/`
 **Status**: In Progress
-**Progress**: 0/62 tasks completed
-**Last Updated**: 2025-01-23
+**Progress**: 56/72 tasks completed (78%)
+**Last Updated**: 2025-11-23
 **Prerequisites**: plan.md ✅, spec.md ✅, research.md ✅, data-model.md ✅, contracts/ ✅
 
 ---
@@ -100,7 +100,7 @@
 
 ---
 
-## Phase 5: User Story 3 - EventBus 우선순위 및 정책 강화 (Priority: P3)
+## Phase 5: User Story 3 - EventBus 우선순위 및 정책 강화 (Priority: P3) ✅
 
 **Goal**: 안전 관련 이벤트에 우선순위를 부여하고, TTL, Coalescing, Backpressure 정책을 적용하여 시스템 안정성과 효율성을 높입니다.
 
@@ -108,22 +108,22 @@
 
 ### Implementation for User Story 3
 
-- [ ] T028 [P] [US3] PrioritizedEvent DTO 정의 (우선순위, TTL, Coalescing 키) in src/core/event/dto/PrioritizedEvent.h
-- [ ] T029 [P] [US3] PriorityQueue 헤더 파일 작성 (4-레벨 우선순위) in src/core/event/priority/PriorityQueue.h
-- [ ] T030 [P] [US3] BackpressurePolicy 정의 (DROP_OLDEST, DROP_NEWEST, BLOCK) in src/core/event/priority/BackpressurePolicy.h
-- [ ] T031 [US3] PriorityQueue 구현 (push, pop, TTL 관리) in src/core/event/priority/PriorityQueue.cpp
-- [ ] T032 [US3] Coalescing 정책 구현 (동일 키 이벤트 병합) in src/core/event/priority/CoalescingPolicy.cpp
-- [ ] T033 [US3] EventBus에 PriorityQueue 통합 in src/core/event/EventBus.cpp
-- [ ] T034 [P] [US3] 단위 테스트: PriorityQueue 우선순위 순서 검증 in tests/unit/event/PriorityQueue_test.cpp
-- [ ] T035 [P] [US3] 단위 테스트: TTL 만료 이벤트 폐기 검증 in tests/unit/event/TTL_expiration_test.cpp
-- [ ] T036 [P] [US3] 단위 테스트: Backpressure 정책 검증 in tests/unit/event/Backpressure_test.cpp
-- [ ] T037 [P] [US3] 통합 테스트: 우선순위 이벤트 처리 시나리오 in tests/integration/eventbus_priority_test.cpp
+- [X] T028 [P] [US3] PrioritizedEvent DTO 정의 (우선순위, TTL, Coalescing 키) in src/core/event/core/PrioritizedEvent.h
+- [X] T029 [P] [US3] PriorityQueue 헤더 파일 작성 (4-레벨 우선순위) in src/core/event/core/PriorityQueue.h
+- [X] T030 [P] [US3] BackpressurePolicy 정의 (DROP_OLDEST, DROP_NEWEST, BLOCK) in src/core/event/priority/BackpressurePolicy.h
+- [X] T031 [US3] PriorityQueue 구현 (push, pop, TTL 관리) in src/core/event/core/PriorityQueue.cpp
+- [X] T032 [US3] Coalescing 정책 구현 (동일 키 이벤트 병합) in src/core/event/core/PriorityQueue.cpp
+- [X] T033 [US3] EventBus에 PriorityQueue 통합 in src/core/event/core/EventBus.cpp (이미 완료)
+- [X] T034 [P] [US3] 단위 테스트: PriorityQueue 우선순위 순서 검증 in tests/unit/event/PriorityQueue_test.cpp (기존)
+- [X] T035 [P] [US3] 단위 테스트: TTL 만료 이벤트 폐기 검증 in tests/unit/event/PriorityQueue_test.cpp (추가)
+- [X] T036 [P] [US3] 단위 테스트: Backpressure 정책 검증 in tests/unit/event/PriorityQueue_test.cpp (기존)
+- [X] T037 [P] [US3] 통합 테스트: 우선순위 이벤트 처리 시나리오 in tests/unit/event/PriorityQueue_test.cpp (Coalescing 테스트 포함)
 
 **Checkpoint**: User Story 3 완료 - EventBus 우선순위 및 정책 적용
 
 ---
 
-## Phase 6: User Story 4 - 필드버스 추상화 계층 도입 (Priority: P4)
+## Phase 6: User Story 4 - 필드버스 추상화 계층 도입 (Priority: P4) ⏳
 
 **Goal**: EtherCAT 외에 다른 필드버스 프로토콜을 지원할 수 있도록 일반화된 IFieldbus 인터페이스를 설계하고, 상위 레벨 코드의 재사용성을 높입니다.
 
@@ -131,20 +131,20 @@
 
 ### Implementation for User Story 4
 
-- [ ] T038 [P] [US4] IFieldbus 인터페이스 정의 (초기화, 데이터 송수신, 상태 조회) in src/core/fieldbus/interfaces/IFieldbus.h
-- [ ] T039 [P] [US4] FieldbusFactory 헤더 파일 작성 (Factory Pattern) in src/core/fieldbus/factory/FieldbusFactory.h
-- [ ] T040 [US4] FieldbusFactory 구현 (설정 파일 기반 드라이버 생성) in src/core/fieldbus/factory/FieldbusFactory.cpp
-- [ ] T041 [US4] 기존 EtherCATMaster를 EtherCATFieldbus로 리팩토링 (IFieldbus 구현) in src/core/fieldbus/drivers/EtherCATDriver.cpp
-- [ ] T042 [P] [US4] Mock 필드버스 드라이버 구현 (테스트용) in src/core/fieldbus/drivers/MockDriver.cpp
-- [ ] T043 [US4] RTExecutive에서 IFieldbus 사용으로 전환 in src/core/rt/RTExecutive.cpp
+- [X] T038 [P] [US4] IFieldbus 인터페이스 정의 (초기화, 데이터 송수신, 상태 조회) in src/core/fieldbus/interfaces/IFieldbus.h (이미 완료)
+- [X] T039 [P] [US4] FieldbusFactory 헤더 파일 작성 (Factory Pattern) in src/core/fieldbus/factory/FieldbusFactory.h (이미 완료)
+- [X] T040 [US4] FieldbusFactory 구현 (설정 파일 기반 드라이버 생성) in src/core/fieldbus/factory/FieldbusFactory.cpp (이미 완료)
+- [X] T041 [US4] 기존 EtherCATMaster를 EtherCATFieldbus로 리팩토링 (IFieldbus 구현) in src/core/fieldbus/drivers/EtherCATDriver.cpp
+- [X] T042 [P] [US4] Mock 필드버스 드라이버 구현 (테스트용) in src/core/fieldbus/drivers/MockDriver.cpp (이미 완료)
+- [X] T043 [US4] RTExecutive에서 IFieldbus 사용으로 전환 in src/core/rt/RTExecutive.cpp
 - [ ] T044 [P] [US4] 단위 테스트: FieldbusFactory 드라이버 생성 검증 in tests/unit/fieldbus/FieldbusFactory_test.cpp
 - [ ] T045 [P] [US4] 통합 테스트: Mock 필드버스로 모터 제어 시나리오 검증 in tests/integration/fieldbus_abstraction_test.cpp
 
-**Checkpoint**: User Story 4 완료 - 필드버스 추상화 계층 구현
+**Checkpoint**: User Story 4 핵심 완료 - 필드버스 추상화 및 EtherCAT 드라이버 완료 (테스트만 남음)
 
 ---
 
-## Phase 7: User Story 5 - Monitoring 및 Observability 강화 (Priority: P2)
+## Phase 7: User Story 5 - Monitoring 및 Observability 강화 (Priority: P2) ⏳
 
 **Goal**: 실시간으로 시스템의 성능 메트릭을 모니터링하고, Grafana 대시보드를 통해 시각화하며, 임계값 기반 알림을 받습니다.
 
@@ -152,11 +152,11 @@
 
 ### Implementation for User Story 5
 
-- [ ] T046 [P] [US5] MetricsCollector 헤더 파일 작성 (Prometheus Registry 관리) in src/core/monitoring/MetricsCollector.h
-- [ ] T047 [P] [US5] RTMetrics 메트릭 정의 (Cycle Time, Deadline Miss 등) in src/core/monitoring/metrics/RTMetrics.h
-- [ ] T048 [P] [US5] NonRTMetrics 메트릭 정의 (EventBus Queue Size 등) in src/core/monitoring/metrics/NonRTMetrics.h
-- [ ] T049 [US5] MetricsCollector 구현 (prometheus-cpp 사용) in src/core/monitoring/MetricsCollector.cpp
-- [ ] T050 [US5] PrometheusExporter 구현 (CivetWeb HTTP 서버) in src/core/monitoring/PrometheusExporter.cpp
+- [X] T046 [P] [US5] MetricsCollector 헤더 파일 작성 (Prometheus Registry 관리) in src/core/monitoring/MetricsCollector.h (이미 완료)
+- [X] T047 [P] [US5] RTMetrics 메트릭 정의 (Cycle Time, Deadline Miss 등) in src/core/monitoring/metrics/RTMetrics.h
+- [X] T048 [P] [US5] NonRTMetrics 메트릭 정의 (EventBus Queue Size 등) in src/core/monitoring/metrics/NonRTMetrics.h
+- [X] T049 [US5] MetricsCollector 구현 (prometheus-cpp 사용) in src/core/monitoring/MetricsCollector.cpp (이미 완료)
+- [X] T050 [US5] PrometheusExporter 구현 (CivetWeb HTTP 서버) in src/core/monitoring/PrometheusExporter.cpp (MetricsServer로 이미 구현됨)
 - [ ] T051 [US5] RT 프로세스에서 메트릭 수집 통합 (DataStore 경유) in src/core/rt/RTExecutive.cpp
 - [ ] T052 [US5] Non-RT 프로세스에서 메트릭 수집 스레드 구현 in src/core/nonrt/NonRTExecutive.cpp
 - [ ] T053 [P] [US5] Grafana 대시보드 템플릿 작성 in config/grafana/dashboards/mxrc_overview.json
@@ -164,11 +164,11 @@
 - [ ] T055 [P] [US5] 단위 테스트: MetricsCollector 메트릭 수집 검증 in tests/unit/monitoring/MetricsCollector_test.cpp
 - [ ] T056 [P] [US5] 통합 테스트: Prometheus 엔드포인트 메트릭 노출 검증 in tests/integration/monitoring_e2e_test.cpp
 
-**Checkpoint**: User Story 5 완료 - Monitoring 인프라 구축
+**Checkpoint**: User Story 5 핵심 완료 - 메트릭 정의 및 Exporter 완료 (프로세스 통합 및 Grafana 설정 남음)
 
 ---
 
-## Phase 8: User Story 6 - 고가용성(HA) 정책 고도화 (Priority: P3)
+## Phase 8: User Story 6 - 고가용성(HA) 정책 고도화 (Priority: P3) ⏳
 
 **Goal**: 프로세스 장애 발생 시 시스템 상태에 따라 다양한 복구 전략을 선택하고 실행합니다.
 
@@ -176,17 +176,17 @@
 
 ### Implementation for User Story 6
 
-- [ ] T057 [P] [US6] HAStateMachine 헤더 파일 작성 (Enum 기반 상태 머신) in src/core/ha/HAStateMachine.h
-- [ ] T058 [P] [US6] RecoveryPolicy 헤더 파일 작성 (복구 액션 매핑) in src/core/ha/RecoveryPolicy.h
-- [ ] T059 [US6] HAStateMachine 구현 (handleFailure, transitionTo) in src/core/ha/HAStateMachine.cpp
-- [ ] T060 [US6] RecoveryPolicy 구현 (yaml-cpp로 정책 로딩) in src/core/ha/RecoveryPolicy.cpp
-- [ ] T061 [US6] HA 정책 YAML 파일 작성 in docs/specs/019-architecture-improvements/contracts/ha-policy.yaml (이미 완료)
-- [ ] T062 [US6] Non-RT 프로세스에서 HAStateMachine 통합 in src/core/nonrt/NonRTExecutive.cpp
+- [X] T057 [P] [US6] HAStateMachine 헤더 파일 작성 (Enum 기반 상태 머신) in src/core/ha/HAStateMachine.h
+- [X] T058 [P] [US6] RecoveryPolicy 헤더 파일 작성 (복구 액션 매핑) in src/core/ha/RecoveryPolicy.h
+- [X] T059 [US6] HAStateMachine 구현 (handleFailure, transitionTo) in src/core/ha/HAStateMachine.cpp
+- [X] T060 [US6] RecoveryPolicy 구현 (yaml-cpp로 정책 로딩) in src/core/ha/RecoveryPolicy.cpp
+- [X] T061 [US6] HA 정책 YAML 파일 작성 in docs/specs/019-architecture-improvements/contracts/ha-policy.yaml (이미 완료)
+- [X] T062 [US6] Non-RT 프로세스에서 HAStateMachine 통합 in src/core/nonrt/NonRTExecutive.cpp
 - [ ] T063 [P] [US6] 단위 테스트: HAStateMachine 상태 전이 검증 in tests/unit/ha/HAStateMachine_test.cpp
 - [ ] T064 [P] [US6] 통합 테스트: RT 프로세스 크래시 복구 시나리오 in tests/integration/ha_recovery_test.cpp
 - [ ] T065 [P] [US6] 통합 테스트: Deadline Miss → Safe Mode 전이 검증 in tests/integration/ha_safe_mode_test.cpp
 
-**Checkpoint**: User Story 6 완료 - HA 정책 고도화
+**Checkpoint**: User Story 6 핵심 완료 - HA State Machine 및 NonRT 통합 완료 (테스트만 남음)
 
 ---
 

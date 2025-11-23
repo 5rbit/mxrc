@@ -289,6 +289,9 @@ tests/
 ## Active Technologies
 - C++20 (GCC 11+ 또는 Clang 14+) + libsystemd-dev (sd_notify API), spdlog >= 1.x, nlohmann_json >= 3.11.0, Prometheus C++ client (선택적) (018-systemd-process-management)
 - N/A (systemd 메트릭 및 로그는 journald/Prometheus에 저장) (018-systemd-process-management)
+- C++20 (GCC 11+) (001-ethercat-integration)
+- RTDataStore (versioned in-memory key-value), SharedMemory (RT/Non-RT 통신) (001-ethercat-integration)
+- Docker 24.0+, Docker Compose V2, Bash scripting (002-docker)
 
 ## Recent Changes
 - 018-systemd-process-management: Added C++20 (GCC 11+ 또는 Clang 14+) + libsystemd-dev (sd_notify API), spdlog >= 1.x, nlohmann_json >= 3.11.0, Prometheus C++ client (선택적)

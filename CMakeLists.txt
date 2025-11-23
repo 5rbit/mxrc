@@ -4,6 +4,9 @@ project(mxrc)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Add cmake modules directory
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+
 # Optional: backward-cpp for stack traces
 option(USE_BACKWARD "Enable backward-cpp for stack traces" OFF)
 
@@ -26,6 +29,23 @@ endif()
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SYSTEMD REQUIRED libsystemd)
 message(STATUS "systemd found: ${SYSTEMD_LIBRARIES}")
+
+# EtherCAT Master (for Feature 001: EtherCAT integration)
+find_package(EtherCAT QUIET)
+if(EtherCAT_FOUND)
+    message(STATUS "IgH EtherCAT Master found: ${EtherCAT_LIBRARIES}")
+else()
+    message(WARNING "IgH EtherCAT Master not found. EtherCAT features will be disabled.")
+    message(WARNING "Install with: https://gitlab.com/etherlab.org/ethercat")
+endif()
+
+# yaml-cpp for YAML configuration parsing
+find_package(yaml-cpp QUIET)
+if(yaml-cpp_FOUND)
+    message(STATUS "yaml-cpp found")
+else()
+    message(WARNING "yaml-cpp not found. Install with: sudo apt install libyaml-cpp-dev")
+endif()
 
 # Production readiness dependencies
 find_library(NUMA_LIBRARY NAMES numa)
@@ -385,6 +405,16 @@ if(Boost_FOUND)
     target_link_libraries(rt PRIVATE Boost::boost)
 endif()
 
+# Link EtherCAT if found
+if(EtherCAT_FOUND)
+    target_link_libraries(rt PRIVATE EtherCAT::EtherCAT)
+endif()
+
+# Link yaml-cpp if found
+if(yaml-cpp_FOUND)
+    target_link_libraries(rt PRIVATE yaml-cpp)
+endif()
+
 # Link NUMA if found
 if(NUMA_FOUND)
     target_link_libraries(rt PRIVATE ${NUMA_LIBRARY})
@@ -414,9 +444,20 @@ target_include_directories(rt PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/systemd/impl
     ${PROJECT_SOURCE_DIR}/src/core/systemd/util
     ${PROJECT_SOURCE_DIR}/src/core/systemd/dto
+    ${PROJECT_SOURCE_DIR}/src/core/ethercat
+    ${PROJECT_SOURCE_DIR}/src/core/ethercat/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/ethercat/core
+    ${PROJECT_SOURCE_DIR}/src/core/ethercat/dto
+    ${PROJECT_SOURCE_DIR}/src/core/ethercat/util
+    ${PROJECT_SOURCE_DIR}/src/core/ethercat/adapters
     ${SYSTEMD_INCLUDE_DIRS}
     ${CMAKE_BINARY_DIR}/generated
 )
+
+# Add EtherCAT include directories if found
+if(EtherCAT_FOUND)
+    target_include_directories(rt PRIVATE ${EtherCAT_INCLUDE_DIRS})
+endif()
 
 # Ensure rt depends on schedule generation
 add_dependencies(rt generate_schedule)
@@ -602,6 +643,18 @@ add_executable(run_tests
     src/core/systemd/impl/SdNotifyWatchdog.cpp
     src/systemd/SystemdMetricsCollector.cpp
     src/systemd/JournaldLogger.cpp
+    # EtherCAT (Feature 001)
+    tests/unit/ethercat/YAMLConfigParser_test.cpp
+    tests/unit/ethercat/SensorDataManager_test.cpp
+    tests/unit/ethercat/MotorCommandManager_test.cpp
+    tests/integration/ethercat/RTEtherCATCycle_test.cpp
+    src/core/ethercat/util/YAMLConfigParser.cpp
+    src/core/ethercat/util/EtherCATLogger.cpp
+    src/core/ethercat/impl/SensorDataManager.cpp
+    src/core/ethercat/impl/MotorCommandManager.cpp
+    src/core/ethercat/core/EtherCATMaster.cpp
+    src/core/ethercat/core/EtherCATDomain.cpp
+    src/core/ethercat/adapters/RTEtherCATCycle.cpp
 )
 
 target_include_directories(run_tests PUBLIC
@@ -667,8 +720,23 @@ target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/tests/unit/systemd
     ${PROJECT_SOURCE_DIR}/tests/integration/systemd
     ${PROJECT_SOURCE_DIR}/include/mxrc/systemd
+    ${PROJECT_SOURCE_DIR}/src/core/ethercat
+    ${PROJECT_SOURCE_DIR}/src/core/ethercat/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/ethercat/core
+    ${PROJECT_SOURCE_DIR}/src/core/ethercat/dto
+    ${PROJECT_SOURCE_DIR}/src/core/ethercat/util
+    ${PROJECT_SOURCE_DIR}/src/core/ethercat/impl
+    ${PROJECT_SOURCE_DIR}/src/core/ethercat/adapters
+    ${PROJECT_SOURCE_DIR}/tests/unit/ethercat
+    ${PROJECT_SOURCE_DIR}/tests/integration/ethercat
+    ${PROJECT_SOURCE_DIR}/tests/mocks
     ${SYSTEMD_INCLUDE_DIRS}
 )
+
+# Add EtherCAT include directories if found
+if(EtherCAT_FOUND)
+    target_include_directories(run_tests PRIVATE ${EtherCAT_INCLUDE_DIRS})
+endif()
 
 
 # Link dependencies for tests
@@ -682,6 +750,16 @@ target_link_libraries(run_tests PRIVATE
 )
 if(Boost_FOUND)
     target_link_libraries(run_tests PRIVATE Boost::boost)
+endif()
+
+# Link EtherCAT for tests if found
+if(EtherCAT_FOUND)
+    target_link_libraries(run_tests PRIVATE EtherCAT::EtherCAT)
+endif()
+
+# Link yaml-cpp for tests if found
+if(yaml-cpp_FOUND)
+    target_link_libraries(run_tests PRIVATE yaml-cpp)
 endif()
 
 # Link NUMA if found

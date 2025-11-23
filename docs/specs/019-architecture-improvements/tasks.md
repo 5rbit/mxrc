@@ -40,18 +40,18 @@
 
 ---
 
-## Phase 2: Foundational (선행 필수 작업)
+## Phase 2: Foundational (선행 필수 작업) ✅
 
 **목적**: 모든 User Story 구현 전에 완료되어야 하는 핵심 인프라
 
 **⚠️ CRITICAL**: 이 Phase가 완료되어야 User Story 작업 시작 가능
 
-- [ ] T005 PyYAML 스키마 검증 스크립트 작성 in scripts/codegen/validate_schema.py
-- [ ] T006 Jinja2 템플릿 엔진 기반 코드 생성 스크립트 작성 in scripts/codegen/generate_ipc_schema.py
-- [ ] T007 [P] DataStore 키 헤더 템플릿 작성 in scripts/codegen/templates/datastore_keys.h.j2
-- [ ] T008 [P] EventBus 이벤트 헤더 템플릿 작성 in scripts/codegen/templates/eventbus_events.h.j2
-- [ ] T009 [P] Accessor 구현 템플릿 작성 in scripts/codegen/templates/accessor_impl.cpp.j2
-- [ ] T010 CMake에 코드 생성 단계 통합 in CMakeLists.txt (add_custom_command)
+- [X] T005 PyYAML 스키마 검증 스크립트 작성 in scripts/codegen/validate_schema.py
+- [X] T006 Jinja2 템플릿 엔진 기반 코드 생성 스크립트 작성 in scripts/codegen/generate_ipc_schema.py
+- [X] T007 [P] DataStore 키 헤더 템플릿 작성 in scripts/codegen/templates/datastore_keys.h.j2
+- [X] T008 [P] EventBus 이벤트 헤더 템플릿 작성 in scripts/codegen/templates/eventbus_events.h.j2
+- [X] T009 [P] Accessor 구현 템플릿 작성 in scripts/codegen/templates/accessor_impl.cpp.j2
+- [X] T010 CMake에 코드 생성 단계 통합 in CMakeLists.txt (add_custom_command)
 
 **Checkpoint**: Foundation 완료 - User Story 병렬 구현 가능
 

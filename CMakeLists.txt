@@ -286,6 +286,39 @@ target_include_directories(mxrc PUBLIC
 # Ensure mxrc depends on schedule generation
 add_dependencies(mxrc generate_schedule)
 
+# ============================================================================
+# Feature 019: IPC Schema Code Generation
+# ============================================================================
+
+# Generate IPC Schema C++ headers from YAML
+add_custom_command(
+    OUTPUT
+        ${CMAKE_BINARY_DIR}/generated/ipc/DataStoreKeys.h
+        ${CMAKE_BINARY_DIR}/generated/ipc/EventBusEvents.h
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/codegen/validate_schema.py
+            ${CMAKE_SOURCE_DIR}/config/ipc/ipc-schema.yaml
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/codegen/generate_ipc_schema.py
+            ${CMAKE_SOURCE_DIR}/config/ipc/ipc-schema.yaml
+            ${CMAKE_BINARY_DIR}/generated/ipc
+    DEPENDS
+        ${CMAKE_SOURCE_DIR}/scripts/codegen/validate_schema.py
+        ${CMAKE_SOURCE_DIR}/scripts/codegen/generate_ipc_schema.py
+        ${CMAKE_SOURCE_DIR}/scripts/codegen/templates/datastore_keys.h.j2
+        ${CMAKE_SOURCE_DIR}/scripts/codegen/templates/eventbus_events.h.j2
+        ${CMAKE_SOURCE_DIR}/config/ipc/ipc-schema.yaml
+    COMMENT "Generating IPC schema C++ headers from YAML..."
+)
+
+# Create custom target for IPC code generation
+add_custom_target(generate_ipc_schema
+    DEPENDS
+        ${CMAKE_BINARY_DIR}/generated/ipc/DataStoreKeys.h
+        ${CMAKE_BINARY_DIR}/generated/ipc/EventBusEvents.h
+)
+
+# Ensure mxrc depends on IPC schema generation
+add_dependencies(mxrc generate_ipc_schema)
+
 # Add generated directory to .gitignore
 file(APPEND ${PROJECT_SOURCE_DIR}/.gitignore "\nbuild/generated/\n")
 

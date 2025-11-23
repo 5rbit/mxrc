@@ -434,4 +434,17 @@ int ActionExecutor::clearCompletedActions() {
     return count;
 }
 
+// Explicit template instantiations for publishEvent()
+// Required because template definition is in .cpp file
+template void ActionExecutor::publishEvent<mxrc::core::event::ActionStartedEvent>(
+    std::shared_ptr<mxrc::core::event::ActionStartedEvent> event);
+template void ActionExecutor::publishEvent<mxrc::core::event::ActionCompletedEvent>(
+    std::shared_ptr<mxrc::core::event::ActionCompletedEvent> event);
+template void ActionExecutor::publishEvent<mxrc::core::event::ActionFailedEvent>(
+    std::shared_ptr<mxrc::core::event::ActionFailedEvent> event);
+template void ActionExecutor::publishEvent<mxrc::core::event::ActionTimeoutEvent>(
+    std::shared_ptr<mxrc::core::event::ActionTimeoutEvent> event);
+template void ActionExecutor::publishEvent<mxrc::core::event::ActionCancelledEvent>(
+    std::shared_ptr<mxrc::core::event::ActionCancelledEvent> event);
+
 } // namespace mxrc::core::action

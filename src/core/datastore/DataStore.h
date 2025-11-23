@@ -18,6 +18,7 @@
 #include "managers/AccessControlManager.h"
 #include "managers/MetricsCollector.h"
 #include "managers/LogManager.h"
+#include "core/VersionedData.h"
 
 class Observer;
 
@@ -108,6 +109,16 @@ public:
     template<typename T>
     T poll(const std::string& id);
 
+    /// @brief 버전이 있는 데이터 조회 (Feature 022: P2 Accessor Pattern)
+    /// @note RT-safe: lock-free read with atomic version check
+    template<typename T>
+    mxrc::core::datastore::VersionedData<T> getVersioned(const std::string& id);
+
+    /// @brief 버전이 있는 데이터 저장 (Feature 022: P2 Accessor Pattern)
+    /// @note RT-safe: atomic version increment
+    template<typename T>
+    void setVersioned(const std::string& id, const T& value, DataType type = DataType::RobotMode);
+
     /// @brief 데이터 변경 알림 구독
     void subscribe(const std::string& id, std::shared_ptr<Observer> observer);
 
@@ -156,6 +167,10 @@ public:
 private:
     /// @brief 스레드 안전 데이터 저장소 (concurrent_hash_map)
     tbb::concurrent_hash_map<std::string, SharedData> data_map_;
+
+    /// @brief 버전 정보 저장 (Feature 022: P2 Accessor Pattern)
+    /// @note Key: data id, Value: atomic version counter
+    tbb::concurrent_hash_map<std::string, std::atomic<uint64_t>> version_map_;
 
     /// @brief Observer 패턴 Notifier 관리
     std::map<std::string, std::shared_ptr<Notifier>> notifiers_;

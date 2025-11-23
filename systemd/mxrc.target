@@ -1,0 +1,11 @@
+[Unit]
+Description=MXRC Service Group - Robot Control System
+Documentation=https://github.com/your-org/mxrc
+After=network.target
+Wants=mxrc-nonrt.service mxrc-rt.service
+
+# Target for all MXRC services
+# Start all services together: sudo systemctl start mxrc.target
+
+[Install]
+WantedBy=multi-user.target

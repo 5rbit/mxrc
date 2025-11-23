@@ -1,0 +1,422 @@
+openapi: 3.0.3
+info:
+  title: MXRC Health Check API
+  description: |
+    Health check API for MXRC production readiness.
+    Provides process health status, readiness checks, and liveness probes
+    for RT and Non-RT processes.
+
+    이 API는 FailoverManager와 외부 모니터링 시스템(예: Kubernetes, systemd)에서
+    프로세스의 건강 상태를 확인하는 데 사용됩니다.
+  version: 1.0.0
+  contact:
+    name: MXRC Team
+
+servers:
+  - url: http://localhost:8080
+    description: RT Process (production)
+  - url: http://localhost:8081
+    description: Non-RT Process (production)
+
+tags:
+  - name: health
+    description: Health check endpoints
+  - name: metrics
+    description: Performance metrics endpoints
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      description: |
+        프로세스의 전반적인 건강 상태를 반환합니다.
+
+        - HEALTHY: 정상 동작 중
+        - DEGRADED: 성능 저하 (deadline miss 증가, 응답 지연)
+        - UNHEALTHY: 비정상 (critical error, 응답 없음)
+
+        이 엔드포인트는 FailoverManager가 주기적으로 호출합니다.
+      operationId: getHealth
+      tags:
+        - health
+      responses:
+        '200':
+          description: Health status successfully retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              examples:
+                healthy:
+                  summary: Healthy process
+                  value:
+                    status: HEALTHY
+                    process_name: rt_process
+                    pid: 12345
+                    last_heartbeat: "2025-11-21T10:30:45.123Z"
+                    response_time_ms: 1.5
+                    cpu_usage_percent: 45.2
+                    memory_usage_mb: 512
+                    deadline_miss_count: 5
+                    restart_count: 0
+                    error_message: ""
+                degraded:
+                  summary: Degraded process (high deadline miss)
+                  value:
+                    status: DEGRADED
+                    process_name: rt_process
+                    pid: 12345
+                    last_heartbeat: "2025-11-21T10:30:45.123Z"
+                    response_time_ms: 8.5
+                    cpu_usage_percent: 85.2
+                    memory_usage_mb: 512
+                    deadline_miss_count: 150
+                    restart_count: 0
+                    error_message: "High deadline miss rate detected"
+        '503':
+          description: Service unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              example:
+                status: UNHEALTHY
+                process_name: rt_process
+                pid: 12345
+                last_heartbeat: "2025-11-21T10:30:40.000Z"
+                response_time_ms: 0
+                cpu_usage_percent: 0
+                memory_usage_mb: 512
+                deadline_miss_count: 250
+                restart_count: 1
+                error_message: "EventBus connection timeout"
+
+  /health/ready:
+    get:
+      summary: Readiness check endpoint
+      description: |
+        프로세스가 요청을 처리할 준비가 되었는지 확인합니다.
+
+        - READY: 초기화 완료, 요청 처리 가능
+        - NOT_READY: 초기화 진행 중, 요청 처리 불가
+
+        Kubernetes readinessProbe에서 사용됩니다.
+      operationId: getReadiness
+      tags:
+        - health
+      responses:
+        '200':
+          description: Process is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessStatus'
+              example:
+                ready: true
+                message: "All subsystems initialized"
+                details:
+                  eventbus_connected: true
+                  datastore_initialized: true
+                  task_registry_loaded: true
+        '503':
+          description: Process is not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessStatus'
+              example:
+                ready: false
+                message: "EventBus connection in progress"
+                details:
+                  eventbus_connected: false
+                  datastore_initialized: true
+                  task_registry_loaded: true
+
+  /health/live:
+    get:
+      summary: Liveness check endpoint
+      description: |
+        프로세스가 살아있는지 확인합니다.
+
+        - ALIVE: 프로세스 실행 중
+        - DEAD: 프로세스 응답 없음 (타임아웃)
+
+        Kubernetes livenessProbe에서 사용됩니다.
+        이 엔드포인트가 실패하면 컨테이너가 재시작됩니다.
+      operationId: getLiveness
+      tags:
+        - health
+      responses:
+        '200':
+          description: Process is alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LivenessStatus'
+              example:
+                alive: true
+                uptime_seconds: 3600
+                last_activity: "2025-11-21T10:30:45.000Z"
+
+  /health/details:
+    get:
+      summary: Detailed health information
+      description: |
+        프로세스의 상세한 건강 상태 정보를 반환합니다.
+
+        CPU affinity, NUMA binding, RT 성능 메트릭 등을 포함합니다.
+        디버깅 및 모니터링 대시보드에서 사용됩니다.
+      operationId: getHealthDetails
+      tags:
+        - health
+      responses:
+        '200':
+          description: Detailed health information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthDetails'
+              example:
+                process_info:
+                  name: rt_process
+                  pid: 12345
+                  start_time: "2025-11-21T09:00:00.000Z"
+                  uptime_seconds: 5445
+                cpu_affinity:
+                  configured_cores: [2, 3]
+                  current_core: 2
+                  isolation_mode: HYBRID
+                numa_binding:
+                  numa_node: 0
+                  memory_policy: LOCAL
+                  local_memory_percent: 96.5
+                rt_performance:
+                  cycle_count: 10000
+                  deadline_miss_count: 5
+                  deadline_miss_rate: 0.0005
+                  avg_cycle_time_us: 850.5
+                  max_cycle_time_us: 1200.0
+                  jitter_us: 8.5
+                failover:
+                  restart_count: 0
+                  last_checkpoint: "2025-11-21T10:20:00.000Z"
+                  checkpoint_age_seconds: 645
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      description: 프로세스 건강 상태
+      required:
+        - status
+        - process_name
+        - pid
+        - last_heartbeat
+        - response_time_ms
+        - cpu_usage_percent
+        - memory_usage_mb
+        - deadline_miss_count
+        - restart_count
+      properties:
+        status:
+          type: string
+          enum: [HEALTHY, DEGRADED, UNHEALTHY, STARTING, STOPPING, STOPPED]
+          description: 건강 상태
+        process_name:
+          type: string
+          description: 프로세스 이름
+        pid:
+          type: integer
+          description: 프로세스 ID
+        last_heartbeat:
+          type: string
+          format: date-time
+          description: 마지막 heartbeat 시각 (ISO 8601)
+        response_time_ms:
+          type: number
+          format: double
+          description: Health check 응답 시간 (ms)
+        cpu_usage_percent:
+          type: number
+          format: double
+          minimum: 0.0
+          maximum: 100.0
+          description: CPU 사용률 (%)
+        memory_usage_mb:
+          type: integer
+          description: 메모리 사용량 (MB)
+        deadline_miss_count:
+          type: integer
+          description: RT deadline miss 횟수 (누적)
+        restart_count:
+          type: integer
+          description: 재시작 횟수 (누적)
+        error_message:
+          type: string
+          description: 오류 메시지 (UNHEALTHY 상태 시)
+
+    ReadinessStatus:
+      type: object
+      description: 프로세스 준비 상태
+      required:
+        - ready
+        - message
+      properties:
+        ready:
+          type: boolean
+          description: 요청 처리 준비 여부
+        message:
+          type: string
+          description: 준비 상태 메시지
+        details:
+          type: object
+          description: 세부 준비 상태
+          additionalProperties:
+            type: boolean
+
+    LivenessStatus:
+      type: object
+      description: 프로세스 생존 상태
+      required:
+        - alive
+        - uptime_seconds
+      properties:
+        alive:
+          type: boolean
+          description: 프로세스 생존 여부
+        uptime_seconds:
+          type: integer
+          description: 프로세스 실행 시간 (초)
+        last_activity:
+          type: string
+          format: date-time
+          description: 마지막 활동 시각 (ISO 8601)
+
+    HealthDetails:
+      type: object
+      description: 상세 건강 상태 정보
+      required:
+        - process_info
+        - cpu_affinity
+        - numa_binding
+        - rt_performance
+        - failover
+      properties:
+        process_info:
+          $ref: '#/components/schemas/ProcessInfo'
+        cpu_affinity:
+          $ref: '#/components/schemas/CPUAffinityInfo'
+        numa_binding:
+          $ref: '#/components/schemas/NUMABindingInfo'
+        rt_performance:
+          $ref: '#/components/schemas/RTPerformanceInfo'
+        failover:
+          $ref: '#/components/schemas/FailoverInfo'
+
+    ProcessInfo:
+      type: object
+      required:
+        - name
+        - pid
+        - start_time
+        - uptime_seconds
+      properties:
+        name:
+          type: string
+        pid:
+          type: integer
+        start_time:
+          type: string
+          format: date-time
+        uptime_seconds:
+          type: integer
+
+    CPUAffinityInfo:
+      type: object
+      required:
+        - configured_cores
+        - current_core
+        - isolation_mode
+      properties:
+        configured_cores:
+          type: array
+          items:
+            type: integer
+          description: 설정된 CPU 코어 목록
+        current_core:
+          type: integer
+          description: 현재 실행 중인 CPU 코어
+        isolation_mode:
+          type: string
+          enum: [NONE, ISOLCPUS, CGROUPS, HYBRID]
+
+    NUMABindingInfo:
+      type: object
+      required:
+        - numa_node
+        - memory_policy
+        - local_memory_percent
+      properties:
+        numa_node:
+          type: integer
+          description: 바인딩된 NUMA 노드
+        memory_policy:
+          type: string
+          enum: [LOCAL, PREFERRED, INTERLEAVE, BIND]
+        local_memory_percent:
+          type: number
+          format: double
+          description: Local NUMA 메모리 접근 비율 (%)
+
+    RTPerformanceInfo:
+      type: object
+      required:
+        - cycle_count
+        - deadline_miss_count
+        - deadline_miss_rate
+        - avg_cycle_time_us
+        - max_cycle_time_us
+        - jitter_us
+      properties:
+        cycle_count:
+          type: integer
+          description: 총 RT cycle 수
+        deadline_miss_count:
+          type: integer
+          description: Deadline miss 횟수
+        deadline_miss_rate:
+          type: number
+          format: double
+          description: Deadline miss rate (0.0 ~ 1.0)
+        avg_cycle_time_us:
+          type: number
+          format: double
+          description: 평균 cycle 시간 (μs)
+        max_cycle_time_us:
+          type: number
+          format: double
+          description: 최대 cycle 시간 (μs)
+        jitter_us:
+          type: number
+          format: double
+          description: Cycle time jitter (μs)
+
+    FailoverInfo:
+      type: object
+      required:
+        - restart_count
+        - last_checkpoint
+        - checkpoint_age_seconds
+      properties:
+        restart_count:
+          type: integer
+          description: 재시작 횟수
+        last_checkpoint:
+          type: string
+          format: date-time
+          description: 마지막 checkpoint 시각
+        checkpoint_age_seconds:
+          type: integer
+          description: Checkpoint 경과 시간 (초)
+
+  securitySchemes: {}

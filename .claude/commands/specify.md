@@ -38,7 +38,7 @@ Given that feature description, do this:
    b. Find the highest feature number across all sources for the short-name:
       - Remote branches: `git ls-remote --heads origin | grep -E 'refs/heads/[0-9]+-<short-name>$'`
       - Local branches: `git branch | grep -E '^[* ]*[0-9]+-<short-name>$'`
-      - Specs directories: Check for directories matching `specs/[0-9]+-<short-name>`
+      - Specs directories: Check for directories matching `docs/specs/[0-9]+-<short-name>`
    
    c. Determine the next available number:
       - Extract all numbers from all three sources
@@ -61,7 +61,12 @@ Given that feature description, do this:
 
 3. Load `.specify/templates/spec-template.md` to understand required sections.
 
-4. Follow this execution flow:
+4. **참고 자료**:
+   - 온보딩 자료: `docs/onboarding/` - 프로젝트 구조와 개발 가이드 참조
+   - Constitution: `.specify/memory/constitution.md` - 프로젝트 원칙 및 규칙
+   - 아키텍처: `docs/architecture/` - 시스템 아키텍처 참조
+
+5. Follow this execution flow:
 
     1. Parse user description from Input
        If empty: ERROR "No feature description provided"
@@ -87,9 +92,14 @@ Given that feature description, do this:
     7. Identify Key Entities (if data involved)
     8. Return: SUCCESS (spec ready for planning)
 
-5. Write the specification to SPEC_FILE using the template structure, replacing placeholders with concrete details derived from the feature description (arguments) while preserving section order and headings.
+6. **언어 사용 규칙**:
+   - 모든 문서는 **한글**로 작성합니다
+   - **기술 용어만 영어로 표기**합니다 (예: Task, Action, Sequence, API, JSON 등)
+   - 일반 설명, 요구사항, 시나리오는 모두 한글로 작성합니다
 
-6. **Specification Quality Validation**: After writing the initial spec, validate it against quality criteria:
+7. Write the specification to SPEC_FILE using the template structure, replacing placeholders with concrete details derived from the feature description (arguments) while preserving section order and headings.
+
+8. **Specification Quality Validation**: After writing the initial spec, validate it against quality criteria:
 
    a. **Create Spec Quality Checklist**: Generate a checklist file at `FEATURE_DIR/checklists/requirements.md` using the checklist template structure with these validation items:
 
@@ -181,7 +191,31 @@ Given that feature description, do this:
 
    d. **Update Checklist**: After each validation iteration, update the checklist file with current pass/fail status
 
-7. Report completion with branch name, spec file path, checklist results, and readiness for the next phase (`/speckit.clarify` or `/speckit.plan`).
+9. **진행도 업데이트**:
+
+   a. **Spec 문서 상태 업데이트**:
+   ```markdown
+   **Status**: Draft → Review
+   **Progress**: 1/5 (Spec 작성 완료)
+   **Last Updated**: [현재 날짜]
+   ```
+
+   b. **Agent 파일 업데이트** (`dev/agent/CLAUDE.md`):
+   - **원칙**: 컴팩트하게 유지 (최소 정보 + 링크)
+   - "## 활성 기능" 섹션에 새로운 기능 추가 (최대 5개)
+   - 오래된 항목이 있으면 제거 후 추가
+   - 예시:
+     ```markdown
+     ### [###-feature-name]
+     - **Status**: Review
+     - **Spec**: [docs/specs/###-feature-name/spec.md](링크)
+     - 상세: Spec 문서 참조
+     ```
+   - **주의**: 상세 설명은 포함하지 않고 링크만 제공
+
+10. Report completion with branch name, spec file path, checklist results, and readiness for the next phase (`/speckit.clarify` or `/speckit.plan`).
+
+**참고**: 작성된 Specification은 `docs/specs/[###-feature-name]/spec.md`에 저장됩니다.
 
 **NOTE:** The script creates and checks out the new branch and initializes the spec file before writing.
 

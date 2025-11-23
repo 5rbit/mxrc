@@ -1,0 +1,34 @@
+[Unit]
+Description=MXRC Process Monitor and Health Check Server
+Documentation=https://github.com/your-org/mxrc
+After=network.target
+Before=mxrc-rt.service mxrc-nonrt.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/mxrc-monitor --config /etc/mxrc/monitor.conf
+Restart=always
+RestartSec=10s
+TimeoutStartSec=30s
+TimeoutStopSec=30s
+
+# CPU affinity for non-RT cores
+CPUAffinity=0 1
+
+# User and group
+User=mxrc
+Group=mxrc
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/mxrc /var/log/mxrc /tmp/mxrc
+
+# Environment
+Environment="HEALTH_CHECK_PORT=8081"
+Environment="METRICS_PORT=9090"
+
+[Install]
+WantedBy=multi-user.target

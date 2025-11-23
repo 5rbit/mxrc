@@ -1,0 +1,129 @@
+# EtherCAT Master Configuration
+# Feature: 001-ethercat-integration
+# This is a sample configuration file for EtherCAT slaves
+
+master:
+  index: 0                    # Master number (use 0 for single master)
+  cycle_time_ns: 10000000     # 10ms (10,000,000 ns) - RT minor cycle
+  priority: 99                # RT priority (SCHED_FIFO)
+  cpu_affinity: 1             # CPU core for RT thread (1 = isolated core)
+
+# EtherCAT Slave Devices
+slaves:
+  # Example 1: Position Encoder (Beckhoff EL5101)
+  - alias: 0
+    position: 0
+    vendor_id: 0x00000002     # Beckhoff
+    product_code: 0x044c2c52  # EL5101 (Incremental encoder)
+    device_name: "Joint1_Encoder"
+    device_type: SENSOR
+    pdo_mappings:
+      - direction: INPUT
+        index: 0x1A00
+        subindex: 0x01
+        data_type: INT32
+        offset: 0
+        description: "Position value (encoder counts)"
+      - direction: INPUT
+        index: 0x1A00
+        subindex: 0x02
+        data_type: INT32
+        offset: 4
+        description: "Velocity value (counts/sec)"
+
+  # Example 2: Servo Driver (Kollmorgen AKD)
+  - alias: 1
+    position: 1
+    vendor_id: 0x000000ab     # Kollmorgen
+    product_code: 0x00000028  # AKD (example product code)
+    device_name: "Joint1_ServoDriver"
+    device_type: MOTOR
+    pdo_mappings:
+      - direction: OUTPUT
+        index: 0x1600
+        subindex: 0x01
+        data_type: INT32
+        offset: 0
+        description: "Target position (counts)"
+      - direction: OUTPUT
+        index: 0x1600
+        subindex: 0x02
+        data_type: UINT16
+        offset: 4
+        description: "Control word"
+      - direction: INPUT
+        index: 0x1A00
+        subindex: 0x01
+        data_type: INT32
+        offset: 0
+        description: "Actual position (counts)"
+      - direction: INPUT
+        index: 0x1A00
+        subindex: 0x02
+        data_type: UINT16
+        offset: 4
+        description: "Status word"
+
+  # Example 3: 4-channel Analog Input (Beckhoff EL3104)
+  - alias: 2
+    position: 2
+    vendor_id: 0x00000002     # Beckhoff
+    product_code: 0x0c1e3052  # EL3104 (4-channel analog input)
+    device_name: "Analog_Inputs"
+    device_type: IO_MODULE
+    pdo_mappings:
+      - direction: INPUT
+        index: 0x1A00
+        subindex: 0x01
+        data_type: INT16
+        offset: 0
+        description: "AI Channel 1"
+      - direction: INPUT
+        index: 0x1A01
+        subindex: 0x01
+        data_type: INT16
+        offset: 2
+        description: "AI Channel 2"
+      - direction: INPUT
+        index: 0x1A02
+        subindex: 0x01
+        data_type: INT16
+        offset: 4
+        description: "AI Channel 3"
+      - direction: INPUT
+        index: 0x1A03
+        subindex: 0x01
+        data_type: INT16
+        offset: 6
+        description: "AI Channel 4"
+
+  # Example 4: Digital I/O Module (Beckhoff EL1809/EL2809)
+  - alias: 3
+    position: 3
+    vendor_id: 0x00000002     # Beckhoff
+    product_code: 0x07113052  # EL1809 (16-channel digital input)
+    device_name: "Digital_Inputs"
+    device_type: IO_MODULE
+    pdo_mappings:
+      - direction: INPUT
+        index: 0x1A00
+        subindex: 0x01
+        data_type: UINT16
+        offset: 0
+        description: "16 digital inputs (bitmask)"
+
+# Distributed Clock (DC) Configuration (Optional - P3)
+# Uncomment to enable DC synchronization
+# dc_config:
+#   enable: true
+#   reference_slave: 0          # Reference clock slave (usually first device)
+#   sync0_cycle_time: 10000000  # SYNC0 period (10ms, same as RT cycle)
+#   sync0_shift_time: 0         # SYNC0 shift (nanoseconds)
+#   sync1_cycle_time: 0         # SYNC1 period (0 = disabled)
+
+# Notes:
+# - vendor_id and product_code: Check with 'sudo ethercat slaves' command
+# - PDO index/subindex: Check with 'sudo ethercat pdos' command
+# - data_type: INT8, UINT8, INT16, UINT16, INT32, UINT32, FLOAT, DOUBLE
+# - offset: Byte offset in PDO domain (must be 4-byte aligned)
+# - direction: INPUT (read from slave) or OUTPUT (write to slave)

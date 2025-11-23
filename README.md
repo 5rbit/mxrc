@@ -23,6 +23,40 @@ MXRC는 어떤 로봇도 제어할 수 있는 범용 로봇 제어 컨트롤러�
   - TBB (Intel Threading Building Blocks)
   - nlohmann_json >= 3.11.0 (JSON 처리)
 
+### 선택적 의존성 (Feature별)
+
+#### EtherCAT 센서/모터 데이터 수신 (Feature 001)
+
+- **IgH EtherCAT Master** 1.5.2+ (kernel module)
+- **yaml-cpp** 0.7.0+ (YAML 설정 파싱)
+
+```bash
+# yaml-cpp 설치
+sudo apt install libyaml-cpp-dev
+
+# IgH EtherCAT Master 설치
+cd /opt
+sudo git clone https://gitlab.com/etherlab.org/ethercat.git
+cd ethercat
+sudo ./bootstrap
+sudo ./configure --prefix=/usr/local --disable-8139too --disable-eoe
+sudo make
+sudo make install
+
+# Kernel 모듈 로드
+sudo modprobe ec_master
+sudo modprobe ec_generic
+
+# 영구 설정 (재부팅 후에도 유지)
+echo "ec_master" | sudo tee -a /etc/modules
+echo "ec_generic" | sudo tee -a /etc/modules
+
+# EtherCAT master 네트워크 인터페이스 설정
+# /etc/ethercat.conf 파일에서 MASTER0_DEVICE 설정
+```
+
+**참고**: EtherCAT 없이도 빌드 가능합니다. EtherCAT 미설치 시 해당 기능만 비활성화됩니다.
+
 ### 빌드 방법
 
 ```bash

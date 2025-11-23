@@ -1,0 +1,59 @@
+{
+  "comment": "RT Executive 스케줄 설정 파일",
+  "description": "주기 기반 실시간 태스크 스케줄링 구성",
+  "periods_ms": [1, 5, 10, 20, 50, 100],
+  "actions": [
+    {
+      "name": "sensor_read",
+      "period_ms": 1,
+      "wcet_us": 50,
+      "priority": "HIGH",
+      "description": "센서 데이터 읽기 (1ms 주기)"
+    },
+    {
+      "name": "motor_control",
+      "period_ms": 1,
+      "wcet_us": 80,
+      "priority": "HIGH",
+      "description": "모터 제어 루프 (1ms 주기)"
+    },
+    {
+      "name": "sync_to_nonrt",
+      "period_ms": 10,
+      "wcet_us": 100,
+      "priority": "MEDIUM",
+      "description": "RT → Non-RT 데이터 동기화 (10ms 주기)"
+    },
+    {
+      "name": "sync_from_nonrt",
+      "period_ms": 100,
+      "wcet_us": 150,
+      "priority": "MEDIUM",
+      "description": "Non-RT → RT 파라미터 반영 (100ms 주기)"
+    },
+    {
+      "name": "heartbeat_check",
+      "period_ms": 100,
+      "wcet_us": 20,
+      "priority": "MEDIUM",
+      "description": "Non-RT Heartbeat 모니터링 (100ms 주기)"
+    },
+    {
+      "name": "state_machine_tick",
+      "period_ms": 5,
+      "wcet_us": 30,
+      "priority": "HIGH",
+      "description": "상태 머신 사이클 틱 (5ms 주기)"
+    }
+  ],
+  "examples": {
+    "manipulator": {
+      "periods_ms": [1, 5, 10, 20],
+      "comment": "매니퓰레이터용 고속 제어 설정"
+    },
+    "mobile_robot": {
+      "periods_ms": [5, 20, 100],
+      "comment": "이동 로봇용 저속 제어 설정"
+    }
+  }
+}

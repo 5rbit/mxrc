@@ -22,9 +22,18 @@ SequenceEngine::SequenceEngine(
 
 template<typename EventType>
 void SequenceEngine::publishEvent(std::shared_ptr<EventType> event) {
-    if (eventBus_ && event) {
-        eventBus_->publish(event);
+    if (!eventBus_) {
+        spdlog::error("[SequenceEngine] publishEvent called but eventBus_ is null!");
+        return;
     }
+    if (!event) {
+        spdlog::error("[SequenceEngine] publishEvent called but event is null!");
+        return;
+    }
+    spdlog::debug("[SequenceEngine] Publishing event: type={}, id={}",
+                  event->getTypeName(), event->getEventId());
+    eventBus_->publish(event);
+    spdlog::debug("[SequenceEngine] Event published successfully");
 }
 
 SequenceEngine::~SequenceEngine() {
@@ -506,5 +515,20 @@ int SequenceEngine::clearCompletedSequences() {
     }
     return count;
 }
+
+// Explicit template instantiations for publishEvent()
+// Required because template definition is in .cpp file
+template void SequenceEngine::publishEvent<mxrc::core::event::SequenceStartedEvent>(
+    std::shared_ptr<mxrc::core::event::SequenceStartedEvent> event);
+template void SequenceEngine::publishEvent<mxrc::core::event::SequenceCompletedEvent>(
+    std::shared_ptr<mxrc::core::event::SequenceCompletedEvent> event);
+template void SequenceEngine::publishEvent<mxrc::core::event::SequenceFailedEvent>(
+    std::shared_ptr<mxrc::core::event::SequenceFailedEvent> event);
+template void SequenceEngine::publishEvent<mxrc::core::event::SequenceCancelledEvent>(
+    std::shared_ptr<mxrc::core::event::SequenceCancelledEvent> event);
+template void SequenceEngine::publishEvent<mxrc::core::event::SequenceStepStartedEvent>(
+    std::shared_ptr<mxrc::core::event::SequenceStepStartedEvent> event);
+template void SequenceEngine::publishEvent<mxrc::core::event::SequenceStepCompletedEvent>(
+    std::shared_ptr<mxrc::core::event::SequenceStepCompletedEvent> event);
 
 } // namespace mxrc::core::sequence

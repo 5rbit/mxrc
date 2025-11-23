@@ -1,0 +1,68 @@
+[Unit]
+Description=MXRC Real-Time Process
+Documentation=https://github.com/your-org/mxrc
+After=network.target
+Before=mxrc-nonrt.service
+Wants=mxrc-nonrt.service
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/mxrc-rt
+
+# journald 구조화 로깅 (User Story 6)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mxrc-rt
+
+# Watchdog configuration (User Story 2)
+WatchdogSec=30s
+Restart=on-failure
+RestartSec=5s
+StartLimitBurst=5
+StartLimitIntervalSec=60s
+
+# Service timeouts
+TimeoutStartSec=30s
+TimeoutStopSec=30s
+
+# Real-time scheduling (User Story 1)
+CPUSchedulingPolicy=fifo
+CPUSchedulingPriority=80
+
+# CPU affinity for RT cores (cores 2-3)
+CPUAffinity=2 3
+
+# Memory locking for RT performance
+LimitMEMLOCK=infinity
+
+# Resource limits (User Story 3)
+CPUQuota=200%
+MemoryMax=2G
+IOWeight=500
+
+# Resource accounting (User Story 5: Prometheus metrics)
+CPUAccounting=true
+MemoryAccounting=true
+IOAccounting=true
+
+# NUMA policy
+NUMAPolicy=bind
+NUMAMask=0
+
+# User and group
+User=mxrc
+Group=mxrc
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/mxrc /var/log/mxrc /tmp/mxrc
+
+# Capabilities
+AmbientCapabilities=CAP_SYS_NICE CAP_IPC_LOCK
+CapabilityBoundingSet=CAP_SYS_NICE CAP_IPC_LOCK
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "NUMA Binding Configuration for RT Process",
+  "version": "1.0.0",
+
+  "process_name": "mxrc_rt",
+
+  "numa_binding": {
+    "enabled": true,
+    "numa_node": 0,
+    "comment": "Bind RT process memory to NUMA node 0 for memory locality. CPU cores specified in cpu_affinity.json should be on the same NUMA node."
+  },
+
+  "memory_policy": {
+    "policy": "BIND",
+    "strict": true,
+    "comment": "BIND: Allocate memory only from specified NUMA node. PREFERRED: Prefer specified node but allow fallback. INTERLEAVE: Distribute across multiple nodes."
+  },
+
+  "memory_allocation": {
+    "prefault_pages": true,
+    "prefault_size_mb": 100,
+    "comment": "Pre-fault memory pages during initialization to avoid page faults during RT execution."
+  },
+
+  "verification": {
+    "verify_numa_available": true,
+    "verify_node_exists": true,
+    "verify_binding": true,
+    "min_local_access_percent": 95.0,
+    "comment": "Verify NUMA is available and binding is successful. min_local_access_percent is the target for local NUMA access (SC-003)."
+  },
+
+  "monitoring": {
+    "enable_numa_stats": true,
+    "stats_update_interval_ms": 1000,
+    "comment": "Collect NUMA memory statistics from /proc/[pid]/numa_maps every stats_update_interval_ms."
+  },
+
+  "fallback": {
+    "allow_non_numa": true,
+    "default_policy": "DEFAULT",
+    "comment": "Fallback settings if NUMA is not available. Set allow_non_numa=true for testing on non-NUMA systems."
+  }
+}

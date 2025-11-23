@@ -1,0 +1,177 @@
+groups:
+  - name: mxrc_rt_alerts
+    interval: 10s
+    rules:
+      # RT 프로세스 다운
+      - alert: RTProcessDown
+        expr: up{job="mxrc-rt"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          component: rt
+        annotations:
+          summary: "RT process is down"
+          description: "RT process has been down for more than 30 seconds"
+
+      # RT SAFE_MODE 진입
+      - alert: RTSafeModeEntered
+        expr: rt_state == 3
+        for: 1m
+        labels:
+          severity: warning
+          component: rt
+        annotations:
+          summary: "RT entered SAFE_MODE"
+          description: "RT process is in SAFE_MODE state, Non-RT heartbeat may be lost"
+
+      # Deadline miss 비율 높음
+      - alert: RTHighDeadlineMissRate
+        expr: rate(rt_deadline_misses_total[1m]) > 0.01
+        for: 2m
+        labels:
+          severity: warning
+          component: rt
+        annotations:
+          summary: "High RT deadline miss rate"
+          description: "RT deadline miss rate is {{ $value | humanize }} misses/sec"
+
+      # Cycle 실행 시간 초과
+      - alert: RTCycleDurationHigh
+        expr: |
+          (rate(rt_cycle_duration_seconds_sum{type="minor"}[1m]) /
+           rate(rt_cycle_duration_seconds_count{type="minor"}[1m])) > 0.0015
+        for: 5m
+        labels:
+          severity: warning
+          component: rt
+        annotations:
+          summary: "RT minor cycle duration is high"
+          description: "RT minor cycle duration is {{ $value | humanizeDuration }}, exceeding 1.5ms threshold"
+
+      # Non-RT heartbeat 끊김
+      - alert: NonRTHeartbeatLost
+        expr: rt_nonrt_heartbeat_alive == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: rt
+        annotations:
+          summary: "Non-RT heartbeat lost"
+          description: "RT cannot detect Non-RT heartbeat for more than 1 minute"
+
+  - name: mxrc_nonrt_alerts
+    interval: 10s
+    rules:
+      # Non-RT 프로세스 다운
+      - alert: NonRTProcessDown
+        expr: up{job="mxrc-nonrt"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          component: nonrt
+        annotations:
+          summary: "Non-RT process is down"
+          description: "Non-RT process has been down for more than 30 seconds"
+
+      # Task 실패율 높음
+      - alert: NonRTHighTaskFailureRate
+        expr: |
+          (rate(nonrt_tasks_total{status="failed"}[5m]) /
+           rate(nonrt_tasks_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: nonrt
+        annotations:
+          summary: "High Non-RT task failure rate"
+          description: "Non-RT task failure rate is {{ $value | humanizePercentage }}"
+
+      # Task 실행 시간 높음
+      - alert: NonRTTaskDurationHigh
+        expr: |
+          (rate(nonrt_task_duration_seconds_sum[1m]) /
+           rate(nonrt_task_duration_seconds_count[1m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          component: nonrt
+        annotations:
+          summary: "Non-RT task duration is high"
+          description: "Non-RT average task duration is {{ $value | humanizeDuration }}"
+
+  - name: mxrc_eventbus_alerts
+    interval: 10s
+    rules:
+      # EventBus 큐 가득 참
+      - alert: EventBusQueueNearFull
+        expr: eventbus_queue_size > 8000
+        for: 1m
+        labels:
+          severity: warning
+          component: eventbus
+        annotations:
+          summary: "EventBus queue is nearly full"
+          description: "EventBus queue size is {{ $value }} (80% of 10000 capacity) for {{$labels.process}} process"
+
+      # EventBus 이벤트 드롭
+      - alert: EventBusEventsDropped
+        expr: rate(eventbus_dropped_total[1m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: eventbus
+        annotations:
+          summary: "EventBus is dropping events"
+          description: "EventBus is dropping {{ $value }} events/sec for {{$labels.process}} process"
+
+      # EventBus 처리 지연
+      - alert: EventBusProcessingDelayed
+        expr: |
+          (rate(eventbus_published_total[1m]) -
+           rate(eventbus_processed_total[1m])) > 100
+        for: 2m
+        labels:
+          severity: warning
+          component: eventbus
+        annotations:
+          summary: "EventBus processing is delayed"
+          description: "EventBus has {{ $value }} events/sec backlog for {{$labels.process}} process"
+
+  - name: mxrc_datastore_alerts
+    interval: 10s
+    rules:
+      # DataStore Seqlock 재시도 높음
+      - alert: DataStoreHighSeqlockRetries
+        expr: rate(rt_datastore_seqlock_retries_total[1m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: datastore
+        annotations:
+          summary: "High DataStore Seqlock retry rate"
+          description: "DataStore Seqlock retry rate is {{ $value }} retries/sec for key {{$labels.key}}"
+
+  - name: mxrc_system_alerts
+    interval: 10s
+    rules:
+      # CPU 사용률 높음
+      - alert: HighCPUUsage
+        expr: process_cpu_usage_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage"
+          description: "Process {{$labels.process}} CPU usage is {{ $value }}%"
+
+      # 메모리 사용량 높음
+      - alert: HighMemoryUsage
+        expr: process_memory_rss_bytes > 500000000
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage"
+          description: "Process {{$labels.process}} memory usage is {{ $value | humanize1024 }}B"

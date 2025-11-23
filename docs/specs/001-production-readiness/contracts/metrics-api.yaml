@@ -1,0 +1,162 @@
+openapi: 3.0.3
+info:
+  title: MXRC Metrics API
+  description: |
+    Prometheus metrics API for MXRC production readiness.
+    Extends existing MetricsServer with performance optimization, high availability,
+    structured logging, and distributed tracing metrics.
+
+    이 API는 Prometheus가 주기적으로 호출하여 메트릭을 수집합니다.
+    Grafana 대시보드에서 시각화됩니다.
+  version: 1.0.0
+  contact:
+    name: MXRC Team
+
+servers:
+  - url: http://localhost:9090
+    description: RT Process Metrics (production)
+  - url: http://localhost:9091
+    description: Non-RT Process Metrics (production)
+
+tags:
+  - name: metrics
+    description: Prometheus metrics endpoint
+
+paths:
+  /metrics:
+    get:
+      summary: Prometheus metrics endpoint
+      description: |
+        Prometheus 형식의 메트릭을 반환합니다.
+
+        이 엔드포인트는 Prometheus가 주기적으로 scrape합니다.
+        메트릭은 다음 카테고리로 분류됩니다:
+        - CPU Affinity & NUMA Optimization
+        - RT Performance
+        - High Availability & Failover
+        - Structured Logging
+        - Distributed Tracing
+      operationId: getMetrics
+      tags:
+        - metrics
+      responses:
+        '200':
+          description: Prometheus metrics in text format
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |
+                # HELP mxrc_cpu_affinity_info CPU affinity configuration
+                # TYPE mxrc_cpu_affinity_info gauge
+                mxrc_cpu_affinity_info{process="rt_process",configured_cores="2,3",isolation_mode="HYBRID"} 1
+
+                # HELP mxrc_cpu_current_core Current CPU core the process is running on
+                # TYPE mxrc_cpu_current_core gauge
+                mxrc_cpu_current_core{process="rt_process"} 2
+
+                # HELP mxrc_numa_node NUMA node the process is bound to
+                # TYPE mxrc_numa_node gauge
+                mxrc_numa_node{process="rt_process"} 0
+
+                # HELP mxrc_numa_local_memory_percent Percentage of local NUMA memory access
+                # TYPE mxrc_numa_local_memory_percent gauge
+                mxrc_numa_local_memory_percent{process="rt_process",numa_node="0"} 96.5
+
+                # HELP mxrc_rt_cycle_count_total Total number of RT cycles executed
+                # TYPE mxrc_rt_cycle_count_total counter
+                mxrc_rt_cycle_count_total{process="rt_process"} 10000
+
+                # HELP mxrc_rt_deadline_miss_count_total Total number of deadline misses
+                # TYPE mxrc_rt_deadline_miss_count_total counter
+                mxrc_rt_deadline_miss_count_total{process="rt_process"} 5
+
+                # HELP mxrc_rt_deadline_miss_rate Deadline miss rate (0.0 to 1.0)
+                # TYPE mxrc_rt_deadline_miss_rate gauge
+                mxrc_rt_deadline_miss_rate{process="rt_process"} 0.0005
+
+                # HELP mxrc_rt_cycle_time_us RT cycle time in microseconds
+                # TYPE mxrc_rt_cycle_time_us histogram
+                mxrc_rt_cycle_time_us_bucket{process="rt_process",le="500"} 2000
+                mxrc_rt_cycle_time_us_bucket{process="rt_process",le="1000"} 7500
+                mxrc_rt_cycle_time_us_bucket{process="rt_process",le="1500"} 9800
+                mxrc_rt_cycle_time_us_bucket{process="rt_process",le="+Inf"} 10000
+                mxrc_rt_cycle_time_us_sum{process="rt_process"} 8505000
+                mxrc_rt_cycle_time_us_count{process="rt_process"} 10000
+
+                # HELP mxrc_rt_jitter_us RT cycle time jitter in microseconds
+                # TYPE mxrc_rt_jitter_us gauge
+                mxrc_rt_jitter_us{process="rt_process"} 8.5
+
+                # HELP mxrc_process_health_status Process health status (0=STOPPED, 1=STARTING, 2=HEALTHY, 3=DEGRADED, 4=UNHEALTHY, 5=STOPPING)
+                # TYPE mxrc_process_health_status gauge
+                mxrc_process_health_status{process="rt_process"} 2
+
+                # HELP mxrc_process_restart_count_total Total number of process restarts
+                # TYPE mxrc_process_restart_count_total counter
+                mxrc_process_restart_count_total{process="rt_process"} 0
+
+                # HELP mxrc_failover_checkpoint_age_seconds Age of the last checkpoint in seconds
+                # TYPE mxrc_failover_checkpoint_age_seconds gauge
+                mxrc_failover_checkpoint_age_seconds{process="rt_process"} 645
+
+                # HELP mxrc_failover_checkpoint_size_bytes Size of the last checkpoint in bytes
+                # TYPE mxrc_failover_checkpoint_size_bytes gauge
+                mxrc_failover_checkpoint_size_bytes{process="rt_process"} 4096
+
+                # HELP mxrc_logging_events_total Total number of log events by level
+                # TYPE mxrc_logging_events_total counter
+                mxrc_logging_events_total{process="rt_process",level="trace"} 5000
+                mxrc_logging_events_total{process="rt_process",level="debug"} 2000
+                mxrc_logging_events_total{process="rt_process",level="info"} 1000
+                mxrc_logging_events_total{process="rt_process",level="warn"} 50
+                mxrc_logging_events_total{process="rt_process",level="error"} 5
+                mxrc_logging_events_total{process="rt_process",level="critical"} 0
+
+                # HELP mxrc_logging_latency_us Logging latency in microseconds
+                # TYPE mxrc_logging_latency_us histogram
+                mxrc_logging_latency_us_bucket{process="rt_process",le="0.1"} 4500
+                mxrc_logging_latency_us_bucket{process="rt_process",le="1"} 6800
+                mxrc_logging_latency_us_bucket{process="rt_process",le="10"} 6990
+                mxrc_logging_latency_us_bucket{process="rt_process",le="+Inf"} 7000
+                mxrc_logging_latency_us_sum{process="rt_process"} 777
+                mxrc_logging_latency_us_count{process="rt_process"} 7000
+
+                # HELP mxrc_tracing_spans_total Total number of spans created
+                # TYPE mxrc_tracing_spans_total counter
+                mxrc_tracing_spans_total{process="rt_process",operation="task.execute"} 1000
+                mxrc_tracing_spans_total{process="rt_process",operation="eventbus.publish"} 5000
+                mxrc_tracing_spans_total{process="rt_process",operation="sequence.run"} 800
+
+                # HELP mxrc_tracing_sampling_rate Tracing sampling rate (0.0 to 1.0)
+                # TYPE mxrc_tracing_sampling_rate gauge
+                mxrc_tracing_sampling_rate{process="rt_process"} 0.1
+
+                # HELP mxrc_tracing_export_latency_ms Tracing export latency in milliseconds
+                # TYPE mxrc_tracing_export_latency_ms histogram
+                mxrc_tracing_export_latency_ms_bucket{process="rt_process",le="10"} 800
+                mxrc_tracing_export_latency_ms_bucket{process="rt_process",le="50"} 950
+                mxrc_tracing_export_latency_ms_bucket{process="rt_process",le="100"} 990
+                mxrc_tracing_export_latency_ms_bucket{process="rt_process",le="+Inf"} 1000
+                mxrc_tracing_export_latency_ms_sum{process="rt_process"} 15000
+                mxrc_tracing_export_latency_ms_count{process="rt_process"} 1000
+
+components:
+  schemas:
+    PrometheusMetrics:
+      type: string
+      description: |
+        Prometheus 텍스트 형식의 메트릭
+
+        형식:
+        # HELP <metric_name> <help_text>
+        # TYPE <metric_name> <metric_type>
+        <metric_name>{<label_name>=<label_value>,...} <metric_value>
+
+        메트릭 타입:
+        - counter: 단조 증가하는 누적 값 (예: 총 요청 수)
+        - gauge: 증가/감소 가능한 값 (예: CPU 사용률)
+        - histogram: 값의 분포 (예: 응답 시간)
+        - summary: 값의 통계 (quantile)
+
+  securitySchemes: {}

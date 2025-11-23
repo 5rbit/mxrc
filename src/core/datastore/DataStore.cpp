@@ -1,5 +1,7 @@
 #include "DataStore.h"
 #include "MapNotifier.h"
+#include "interfaces/IRobotStateAccessor.h"
+#include "interfaces/ITaskStatusAccessor.h"
 #include <mutex>
 #include <stdexcept>
 #include <fstream>
@@ -281,3 +283,84 @@ void DataStore::setAccessPolicy(const std::string& id, const std::string& module
 bool DataStore::hasAccess(const std::string& id, const std::string& module_id) const {
     return access_control_manager_->hasAccess(id, module_id);
 }
+
+// ============================================================================
+// Feature 022: P2 Accessor Pattern - VersionedData Support
+// ============================================================================
+
+template<typename T>
+mxrc::core::datastore::VersionedData<T> DataStore::getVersioned(const std::string& id) {
+    using namespace mxrc::core::datastore;
+
+    // 1. Get data from data_map_
+    typename tbb::concurrent_hash_map<std::string, SharedData>::const_accessor acc;
+    if (!data_map_.find(acc, id)) {
+        throw std::runtime_error("DataStore::getVersioned: Key not found: " + id);
+    }
+
+    const SharedData& data = acc->second;
+    T value = std::any_cast<T>(data.value);
+
+    // 2. Get version from version_map_ (or 0 if not exists)
+    uint64_t version = 0;
+    typename tbb::concurrent_hash_map<std::string, std::atomic<uint64_t>>::const_accessor ver_acc;
+    if (version_map_.find(ver_acc, id)) {
+        version = ver_acc->second.load(std::memory_order_acquire);
+    }
+
+    // 3. Convert timestamp to nanoseconds
+    auto duration = data.timestamp.time_since_epoch();
+    uint64_t timestamp_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
+
+    // 4. Return VersionedData
+    return VersionedData<T>(value, version, timestamp_ns);
+}
+
+template<typename T>
+void DataStore::setVersioned(const std::string& id, const T& value, DataType type) {
+    // 1. Store data in data_map_ (reuse existing set logic)
+    SharedData new_data;
+    new_data.id = id;
+    new_data.type = type;
+    new_data.value = value;
+    new_data.timestamp = std::chrono::system_clock::now();
+    new_data.expiration_time = std::chrono::time_point<std::chrono::system_clock>();
+
+    typename tbb::concurrent_hash_map<std::string, SharedData>::accessor acc;
+    data_map_.insert(acc, id);
+    acc->second = new_data;
+    acc.release();
+
+    // 2. Increment version in version_map_ (atomic)
+    typename tbb::concurrent_hash_map<std::string, std::atomic<uint64_t>>::accessor ver_acc;
+    if (version_map_.insert(ver_acc, id)) {
+        // New entry, initialize to 1
+        ver_acc->second.store(1, std::memory_order_release);
+    } else {
+        // Existing entry, increment
+        ver_acc->second.fetch_add(1, std::memory_order_acq_rel);
+    }
+
+    // 3. Notify subscribers (reuse existing notification logic)
+    notifySubscribers(new_data);
+
+    // 4. Update metrics (TODO: Add recordWrite() to MetricsCollector)
+    // metrics_collector_->recordWrite();
+}
+
+// Template instantiations for common types
+template mxrc::core::datastore::VersionedData<double> DataStore::getVersioned<double>(const std::string&);
+template mxrc::core::datastore::VersionedData<int> DataStore::getVersioned<int>(const std::string&);
+template mxrc::core::datastore::VersionedData<bool> DataStore::getVersioned<bool>(const std::string&);
+template mxrc::core::datastore::VersionedData<std::string> DataStore::getVersioned<std::string>(const std::string&);
+template mxrc::core::datastore::VersionedData<std::vector<double>> DataStore::getVersioned<std::vector<double>>(const std::string&);
+template mxrc::core::datastore::VersionedData<mxrc::core::datastore::Vector3d> DataStore::getVersioned<mxrc::core::datastore::Vector3d>(const std::string&);
+template mxrc::core::datastore::VersionedData<mxrc::core::datastore::TaskState> DataStore::getVersioned<mxrc::core::datastore::TaskState>(const std::string&);
+
+template void DataStore::setVersioned<double>(const std::string&, const double&, DataType);
+template void DataStore::setVersioned<int>(const std::string&, const int&, DataType);
+template void DataStore::setVersioned<bool>(const std::string&, const bool&, DataType);
+template void DataStore::setVersioned<std::string>(const std::string&, const std::string&, DataType);
+template void DataStore::setVersioned<std::vector<double>>(const std::string&, const std::vector<double>&, DataType);
+template void DataStore::setVersioned<mxrc::core::datastore::Vector3d>(const std::string&, const mxrc::core::datastore::Vector3d&, DataType);
+template void DataStore::setVersioned<mxrc::core::datastore::TaskState>(const std::string&, const mxrc::core::datastore::TaskState&, DataType);

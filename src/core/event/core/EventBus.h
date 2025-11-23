@@ -6,43 +6,70 @@
 
 #include "interfaces/IEventBus.h"
 #include "core/SubscriptionManager.h"
-#include "util/LockFreeQueue.h"
+#include "core/PriorityQueue.h"
+#include "core/PrioritizedEvent.h"
 #include "util/EventStats.h"
 #include <memory>
 #include <thread>
 #include <atomic>
 #include <mutex>
+#include <functional>
+#include <vector>
 
 namespace mxrc::core::event {
 
 /**
+ * @brief Event observer interface for tracing
+ *
+ * Production readiness: Observer pattern for distributed tracing.
+ * Observers can monitor event lifecycle (publish, dispatch) without
+ * modifying EventBus core logic.
+ */
+class IEventObserver {
+public:
+    virtual ~IEventObserver() = default;
+
+    /**
+     * @brief Called before event is published
+     *
+     * @param event Event being published
+     */
+    virtual void onBeforePublish(const std::shared_ptr<IEvent>& event) = 0;
+
+    /**
+     * @brief Called after event is published
+     *
+     * @param event Event that was published
+     * @param success Whether publish succeeded
+     */
+    virtual void onAfterPublish(const std::shared_ptr<IEvent>& event, bool success) = 0;
+
+    /**
+     * @brief Called before event is dispatched to subscribers
+     *
+     * @param event Event being dispatched
+     */
+    virtual void onBeforeDispatch(const std::shared_ptr<IEvent>& event) = 0;
+
+    /**
+     * @brief Called after event is dispatched to subscribers
+     *
+     * @param event Event that was dispatched
+     * @param subscriber_count Number of subscribers that received the event
+     */
+    virtual void onAfterDispatch(const std::shared_ptr<IEvent>& event, size_t subscriber_count) = 0;
+};
+
+/**
  * @brief 중앙 이벤트 버스 구현
  *
- * SPSC Lock-Free Queue + Mutex 기반의 비동기 이벤트 처리 시스템입니다.
- * 여러 스레드에서 동시에 publish 가능하며 (mutex로 보호됨),
- * 큐 자체는 lock-free로 동작하여 높은 성능을 제공합니다.
+ * Priority Queue + Mutex 기반의 비동기 이벤트 처리 시스템입니다.
+ * Feature 022 Phase 4: 우선순위 기반 이벤트 처리를 지원합니다.
+ * - CRITICAL 이벤트가 NORMAL/LOW 이벤트보다 먼저 처리됩니다
+ * - Backpressure: 큐가 80% 이상 찰 때 LOW 이벤트부터 drop됩니다
+ * - CRITICAL 이벤트는 절대 drop되지 않습니다
  */
 class EventBus : public IEventBus {
-private:
-    SPSCLockFreeQueue<std::shared_ptr<IEvent>> eventQueue_;  ///< 이벤트 큐 (SPSC)
-    std::mutex publishMutex_;                                 ///< publish 동시성 보호
-    SubscriptionManager subscriptionManager_;                 ///< 구독 관리자
-    EventStats stats_;                                         ///< 통계 정보
-
-    std::thread dispatchThread_;       ///< 이벤트 처리 스레드
-    std::atomic<bool> running_{false}; ///< 실행 상태 플래그
-
-    /**
-     * @brief 이벤트 처리 루프 (dispatch 스레드에서 실행)
-     */
-    void dispatchLoop();
-
-    /**
-     * @brief 구독자에게 이벤트 전달
-     *
-     * @param event 전달할 이벤트
-     */
-    void dispatchToSubscribers(std::shared_ptr<IEvent> event);
 
 public:
     /**
@@ -82,6 +109,66 @@ public:
      * @brief 통계 정보 초기화
      */
     void resetStats() { stats_.reset(); }
+
+    /**
+     * @brief Register event observer for tracing
+     *
+     * Production readiness: Add observer to monitor event lifecycle.
+     *
+     * @param observer Observer to register
+     */
+    void registerObserver(std::shared_ptr<IEventObserver> observer);
+
+    /**
+     * @brief Unregister event observer
+     *
+     * @param observer Observer to unregister
+     */
+    void unregisterObserver(std::shared_ptr<IEventObserver> observer);
+
+private:
+    // Core EventBus members
+    std::unique_ptr<PriorityQueue> eventQueue_;
+    std::mutex publishMutex_;
+    SubscriptionManager subscriptionManager_;
+    EventStats stats_;
+    std::thread dispatchThread_;
+    std::atomic<bool> running_{false};
+    std::atomic<uint64_t> sequenceCounter_{0};  // For FIFO ordering within same priority
+
+    /**
+     * @brief 이벤트 디스패치 루프 (별도 스레드에서 실행)
+     */
+    void dispatchLoop();
+
+    /**
+     * @brief 이벤트를 구독자들에게 전달
+     */
+    void dispatchToSubscribers(std::shared_ptr<IEvent> event);
+
+    // Production readiness: Event observers for tracing
+    std::vector<std::shared_ptr<IEventObserver>> observers_;
+    std::mutex observerMutex_;  // Protects observers_ vector
+
+    /**
+     * @brief Notify all observers before publish
+     */
+    void notifyBeforePublish(const std::shared_ptr<IEvent>& event);
+
+    /**
+     * @brief Notify all observers after publish
+     */
+    void notifyAfterPublish(const std::shared_ptr<IEvent>& event, bool success);
+
+    /**
+     * @brief Notify all observers before dispatch
+     */
+    void notifyBeforeDispatch(const std::shared_ptr<IEvent>& event);
+
+    /**
+     * @brief Notify all observers after dispatch
+     */
+    void notifyAfterDispatch(const std::shared_ptr<IEvent>& event, size_t subscriber_count);
 };
 
 } // namespace mxrc::core::event

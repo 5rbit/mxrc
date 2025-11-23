@@ -1,0 +1,48 @@
+[Unit]
+Description=MXRC Non-RT Executive - Non-Realtime Control Process
+Documentation=https://github.com/your-org/mxrc
+After=network.target mxrc-rt.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/mxrc-nonrt
+
+# journald 구조화 로깅 (User Story 6)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mxrc-nonrt
+
+# Restart policy
+Restart=on-failure
+RestartSec=5s
+
+# Service timeouts
+TimeoutStartSec=30s
+TimeoutStopSec=30s
+
+# CPU affinity for Non-RT cores (cores 0-1)
+CPUAffinity=0 1
+
+# Resource limits (User Story 3)
+CPUQuota=100%
+MemoryMax=1G
+IOWeight=100
+
+# Resource accounting (User Story 5: Prometheus metrics)
+CPUAccounting=true
+MemoryAccounting=true
+IOAccounting=true
+
+# User and group
+User=mxrc
+Group=mxrc
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/mxrc /var/log/mxrc /tmp/mxrc
+
+[Install]
+WantedBy=multi-user.target

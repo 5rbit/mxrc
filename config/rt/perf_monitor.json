@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Performance Monitor Configuration for RT Process",
+  "version": "1.0.0",
+
+  "process_name": "mxrc_rt",
+
+  "cycle_timing": {
+    "cycle_time_us": 1000,
+    "deadline_us": 900,
+    "comment": "RT cycle period is 1000us (1ms). Deadline is 900us (90% of cycle time) to allow margin for jitter."
+  },
+
+  "monitoring": {
+    "enable_histogram": true,
+    "histogram_buckets": 100,
+    "sample_buffer_size": 10000,
+    "comment": "Histogram tracks latency distribution. sample_buffer_size determines window for percentile calculations."
+  },
+
+  "metrics": {
+    "track_min_max": true,
+    "track_percentiles": true,
+    "percentiles": [50, 95, 99],
+    "track_jitter": true,
+    "track_deadline_misses": true,
+    "comment": "Enable various performance metrics. Percentiles are calculated from sample buffer."
+  },
+
+  "thresholds": {
+    "max_deadline_miss_rate_percent": 0.01,
+    "max_jitter_us": 100,
+    "max_p99_latency_us": 950,
+    "comment": "Performance thresholds for alerts. max_deadline_miss_rate_percent corresponds to SC-001 (< 0.01%)."
+  },
+
+  "prometheus": {
+    "enable_export": true,
+    "export_interval_cycles": 1000,
+    "metrics_prefix": "mxrc_rt",
+    "comment": "Export metrics to Prometheus every export_interval_cycles (every 1000 cycles = 1 second at 1ms cycle time)."
+  },
+
+  "tracing": {
+    "enable_tracing": false,
+    "trace_level": "warn",
+    "log_deadline_misses": true,
+    "log_interval_cycles": 10000,
+    "comment": "Enable detailed tracing for debugging. Disabled by default to avoid RT overhead. log_interval_cycles = periodic stats logging."
+  },
+
+  "advanced": {
+    "enable_cycle_guard": true,
+    "enable_warmup_cycles": true,
+    "warmup_cycle_count": 1000,
+    "comment": "CycleGuard provides RAII-based cycle timing. Warmup cycles are excluded from statistics to avoid cold start effects."
+  }
+}

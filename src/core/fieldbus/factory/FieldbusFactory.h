@@ -118,8 +118,10 @@ private:
 
     /**
      * @brief Initialize built-in protocols
+     *
+     * @param registry Protocol registry to initialize
      */
-    static void initializeBuiltInProtocols();
+    static void initializeBuiltInProtocols(std::map<std::string, Creator>& registry);
 };
 
 } // namespace mxrc::core::fieldbus

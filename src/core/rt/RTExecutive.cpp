@@ -9,6 +9,7 @@
 #include "core/rt/perf/NUMABinding.h"
 #include "core/rt/perf/PerfMonitor.h"
 #include "core/rt/RTMetrics.h"
+#include "core/fieldbus/interfaces/IFieldbus.h"
 #include <spdlog/spdlog.h>
 #include <sched.h>
 

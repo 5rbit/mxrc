@@ -266,14 +266,15 @@ FieldbusStatus EtherCATDriver::getStatus() const {
 FieldbusStats EtherCATDriver::getStatistics() const {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    // Update statistics from EtherCAT master
+    // Create local copy of stats and update from EtherCAT master
+    FieldbusStats stats = stats_;
     if (ethercat_master_) {
-        stats_.total_cycles = ethercat_master_->getTotalCycles();
-        stats_.communication_errors = ethercat_master_->getSendErrorCount() +
+        stats.total_cycles = ethercat_master_->getTotalCycles();
+        stats.communication_errors = ethercat_master_->getSendErrorCount() +
                                      ethercat_master_->getReceiveErrorCount();
     }
 
-    return stats_;
+    return stats;
 }
 
 std::string EtherCATDriver::getProtocolName() const {

@@ -710,6 +710,8 @@ add_executable(run_tests
     tests/unit/rt/RTStateMachine_test.cpp
     tests/integration/rt/rt_integration_test.cpp
     tests/core/rt/RTExecutiveEventBusTest.cpp
+    # Fieldbus tests (Feature 019)
+    tests/unit/fieldbus/FieldbusFactory_test.cpp
     tests/unit/monitoring/MetricsCollector_test.cpp
     tests/unit/monitoring/MetricsServer_test.cpp
     tests/unit/monitoring/RTMetrics_test.cpp
@@ -763,6 +765,10 @@ add_executable(run_tests
     # HA classes (Feature 019 - required by NonRTExecutive)
     src/core/ha/HAStateMachine.cpp
     src/core/ha/RecoveryPolicy.cpp
+    # Fieldbus drivers (Feature 019 - for FieldbusFactory test)
+    src/core/fieldbus/factory/FieldbusFactory.cpp
+    src/core/fieldbus/drivers/MockDriver.cpp
+    src/core/fieldbus/drivers/EtherCATDriver.cpp
     # Monitoring
     src/core/monitoring/MetricsCollector.cpp
     src/core/monitoring/MetricsServer.cpp

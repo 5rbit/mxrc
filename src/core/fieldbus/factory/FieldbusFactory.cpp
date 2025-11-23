@@ -5,28 +5,29 @@
 
 namespace mxrc::core::fieldbus {
 
-std::map<std::string, FieldbusFactory::Creator>& FieldbusFactory::getRegistry() {
-    static std::map<std::string, Creator> registry;
-    static bool initialized = false;
+// Static variables for registry
+static std::map<std::string, FieldbusFactory::Creator> s_registry;
+static bool s_initialized = false;
 
-    if (!initialized) {
-        initializeBuiltInProtocols();
-        initialized = true;
+std::map<std::string, FieldbusFactory::Creator>& FieldbusFactory::getRegistry() {
+    if (!s_initialized) {
+        s_initialized = true;  // Set BEFORE calling init to prevent recursion
+        initializeBuiltInProtocols(s_registry);
     }
 
-    return registry;
+    return s_registry;
 }
 
-void FieldbusFactory::initializeBuiltInProtocols() {
+void FieldbusFactory::initializeBuiltInProtocols(std::map<std::string, Creator>& registry) {
     // Register Mock driver (always available for testing)
-    registerProtocol("Mock", [](const FieldbusConfig& config) -> IFieldbusPtr {
+    registry["Mock"] = [](const FieldbusConfig& config) -> IFieldbusPtr {
         return std::make_shared<MockDriver>(config);
-    });
+    };
 
     // Register EtherCAT driver (Feature 019 US4 - T041)
-    registerProtocol("EtherCAT", [](const FieldbusConfig& config) -> IFieldbusPtr {
+    registry["EtherCAT"] = [](const FieldbusConfig& config) -> IFieldbusPtr {
         return std::make_shared<EtherCATDriver>(config);
-    });
+    };
 
     spdlog::info("[FieldbusFactory] Initialized built-in protocols: Mock, EtherCAT");
 }
@@ -121,8 +122,8 @@ bool FieldbusFactory::unregisterProtocol(const std::string& protocol) {
 }
 
 void FieldbusFactory::clearProtocols() {
-    auto& registry = getRegistry();
-    registry.clear();
+    s_registry.clear();
+    s_initialized = false;  // Allow re-initialization
     spdlog::debug("[FieldbusFactory] Cleared all registered protocols");
 }
 

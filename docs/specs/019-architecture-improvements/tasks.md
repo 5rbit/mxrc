@@ -57,7 +57,7 @@
 
 ---
 
-## Phase 3: User Story 1 - IPC 계약 명시화 및 타입 안전성 보장 (Priority: P1) 🎯 MVP
+## Phase 3: User Story 1 - IPC 계약 명시화 및 타입 안전성 보장 (Priority: P1) ✅ 🎯 MVP
 
 **Goal**: DataStore 키와 EventBus 이벤트를 YAML 스키마로 정의하고, 컴파일 타임 타입 안전 코드를 자동 생성하여 런타임 오류를 방지합니다.
 
@@ -68,11 +68,11 @@
 - [X] T011 [P] [US1] IPC 스키마 YAML 파일 작성 in docs/specs/019-architecture-improvements/contracts/ipc-schema.yaml (이미 완료)
 - [X] T012 [US1] 스키마 검증 실행 및 통과 확인 (scripts/codegen/validate_schema.py 실행)
 - [X] T013 [US1] C++ 코드 생성 실행 in build/generated/ipc/ (DataStoreKeys.h, EventBusEvents.h)
-- [ ] T014 [US1] DataStore에 생성된 키 상수 통합 in src/core/datastore/DataStore.h
-- [ ] T015 [US1] EventBus에 생성된 이벤트 타입 통합 in src/core/event/EventBus.h
-- [ ] T016 [P] [US1] 통합 테스트: 스키마 코드 생성 파이프라인 검증 in tests/integration/ipc_schema_integration_test.cpp
-- [ ] T017 [P] [US1] 단위 테스트: 잘못된 키 사용 시 컴파일 에러 검증 in tests/unit/ipc/schema_validation_test.cpp
-- [ ] T018 [US1] 스키마 버전 관리 및 하위 호환성 검증 로직 추가 in scripts/codegen/validate_schema.py
+- [X] T014 [US1] DataStore에 생성된 키 상수 통합 in src/core/datastore/DataStore.h
+- [X] T015 [US1] EventBus에 생성된 이벤트 타입 통합 in src/core/event/EventBus.h
+- [X] T016 [P] [US1] 통합 테스트: 스키마 코드 생성 파이프라인 검증 in tests/integration/ipc_schema_integration_test.cpp
+- [X] T017 [P] [US1] 단위 테스트: 잘못된 키 사용 시 컴파일 에러 검증 in tests/unit/ipc/schema_validation_test.cpp
+- [X] T018 [US1] 스키마 버전 관리 및 하위 호환성 검증 로직 추가 in scripts/codegen/validate_schema.py
 
 **Checkpoint**: User Story 1 완료 - IPC 계약이 명시화되고 타입 안전성이 보장됨
 

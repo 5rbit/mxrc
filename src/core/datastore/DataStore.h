@@ -20,6 +20,9 @@
 #include "managers/LogManager.h"
 #include "core/VersionedData.h"
 
+// Feature 019: IPC Schema - Type-safe key constants (auto-generated)
+#include "ipc/DataStoreKeys.h"
+
 class Observer;
 
 /// @brief 로봇 데이터 타입 분류

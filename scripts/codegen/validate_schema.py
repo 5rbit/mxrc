@@ -42,6 +42,7 @@ class SchemaValidator:
         if not self._load_schema():
             return False
 
+        self._validate_schema_version()
         self._load_custom_types()
         self._validate_datastore_keys()
         self._validate_eventbus_events()
@@ -61,6 +62,36 @@ class SchemaValidator:
         except yaml.YAMLError as e:
             self.errors.append(f"YAML parsing error: {e}")
             return False
+
+    def _validate_schema_version(self):
+        """스키마 버전 검증 및 시맨틱 버저닝 확인"""
+        if 'schema_version' not in self.schema_data:
+            self.errors.append("Missing 'schema_version' field in schema")
+            return
+
+        version_str = self.schema_data['schema_version']
+
+        # 시맨틱 버저닝 형식 검증 (MAJOR.MINOR.PATCH)
+        import re
+        version_pattern = r'^\d+\.\d+\.\d+$'
+        if not re.match(version_pattern, version_str):
+            self.errors.append(
+                f"Invalid schema_version format: '{version_str}' "
+                f"(expected: MAJOR.MINOR.PATCH, e.g., 1.0.0)"
+            )
+            return
+
+        # 버전 파싱
+        major, minor, patch = map(int, version_str.split('.'))
+
+        # 버전 범위 검증 (1.x.x만 지원)
+        if major != 1:
+            self.warnings.append(
+                f"Schema version {version_str} uses MAJOR version {major}. "
+                f"Only version 1.x.x is currently tested."
+            )
+
+        print(f"✓ Schema version: {version_str}")
 
     def _load_custom_types(self):
         """사용자 정의 타입 로드 (types 섹션에서)"""

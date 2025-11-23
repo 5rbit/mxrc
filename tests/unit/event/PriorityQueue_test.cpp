@@ -515,8 +515,17 @@ TEST_F(PriorityQueueTest, TTL_MixedEvents_OnlyExpiredSkipped) {
     auto popped = queue_->pop();
     ASSERT_TRUE(popped.has_value());
     EXPECT_EQ(std::get<int>(popped->payload), 2);
-    EXPECT_EQ(queue_->metrics().events_expired.load(), 2u);
+    // At least 1 expired event should have been skipped before reaching the valid one
+    // (Exact count depends on heap ordering for same-priority events)
+    EXPECT_GE(queue_->metrics().events_expired.load(), 1u);
     EXPECT_EQ(queue_->metrics().events_popped.load(), 1u);
+
+    // Pop remaining events to verify total expired count
+    while (auto remaining = queue_->pop()) {
+        // All remaining events should be expired
+    }
+    EXPECT_EQ(queue_->metrics().events_expired.load(), 2u);  // Total 2 expired
+    EXPECT_EQ(queue_->metrics().events_popped.load(), 1u);    // Only 1 valid popped
 }
 
 // ============================================================================

@@ -7,12 +7,35 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <filesystem>
+#include <spdlog/spdlog.h>
 
 DataStore::DataStore()
     : expiration_manager_(std::make_unique<mxrc::core::datastore::ExpirationManager>()),
       access_control_manager_(std::make_unique<mxrc::core::datastore::AccessControlManager>()),
       metrics_collector_(std::make_unique<mxrc::core::datastore::MetricsCollector>()),
-      log_manager_(std::make_unique<mxrc::core::datastore::LogManager>()) {}
+      log_manager_(std::make_unique<mxrc::core::datastore::LogManager>()),
+      hot_key_cache_(std::make_unique<mxrc::core::datastore::HotKeyCache>(32)),
+      hot_key_config_(std::make_unique<mxrc::core::datastore::HotKeyConfig>())
+{
+    // Feature 019: Load Hot Key configuration from IPC schema
+    namespace fs = std::filesystem;
+    fs::path schema_path = "config/ipc/ipc-schema.yaml";
+
+    if (fs::exists(schema_path)) {
+        if (hot_key_config_->loadFromSchema(schema_path)) {
+            // Register Hot Keys in cache
+            for (const auto& info : hot_key_config_->getHotKeys()) {
+                hot_key_cache_->registerHotKey(info.key_name);
+            }
+            spdlog::info("[DataStore] Hot Key cache initialized with {} keys",
+                        hot_key_config_->getHotKeyCount());
+        } else {
+            spdlog::warn("[DataStore] Failed to load Hot Key configuration");
+        }
+    } else {
+        spdlog::debug("[DataStore] IPC schema not found, Hot Key cache disabled");
+    }
+}
 
 std::shared_ptr<DataStore> DataStore::create() {
     static std::shared_ptr<DataStore> instance = std::make_shared<DataStore>();

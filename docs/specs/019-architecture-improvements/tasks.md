@@ -29,14 +29,14 @@
 
 ---
 
-## Phase 1: Setup (공통 인프라)
+## Phase 1: Setup (공통 인프라) ✅
 
 **목적**: 프로젝트 초기화 및 기본 구조 설정
 
-- [ ] T001 CMake 빌드 시스템에 새 의존성 추가 (Folly, yaml-cpp, prometheus-cpp) in CMakeLists.txt
-- [ ] T002 [P] 코드 생성 스크립트 디렉토리 생성 in scripts/codegen/
-- [ ] T003 [P] 설정 파일 디렉토리 생성 in config/ipc/, config/grafana/
-- [ ] T004 [P] 생성된 코드 출력 디렉토리 CMake 설정 in CMakeLists.txt (build/generated/)
+- [X] T001 CMake 빌드 시스템에 새 의존성 추가 (Folly, yaml-cpp, prometheus-cpp) in CMakeLists.txt
+- [X] T002 [P] 코드 생성 스크립트 디렉토리 생성 in scripts/codegen/
+- [X] T003 [P] 설정 파일 디렉토리 생성 in config/ipc/, config/grafana/
+- [X] T004 [P] 생성된 코드 출력 디렉토리 CMake 설정 in CMakeLists.txt (build/generated/)
 
 ---
 

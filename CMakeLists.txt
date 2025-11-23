@@ -39,12 +39,36 @@ else()
     message(WARNING "Install with: https://gitlab.com/etherlab.org/ethercat")
 endif()
 
-# yaml-cpp for YAML configuration parsing
+# yaml-cpp for YAML configuration parsing (Feature 019: IPC Schema)
 find_package(yaml-cpp QUIET)
 if(yaml-cpp_FOUND)
     message(STATUS "yaml-cpp found")
 else()
     message(WARNING "yaml-cpp not found. Install with: sudo apt install libyaml-cpp-dev")
+endif()
+
+# Folly for AtomicHashMap (Feature 019: Hot Key Optimization)
+find_package(folly QUIET)
+if(folly_FOUND)
+    message(STATUS "Folly found")
+else()
+    message(WARNING "Folly not found. Install with: sudo apt install libfolly-dev")
+endif()
+
+# prometheus-cpp for Metrics (Feature 019: Monitoring)
+find_package(prometheus-cpp QUIET)
+if(prometheus-cpp_FOUND)
+    message(STATUS "prometheus-cpp found")
+else()
+    message(WARNING "prometheus-cpp not found. Install from https://github.com/jupp0r/prometheus-cpp")
+endif()
+
+# CivetWeb for HTTP server (Feature 019: Monitoring)
+find_package(civetweb QUIET)
+if(civetweb_FOUND)
+    message(STATUS "CivetWeb found")
+else()
+    message(WARNING "CivetWeb not found. Install with: sudo apt install libcivetweb-dev")
 endif()
 
 # Production readiness dependencies
@@ -201,8 +225,9 @@ target_include_directories(mxrc PUBLIC
 # RT Schedule Tools
 # ===========================
 
-# Create generated directory
+# Create generated directories
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/generated)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/generated/ipc)  # Feature 019: IPC Schema
 
 # Build schedule_generator tool
 add_executable(schedule_generator

@@ -10,90 +10,203 @@ list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 # Optional: backward-cpp for stack traces
 option(USE_BACKWARD "Enable backward-cpp for stack traces" OFF)
 
-# Find dependencies
+# ============================================================================
+# REQUIRED Dependencies
+# ============================================================================
+# These packages are REQUIRED for building the project.
+# Install: sudo ./scripts/install-dependencies.sh --required
+# See: README_DEPENDENCIES.md
+
+message(STATUS "")
+message(STATUS "========================================")
+message(STATUS "Checking REQUIRED dependencies...")
+message(STATUS "========================================")
+
 find_package(Threads REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(GTest REQUIRED)
-find_package(TBB REQUIRED)
+find_package(TBB REQUIRED)  # concurrent_hash_map
 find_package(nlohmann_json 3.11.0 REQUIRED)
-
-# Google Benchmark for performance testing (Feature 019)
-find_package(benchmark QUIET)
-if(benchmark_FOUND)
-    message(STATUS "Google Benchmark found")
-else()
-    message(WARNING "Google Benchmark not found. Install with: sudo apt install libbenchmark-dev")
-endif()
-
-# Boost.Lockfree for lock-free data structures (Feature 022)
-find_package(Boost 1.65 QUIET)
-if(Boost_FOUND)
-    message(STATUS "Boost found: ${Boost_INCLUDE_DIRS}")
-else()
-    message(WARNING "Boost not found. Install with: sudo apt install libboost-dev")
-endif()
-
-# systemd dependency for process management
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SYSTEMD REQUIRED libsystemd)
-message(STATUS "systemd found: ${SYSTEMD_LIBRARIES}")
 
-# EtherCAT Master (for Feature 001: EtherCAT integration)
-find_package(EtherCAT QUIET)
-if(EtherCAT_FOUND)
-    message(STATUS "IgH EtherCAT Master found: ${EtherCAT_LIBRARIES}")
-else()
-    message(WARNING "IgH EtherCAT Master not found. EtherCAT features will be disabled.")
-    message(WARNING "Install with: https://gitlab.com/etherlab.org/ethercat")
-endif()
+message(STATUS "✓ All REQUIRED dependencies found")
+message(STATUS "  - Threads: OK")
+message(STATUS "  - spdlog: OK")
+message(STATUS "  - GTest: OK")
+message(STATUS "  - TBB: OK (concurrent containers)")
+message(STATUS "  - nlohmann_json: OK")
+message(STATUS "  - systemd: ${SYSTEMD_LIBRARIES}")
 
-# yaml-cpp for YAML configuration parsing (Feature 019: IPC Schema)
+# ============================================================================
+# OPTIONAL Dependencies (Feature 019: IPC Schema)
+# ============================================================================
+message(STATUS "")
+message(STATUS "========================================")
+message(STATUS "Feature 019: IPC Schema")
+message(STATUS "========================================")
+
+# yaml-cpp (REQUIRED for IPC code generation)
 find_package(yaml-cpp QUIET)
 if(yaml-cpp_FOUND)
-    message(STATUS "yaml-cpp found")
+    message(STATUS "✓ yaml-cpp: FOUND")
 else()
-    message(WARNING "yaml-cpp not found. Install with: sudo apt install libyaml-cpp-dev")
+    message(WARNING "✗ yaml-cpp: NOT FOUND")
+    message(WARNING "   IPC schema code generation will FAIL!")
+    message(WARNING "   Install: sudo apt install libyaml-cpp-dev")
 endif()
 
-# Folly for AtomicHashMap (Feature 019: Hot Key Optimization)
+# ============================================================================
+# OPTIONAL Dependencies (Feature 019: Hot Key Optimization)
+# ============================================================================
+message(STATUS "")
+message(STATUS "========================================")
+message(STATUS "Feature 019: Hot Key Optimization")
+message(STATUS "========================================")
+
+# Folly (AtomicHashMap for lock-free cache)
 find_package(folly QUIET)
 if(folly_FOUND)
-    message(STATUS "Folly found")
+    message(STATUS "✓ Folly: FOUND - Hot Key optimization ENABLED")
 else()
-    message(WARNING "Folly not found. Install with: sudo apt install libfolly-dev")
+    message(WARNING "✗ Folly: NOT FOUND - Hot Key optimization DISABLED")
+    message(WARNING "   See: docs/specs/019-architecture-improvements/folly-benchmark-installation.md")
+    message(WARNING "   Or:  README_DEPENDENCIES.md")
 endif()
 
-# prometheus-cpp for Metrics (Feature 019: Monitoring)
-find_package(prometheus-cpp QUIET)
-if(prometheus-cpp_FOUND)
-    message(STATUS "prometheus-cpp found")
+# Google Benchmark (performance testing)
+find_package(benchmark QUIET)
+if(benchmark_FOUND)
+    message(STATUS "✓ Google Benchmark: FOUND")
 else()
-    message(WARNING "prometheus-cpp not found. Install from https://github.com/jupp0r/prometheus-cpp")
+    message(WARNING "✗ Google Benchmark: NOT FOUND")
+    message(WARNING "   Hot Key benchmarks will not run")
+    message(WARNING "   Install: Build from source (see README_DEPENDENCIES.md)")
 endif()
 
-# CivetWeb for HTTP server (Feature 019: Monitoring)
-find_package(civetweb QUIET)
-if(civetweb_FOUND)
-    message(STATUS "CivetWeb found")
+# ============================================================================
+# OPTIONAL Dependencies (Performance Optimization)
+# ============================================================================
+message(STATUS "")
+message(STATUS "========================================")
+message(STATUS "Performance Optimization")
+message(STATUS "========================================")
+
+# Boost (lock-free data structures)
+find_package(Boost 1.65 QUIET)
+if(Boost_FOUND)
+    message(STATUS "✓ Boost: FOUND at ${Boost_INCLUDE_DIRS}")
 else()
-    message(WARNING "CivetWeb not found. Install with: sudo apt install libcivetweb-dev")
+    message(WARNING "✗ Boost: NOT FOUND")
+    message(WARNING "   Install: sudo apt install libboost-all-dev")
 endif()
 
-# Production readiness dependencies
+# NUMA (Non-Uniform Memory Access)
 find_library(NUMA_LIBRARY NAMES numa)
 find_path(NUMA_INCLUDE_DIR NAMES numa.h)
 if(NUMA_LIBRARY AND NUMA_INCLUDE_DIR)
-    message(STATUS "NUMA library found: ${NUMA_LIBRARY}")
     set(NUMA_FOUND TRUE)
+    message(STATUS "✓ NUMA: FOUND at ${NUMA_LIBRARY}")
 else()
-    message(STATUS "NUMA library not found, will need to be installed for performance optimization (Phase 3)")
     set(NUMA_FOUND FALSE)
+    message(WARNING "✗ NUMA: NOT FOUND")
+    message(WARNING "   Install: sudo apt install libnuma-dev")
 endif()
 
-find_package(opentelemetry-cpp QUIET)
-if(NOT opentelemetry-cpp_FOUND)
-    message(STATUS "OpenTelemetry not found, will need to be installed for tracing support")
+# ============================================================================
+# OPTIONAL Dependencies (Feature 019: Monitoring)
+# ============================================================================
+message(STATUS "")
+message(STATUS "========================================")
+message(STATUS "Feature 019: Monitoring")
+message(STATUS "========================================")
+
+# prometheus-cpp (Metrics collection)
+find_package(prometheus-cpp QUIET)
+if(prometheus-cpp_FOUND)
+    message(STATUS "✓ prometheus-cpp: FOUND")
+else()
+    message(WARNING "✗ prometheus-cpp: NOT FOUND")
+    message(WARNING "   Install: Build from source (see README_DEPENDENCIES.md)")
 endif()
+
+# CivetWeb (HTTP server for metrics endpoint)
+# Note: Ubuntu's civetweb package has broken CMake config, checking manually
+find_library(CIVETWEB_LIBRARY NAMES civetweb)
+find_path(CIVETWEB_INCLUDE_DIR NAMES civetweb.h)
+if(CIVETWEB_LIBRARY AND CIVETWEB_INCLUDE_DIR)
+    set(civetweb_FOUND TRUE)
+    message(STATUS "✓ CivetWeb: FOUND at ${CIVETWEB_LIBRARY}")
+else()
+    set(civetweb_FOUND FALSE)
+    message(WARNING "✗ CivetWeb: NOT FOUND")
+    message(WARNING "   Install: sudo apt install libcivetweb-dev")
+endif()
+
+# ============================================================================
+# OPTIONAL Dependencies (Feature 001: EtherCAT)
+# ============================================================================
+message(STATUS "")
+message(STATUS "========================================")
+message(STATUS "Feature 001: EtherCAT Integration")
+message(STATUS "========================================")
+
+# IgH EtherCAT Master
+find_package(EtherCAT QUIET)
+if(EtherCAT_FOUND)
+    message(STATUS "✓ IgH EtherCAT Master: FOUND at ${EtherCAT_LIBRARIES}")
+else()
+    message(WARNING "✗ IgH EtherCAT Master: NOT FOUND")
+    message(WARNING "   EtherCAT features will be DISABLED")
+    message(WARNING "   Install: https://gitlab.com/etherlab.org/ethercat")
+endif()
+
+# ============================================================================
+# OPTIONAL Dependencies (Tracing)
+# ============================================================================
+message(STATUS "")
+message(STATUS "========================================")
+message(STATUS "Distributed Tracing")
+message(STATUS "========================================")
+
+# OpenTelemetry
+find_package(opentelemetry-cpp QUIET)
+if(opentelemetry-cpp_FOUND)
+    message(STATUS "✓ OpenTelemetry: FOUND")
+else()
+    message(STATUS "ℹ OpenTelemetry: NOT FOUND (optional)")
+endif()
+
+# ============================================================================
+# Summary
+# ============================================================================
+message(STATUS "")
+message(STATUS "========================================")
+message(STATUS "Dependency Check Summary")
+message(STATUS "========================================")
+message(STATUS "Required:  ✓ ALL FOUND")
+if(yaml-cpp_FOUND)
+    message(STATUS "IPC Schema: ✓ ENABLED")
+else()
+    message(STATUS "IPC Schema: ✗ DISABLED (yaml-cpp missing)")
+endif()
+if(folly_FOUND)
+    message(STATUS "Hot Key:    ✓ ENABLED")
+else()
+    message(STATUS "Hot Key:    ✗ DISABLED (Folly missing)")
+endif()
+if(prometheus-cpp_FOUND AND civetweb_FOUND)
+    message(STATUS "Monitoring: ✓ ENABLED")
+else()
+    message(STATUS "Monitoring: ⚠ PARTIAL (some libs missing)")
+endif()
+if(EtherCAT_FOUND)
+    message(STATUS "EtherCAT:   ✓ ENABLED")
+else()
+    message(STATUS "EtherCAT:   ✗ DISABLED")
+endif()
+message(STATUS "========================================")
+message(STATUS "")
 
 # backward-cpp (header-only, optional)
 if(USE_BACKWARD)

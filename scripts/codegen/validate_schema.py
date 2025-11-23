@@ -35,12 +35,14 @@ class SchemaValidator:
         self.errors: List[str] = []
         self.warnings: List[str] = []
         self.schema_data: Dict = {}
+        self.custom_types: Set[str] = set()
 
     def validate(self) -> bool:
         """스키마 전체 검증 수행"""
         if not self._load_schema():
             return False
 
+        self._load_custom_types()
         self._validate_datastore_keys()
         self._validate_eventbus_events()
         self._validate_hot_keys()
@@ -59,6 +61,11 @@ class SchemaValidator:
         except yaml.YAMLError as e:
             self.errors.append(f"YAML parsing error: {e}")
             return False
+
+    def _load_custom_types(self):
+        """사용자 정의 타입 로드 (types 섹션에서)"""
+        if 'types' in self.schema_data:
+            self.custom_types = set(self.schema_data['types'].keys())
 
     def _validate_datastore_keys(self):
         """DataStore 키 검증"""
@@ -154,14 +161,14 @@ class SchemaValidator:
         array_match = re.match(ARRAY_TYPE_PATTERN, type_str)
         if array_match:
             element_type = array_match.group(1)
-            if element_type not in BASIC_TYPES:
+            if element_type not in BASIC_TYPES and element_type not in self.custom_types:
                 self.errors.append(
                     f"Invalid array element type '{element_type}' for key: {key_name}"
                 )
             return
 
-        # Vector3d 등 복합 타입 (추후 확장 가능)
-        if type_str in ['Vector3d', 'Quaternion', 'Transform']:
+        # 사용자 정의 타입 체크 (types 섹션에서 정의된 타입)
+        if type_str in self.custom_types:
             return
 
         self.errors.append(f"Unknown type '{type_str}' for key: {key_name}")
@@ -189,10 +196,16 @@ class SchemaValidator:
             'int64_t': 8, 'uint64_t': 8,
             'bool': 1, 'string': 256,  # string은 가변이지만 최대 256으로 가정
             'Vector3d': 24,  # 3 * double
+            'TaskStatus': 4,  # enum (int32_t)
+            'HAState': 4,  # enum (int32_t)
         }
 
         if type_str in type_sizes:
             return type_sizes[type_str]
+
+        # 커스텀 타입은 기본 8바이트로 추정 (enum은 4바이트, struct는 더 클 수 있음)
+        if type_str in self.custom_types:
+            return 8
 
         # 배열 타입 (예: array<double, 64>)
         array_match = re.match(ARRAY_TYPE_PATTERN, type_str)

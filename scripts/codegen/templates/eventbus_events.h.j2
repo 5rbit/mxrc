@@ -41,7 +41,7 @@ struct {{ event_name }} {
     static constexpr const char* NAME = "{{ event_name }}";
     static constexpr EventPriority PRIORITY = EventPriority::{{ spec.get('priority', 'NORMAL') }};
     {% if spec.get('ttl_ms') %}
-    static constexpr std::chrono::milliseconds TTL{{{ spec.ttl_ms }}};
+    static constexpr std::chrono::milliseconds TTL{ {{ spec.ttl_ms }} };
     {% else %}
     static constexpr std::optional<std::chrono::milliseconds> TTL = std::nullopt;
     {% endif %}

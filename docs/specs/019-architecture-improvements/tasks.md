@@ -65,9 +65,9 @@
 
 ### Implementation for User Story 1
 
-- [ ] T011 [P] [US1] IPC 스키마 YAML 파일 작성 in docs/specs/019-architecture-improvements/contracts/ipc-schema.yaml (이미 완료)
-- [ ] T012 [US1] 스키마 검증 실행 및 통과 확인 (scripts/codegen/validate_schema.py 실행)
-- [ ] T013 [US1] C++ 코드 생성 실행 in build/generated/ipc/ (DataStoreKeys.h, EventBusEvents.h)
+- [X] T011 [P] [US1] IPC 스키마 YAML 파일 작성 in docs/specs/019-architecture-improvements/contracts/ipc-schema.yaml (이미 완료)
+- [X] T012 [US1] 스키마 검증 실행 및 통과 확인 (scripts/codegen/validate_schema.py 실행)
+- [X] T013 [US1] C++ 코드 생성 실행 in build/generated/ipc/ (DataStoreKeys.h, EventBusEvents.h)
 - [ ] T014 [US1] DataStore에 생성된 키 상수 통합 in src/core/datastore/DataStore.h
 - [ ] T015 [US1] EventBus에 생성된 이벤트 타입 통합 in src/core/event/EventBus.h
 - [ ] T016 [P] [US1] 통합 테스트: 스키마 코드 생성 파이프라인 검증 in tests/integration/ipc_schema_integration_test.cpp

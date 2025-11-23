@@ -476,6 +476,9 @@ add_executable(nonrt
     src/core/datastore/managers/AccessControlManager.cpp
     src/core/datastore/managers/MetricsCollector.cpp
     src/core/datastore/managers/LogManager.cpp
+    # HA classes (Feature 019)
+    src/core/ha/HAStateMachine.cpp
+    src/core/ha/RecoveryPolicy.cpp
     # RT IPC
     src/core/rt/ipc/SharedMemory.cpp
     src/core/rt/util/TimeUtils.cpp
@@ -488,6 +491,7 @@ target_link_libraries(nonrt PRIVATE
     spdlog::spdlog
     TBB::tbb
     nlohmann_json::nlohmann_json
+    yaml-cpp
     Threads::Threads
     ${SYSTEMD_LIBRARIES}
 )
@@ -502,6 +506,7 @@ target_link_libraries(nonrt PRIVATE -fsanitize=address)
 # Include directories for nonrt
 target_include_directories(nonrt PUBLIC
     ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_BINARY_DIR}/generated
     ${PROJECT_SOURCE_DIR}/src/core/action
     ${PROJECT_SOURCE_DIR}/src/core/action/interfaces
     ${PROJECT_SOURCE_DIR}/src/core/action/core
@@ -529,6 +534,7 @@ target_include_directories(nonrt PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/rt
     ${PROJECT_SOURCE_DIR}/src/core/rt/util
     ${PROJECT_SOURCE_DIR}/src/core/rt/ipc
+    ${PROJECT_SOURCE_DIR}/src/core/ha
     ${PROJECT_SOURCE_DIR}/src/core/systemd
     ${PROJECT_SOURCE_DIR}/src/core/systemd/interfaces
     ${PROJECT_SOURCE_DIR}/src/core/systemd/impl
@@ -754,6 +760,9 @@ add_executable(run_tests
     src/core/rt/util/ScheduleCalculator.cpp
     # Non-RT Executive (for integration tests)
     src/core/nonrt/NonRTExecutive.cpp
+    # HA classes (Feature 019 - required by NonRTExecutive)
+    src/core/ha/HAStateMachine.cpp
+    src/core/ha/RecoveryPolicy.cpp
     # Monitoring
     src/core/monitoring/MetricsCollector.cpp
     src/core/monitoring/MetricsServer.cpp

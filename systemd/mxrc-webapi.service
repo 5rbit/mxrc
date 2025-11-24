@@ -1,0 +1,105 @@
+[Unit]
+Description=MXRC WebAPI Server - RESTful HTTP API and WebSocket Service
+Documentation=https://github.com/your-org/mxrc
+After=network.target mxrc-rt.service mxrc-nonrt.service
+Requires=mxrc-rt.service
+PartOf=mxrc.target
+
+[Service]
+Type=notify
+WorkingDirectory=/opt/mxrc/webapi
+ExecStart=/usr/bin/node /opt/mxrc/webapi/dist/server.js
+
+# Environment variables
+Environment="NODE_ENV=production"
+Environment="PORT=8080"
+Environment="HOST=0.0.0.0"
+Environment="LOG_LEVEL=info"
+Environment="IPC_SOCKET_PATH=/var/run/mxrc/ipc.sock"
+Environment="IPC_TIMEOUT_MS=5000"
+Environment="IPC_SCHEMA_PATH=/opt/mxrc/config/ipc/ipc-schema.yaml"
+Environment="SYSTEMD_NOTIFY=true"
+Environment="WATCHDOG_ENABLED=true"
+Environment="CORS_ORIGIN=http://localhost:3000"
+
+# systemd integration
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mxrc-webapi
+NotifyAccess=main
+
+# Watchdog configuration
+WatchdogSec=60s
+Restart=on-failure
+RestartSec=10s
+StartLimitBurst=5
+StartLimitIntervalSec=120s
+
+# Service timeouts
+TimeoutStartSec=30s
+TimeoutStopSec=15s
+
+# CPU affinity for Non-RT cores (cores 0-1)
+# WebAPI는 Non-RT 작업이므로 RT 코어를 피함
+CPUAffinity=0 1
+
+# Resource limits
+CPUQuota=150%
+MemoryMax=512M
+MemoryHigh=384M
+IOWeight=100
+
+# Resource accounting (Prometheus metrics)
+CPUAccounting=true
+MemoryAccounting=true
+IOAccounting=true
+TasksAccounting=true
+
+# User and group
+User=mxrc
+Group=mxrc
+SupplementaryGroups=
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RemoveIPC=true
+
+# Filesystem access
+ReadWritePaths=/var/run/mxrc
+ReadOnlyPaths=/opt/mxrc/config
+PrivateDevices=true
+ProtectProc=invisible
+ProcSubset=pid
+
+# Capabilities
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# System call filtering
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete
+SystemCallErrorNumber=EPERM
+SystemCallArchitectures=native
+
+# Network access (required for HTTP/WebSocket)
+IPAddressAllow=localhost 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
+IPAddressDeny=any
+
+# Logging
+LogLevelMax=info
+
+[Install]
+WantedBy=mxrc.target multi-user.target

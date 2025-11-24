@@ -20,29 +20,34 @@ Decoupled API server for monitoring and controlling MXRC Core Datastore via HTTP
 
 ## Quick Start
 
-### 1. Install Dependencies
+### Development Mode
 
 ```bash
+# 1. Install dependencies
 cd webapi
 npm install
-```
 
-### 2. Configure Environment
+# 2. Build TypeScript
+npm run build
 
-```bash
-cp .env.example .env
-# Edit .env to match your system paths
-```
-
-### 3. Development
-
-```bash
-# With real MXRC Core
+# 3. Start development server
 npm run dev
-
-# With mock IPC server (no MXRC Core required)
-npm run dev:mock
 ```
+
+### Production Deployment (systemd)
+
+```bash
+# Quick installation
+sudo ./scripts/install-systemd.sh
+
+# Start service
+sudo systemctl start mxrc-webapi
+
+# Check status
+sudo systemctl status mxrc-webapi
+```
+
+See [systemd Deployment Guide](docs/SYSTEMD_DEPLOYMENT.md) for complete instructions.
 
 ### 4. Verify Server
 

@@ -26,7 +26,8 @@ struct FieldbusConfig {
     std::string protocol;        ///< Protocol name (e.g., "EtherCAT", "CANopen")
     std::string config_file;     ///< Path to configuration file
     uint32_t cycle_time_us;      ///< Cycle time in microseconds
-    bool enable_diagnostics;     ///< Enable diagnostics
+    bool enable_diagnostics{false}; ///< Enable diagnostics
+    size_t device_count{64};     ///< Number of devices (default: 64)
 };
 
 /**

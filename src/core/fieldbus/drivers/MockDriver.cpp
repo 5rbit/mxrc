@@ -45,8 +45,10 @@ bool MockDriver::initialize() {
 bool MockDriver::start() {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    if (status_ != FieldbusStatus::INITIALIZED) {
-        last_error_ = "Cannot start: not initialized";
+    // Allow starting from INITIALIZED or STOPPED state
+    if (status_ != FieldbusStatus::INITIALIZED &&
+        status_ != FieldbusStatus::STOPPED) {
+        last_error_ = "Cannot start: not initialized or stopped";
         spdlog::error("[MockDriver] {}", *last_error_);
         return false;
     }

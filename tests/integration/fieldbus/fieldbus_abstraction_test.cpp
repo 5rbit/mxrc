@@ -39,6 +39,7 @@ TEST_F(FieldbusIntegrationTest, MockDriver_BasicLifecycle) {
     config.protocol = "Mock";
     config.config_file = "test.yaml";
     config.cycle_time_us = 1000;
+    config.device_count = 4;
 
     fieldbus_ = FieldbusFactory::create(config);
     ASSERT_NE(fieldbus_, nullptr);
@@ -62,6 +63,7 @@ TEST_F(FieldbusIntegrationTest, MockDriver_SensorDataRead) {
     config.protocol = "Mock";
     config.config_file = "test.yaml";
     config.cycle_time_us = 1000;
+    config.device_count = 4;
 
     fieldbus_ = FieldbusFactory::create(config);
     ASSERT_NE(fieldbus_, nullptr);
@@ -88,6 +90,7 @@ TEST_F(FieldbusIntegrationTest, MockDriver_ActuatorControl) {
     config.protocol = "Mock";
     config.config_file = "test.yaml";
     config.cycle_time_us = 1000;
+    config.device_count = 4;
 
     fieldbus_ = FieldbusFactory::create(config);
     ASSERT_NE(fieldbus_, nullptr);
@@ -95,13 +98,13 @@ TEST_F(FieldbusIntegrationTest, MockDriver_ActuatorControl) {
     ASSERT_TRUE(fieldbus_->start());
 
     // Write actuator commands
-    std::vector<double> actuator_commands = {10.0, 20.0, 30.0};
+    std::vector<double> actuator_commands = {10.0, 20.0, 30.0, 40.0};
     EXPECT_TRUE(fieldbus_->writeActuators(actuator_commands));
 
     // Read back to verify (Mock driver echoes commands)
     std::vector<double> sensor_data;
     EXPECT_TRUE(fieldbus_->readSensors(sensor_data));
-    ASSERT_GE(sensor_data.size(), 3u);
+    ASSERT_EQ(sensor_data.size(), 4u);
 }
 
 TEST_F(FieldbusIntegrationTest, MockDriver_CyclicOperation) {
@@ -110,6 +113,7 @@ TEST_F(FieldbusIntegrationTest, MockDriver_CyclicOperation) {
     config.protocol = "Mock";
     config.config_file = "test.yaml";
     config.cycle_time_us = 1000;
+    config.device_count = 4;
 
     fieldbus_ = FieldbusFactory::create(config);
     ASSERT_NE(fieldbus_, nullptr);
@@ -118,7 +122,7 @@ TEST_F(FieldbusIntegrationTest, MockDriver_CyclicOperation) {
 
     // Simulate cyclic operation (10 cycles)
     const int num_cycles = 10;
-    std::vector<double> actuator_commands = {1.0, 2.0, 3.0};
+    std::vector<double> actuator_commands = {1.0, 2.0, 3.0, 4.0};
 
     for (int cycle = 0; cycle < num_cycles; ++cycle) {
         // Write actuators
@@ -127,7 +131,7 @@ TEST_F(FieldbusIntegrationTest, MockDriver_CyclicOperation) {
         // Read sensors
         std::vector<double> sensor_data;
         EXPECT_TRUE(fieldbus_->readSensors(sensor_data));
-        EXPECT_GE(sensor_data.size(), 3u);
+        EXPECT_EQ(sensor_data.size(), 4u);
 
         // Simulate cycle time
         std::this_thread::sleep_for(std::chrono::microseconds(config.cycle_time_us));
@@ -150,6 +154,7 @@ TEST_F(FieldbusIntegrationTest, MockDriver_ErrorHandling) {
     config.protocol = "Mock";
     config.config_file = "test.yaml";
     config.cycle_time_us = 1000;
+    config.device_count = 4;
 
     fieldbus_ = FieldbusFactory::create(config);
     ASSERT_NE(fieldbus_, nullptr);
@@ -165,7 +170,7 @@ TEST_F(FieldbusIntegrationTest, MockDriver_ErrorHandling) {
 
     // Now operations should succeed
     EXPECT_TRUE(fieldbus_->readSensors(data));
-    EXPECT_TRUE(fieldbus_->writeActuators({1.0, 2.0, 3.0}));
+    EXPECT_TRUE(fieldbus_->writeActuators({1.0, 2.0, 3.0, 4.0}));
 }
 
 TEST_F(FieldbusIntegrationTest, MockDriver_StatisticsTracking) {
@@ -174,6 +179,7 @@ TEST_F(FieldbusIntegrationTest, MockDriver_StatisticsTracking) {
     config.protocol = "Mock";
     config.config_file = "test.yaml";
     config.cycle_time_us = 1000;
+    config.device_count = 4;
 
     fieldbus_ = FieldbusFactory::create(config);
     ASSERT_NE(fieldbus_, nullptr);
@@ -189,7 +195,7 @@ TEST_F(FieldbusIntegrationTest, MockDriver_StatisticsTracking) {
     for (int i = 0; i < operations; ++i) {
         std::vector<double> data;
         fieldbus_->readSensors(data);
-        fieldbus_->writeActuators({1.0, 2.0});
+        fieldbus_->writeActuators({1.0, 2.0, 3.0, 4.0});
     }
 
     // Get updated statistics
@@ -206,11 +212,13 @@ TEST_F(FieldbusIntegrationTest, MultipleDriverInstances) {
     config1.protocol = "Mock";
     config1.config_file = "test1.yaml";
     config1.cycle_time_us = 1000;
+    config1.device_count = 4;
 
     FieldbusConfig config2;
     config2.protocol = "Mock";
     config2.config_file = "test2.yaml";
     config2.cycle_time_us = 2000;
+    config2.device_count = 4;
 
     auto fieldbus1 = FieldbusFactory::create(config1);
     auto fieldbus2 = FieldbusFactory::create(config2);
@@ -240,6 +248,7 @@ TEST_F(FieldbusIntegrationTest, ProtocolSwitching) {
     config.protocol = "Mock";
     config.config_file = "test.yaml";
     config.cycle_time_us = 1000;
+    config.device_count = 4;
 
     auto mock_fieldbus = FieldbusFactory::create(config);
     ASSERT_NE(mock_fieldbus, nullptr);
@@ -268,6 +277,7 @@ TEST_F(FieldbusIntegrationTest, RepeatedStartStop) {
     config.protocol = "Mock";
     config.config_file = "test.yaml";
     config.cycle_time_us = 1000;
+    config.device_count = 4;
 
     fieldbus_ = FieldbusFactory::create(config);
     ASSERT_NE(fieldbus_, nullptr);

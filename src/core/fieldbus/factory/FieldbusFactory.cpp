@@ -21,7 +21,7 @@ std::map<std::string, FieldbusFactory::Creator>& FieldbusFactory::getRegistry() 
 void FieldbusFactory::initializeBuiltInProtocols(std::map<std::string, Creator>& registry) {
     // Register Mock driver (always available for testing)
     registry["Mock"] = [](const FieldbusConfig& config) -> IFieldbusPtr {
-        return std::make_shared<MockDriver>(config);
+        return std::make_shared<MockDriver>(config, config.device_count);
     };
 
     // Register EtherCAT driver (Feature 019 US4 - T041)

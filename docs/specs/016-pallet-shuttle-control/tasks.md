@@ -1,9 +1,9 @@
 # Tasks: 팔렛 셔틀 제어 시스템
 
 **Input**: Design documents from `/docs/specs/016-pallet-shuttle-control/`
-**Status**: In Progress - Phase 4 Mostly Complete
-**Progress**: 54/93 tasks completed (58.1%)
-**Last Updated**: 2025-01-25
+**Status**: In Progress - Phase 3-4 Mostly Complete
+**Progress**: 56/93 tasks completed (60.2%)
+**Last Updated**: 2025-11-25
 **Prerequisites**: plan.md, spec.md, research.md
 
 ---
@@ -114,9 +114,9 @@
 ### 테스트 작성 (TDD)
 
 - [X] T034 [P] [US2] AlarmManager 단위 테스트 (생성, 조회, 리셋, 재발 추적, 심각도 상향) in tests/unit/core/alarm/AlarmManager_test.cpp ✅
-- [ ] T035 [P] [US2] AlarmConfiguration 단위 테스트 (YAML 파싱, 심각도 상향) in tests/unit/core/alarm/AlarmConfigurationTest.cpp
-- [ ] T036 [P] [US2] Alarm 재발 빈도 추적 테스트 in tests/unit/core/alarm/AlarmTest.cpp
-- [ ] T037 [P] [US2] Critical Alarm 발생 시 즉시 중단 통합 테스트 in tests/integration/robot/pallet_shuttle/alarm_handling_test.cpp
+- [X] T035 [P] [US2] AlarmConfiguration 단위 테스트 (YAML 파싱, 심각도 상향) in tests/unit/core/alarm/AlarmConfiguration_test.cpp ✅
+- [X] T036 [P] [US2] Alarm 재발 빈도 추적 테스트 in tests/unit/core/alarm/AlarmManager_test.cpp ✅
+- [ ] T037 [P] [US2] Critical Alarm 발생 시 즉시 중단 통합 테스트 in tests/integration/robot/pallet_shuttle/alarm_handling_test.cpp (Phase 5 의존)
 
 ### 구현
 

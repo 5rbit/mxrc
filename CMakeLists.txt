@@ -873,6 +873,11 @@ add_executable(run_tests
     tests/unit/core/alarm/AlarmConfiguration_test.cpp
     tests/unit/core/control/BehaviorArbiter_test.cpp
     tests/unit/core/control/TaskQueue_test.cpp
+    tests/unit/robot/pallet_shuttle/actions/MoveToPositionAction_test.cpp
+    tests/unit/robot/pallet_shuttle/actions/PickPalletAction_test.cpp
+    tests/unit/robot/pallet_shuttle/actions/PlacePalletAction_test.cpp
+    tests/unit/robot/pallet_shuttle/sequences/PalletTransportSequence_test.cpp
+    tests/unit/robot/pallet_shuttle/tasks/PalletTransportTask_test.cpp
     # Feature 016: Implementation sources for tests
     src/core/alarm/impl/Alarm.cpp
     src/core/alarm/impl/AlarmConfiguration.cpp
@@ -880,6 +885,11 @@ add_executable(run_tests
     src/core/control/impl/BehaviorPriorityQueue.cpp
     src/core/control/impl/BehaviorArbiter.cpp
     src/core/control/impl/TaskQueue.cpp
+    src/robot/pallet_shuttle/actions/MoveToPositionAction.cpp
+    src/robot/pallet_shuttle/actions/PickPalletAction.cpp
+    src/robot/pallet_shuttle/actions/PlacePalletAction.cpp
+    src/robot/pallet_shuttle/sequences/PalletTransportSequence.cpp
+    src/robot/pallet_shuttle/tasks/PalletTransportTask.cpp
     # systemd integration tests (Feature 022: P1 Startup Order)
     tests/integration/systemd/startup_order_test.cpp
     tests/integration/systemd/retry_logic_test.cpp

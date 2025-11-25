@@ -100,6 +100,27 @@ public:
         actionResults_.clear();
     }
 
+    // 편의 메서드 (문자열 기반)
+    void set(const std::string& key, const std::string& value) {
+        setVariable(key, value);
+    }
+
+    std::string get(const std::string& key) const {
+        auto var = getVariable(key);
+        if (var.has_value()) {
+            try {
+                return std::any_cast<std::string>(var.value());
+            } catch (const std::bad_any_cast&) {
+                return "";
+            }
+        }
+        return "";
+    }
+
+    bool has(const std::string& key) const {
+        return hasVariable(key);
+    }
+
 private:
     mutable std::mutex mutex_;                          // 스레드 안전성을 위한 뮤텍스
     std::map<std::string, std::any> variables_;         // 공유 변수

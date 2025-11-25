@@ -1,0 +1,60 @@
+{
+  "name": "mxrc-webapi",
+  "version": "1.0.0",
+  "description": "MXRC Datastore Web API Server - Decoupled API server for monitoring and controlling MXRC Core via HTTP/WebSocket",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "dev:mock": "ts-node tests/mocks/ipc-mock.ts & npm run dev",
+    "start": "node dist/server.js",
+    "test": "jest",
+    "test:unit": "jest --testPathPattern=tests/unit",
+    "test:integration": "jest --testPathPattern=tests/integration",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src tests --ext .ts",
+    "lint:fix": "eslint src tests --ext .ts --fix"
+  },
+  "keywords": [
+    "mxrc",
+    "datastore",
+    "webapi",
+    "ipc",
+    "realtime",
+    "systemd"
+  ],
+  "author": "MXRC Team",
+  "license": "ISC",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@fastify/websocket": "^9.0.0",
+    "dotenv": "^16.3.0",
+    "fastify": "^4.25.0",
+    "js-yaml": "^4.1.0",
+    "pino": "^8.16.0",
+    "rate-limiter-flexible": "^4.0.0",
+    "sd-notify": "^1.0.0",
+    "ws": "^8.18.3",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@fastify/cors": "^11.1.0",
+    "@types/jest": "^29.5.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.10.0",
+    "@types/sd-notify": "^2.8.2",
+    "@types/ws": "^8.18.1",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "eslint": "^8.55.0",
+    "eslint-config-airbnb-typescript": "^17.1.0",
+    "eslint-plugin-import": "^2.29.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
+    "ts-node": "^10.9.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.3.0"
+  }
+}

@@ -1,0 +1,504 @@
+# IPC Schema Definition for MXRC
+# Feature: 019-architecture-improvements
+# Version: 1.0.0
+# Date: 2025-01-23
+#
+# 이 파일은 DataStore 키와 EventBus 이벤트의 타입 안전 계약을 정의합니다.
+# 코드 생성 도구(scripts/codegen/generate_ipc_schema.py)가 이 파일을 읽어
+# C++ 타입 안전 Accessor 및 Event Struct를 자동 생성합니다.
+
+---
+schema_version: "1.0.0"
+namespace: "mxrc::ipc"
+
+# =============================================================================
+# DataStore 키 정의
+# =============================================================================
+datastore_keys:
+  # --- RT 프로세스 상태 ---
+  robot_position:
+    type: Vector3d
+    hot_key: true
+    description: "로봇의 현재 위치 (m 단위, world frame)"
+    access:
+      rt_read: true
+      rt_write: true
+      nonrt_read: true
+      nonrt_write: false
+    default_value: [0.0, 0.0, 0.0]
+
+  robot_velocity:
+    type: Vector3d
+    hot_key: true
+    description: "로봇의 현재 속도 (m/s 단위)"
+    access:
+      rt_read: true
+      rt_write: true
+      nonrt_read: true
+      nonrt_write: false
+    default_value: [0.0, 0.0, 0.0]
+
+  robot_acceleration:
+    type: Vector3d
+    hot_key: true
+    description: "로봇의 현재 가속도 (m/s^2 단위)"
+    access:
+      rt_read: true
+      rt_write: true
+      nonrt_read: true
+      nonrt_write: false
+    default_value: [0.0, 0.0, 0.0]
+
+  # --- EtherCAT 센서/액추에이터 데이터 (최대 64축) ---
+  ethercat_sensor_position:
+    type: array<double, 64>
+    hot_key: true
+    description: "EtherCAT 64축 모터 센서 위치 (rad 단위)"
+    access:
+      rt_read: true
+      rt_write: true
+      nonrt_read: true
+      nonrt_write: false
+    default_value: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+  ethercat_sensor_velocity:
+    type: array<double, 64>
+    hot_key: true
+    description: "EtherCAT 64축 모터 센서 속도 (rad/s 단위)"
+    access:
+      rt_read: true
+      rt_write: true
+      nonrt_read: true
+      nonrt_write: false
+    default_value: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+  ethercat_target_position:
+    type: array<double, 64>
+    hot_key: true
+    description: "EtherCAT 64축 모터 목표 위치 (rad 단위)"
+    access:
+      rt_read: true
+      rt_write: true
+      nonrt_read: true
+      nonrt_write: true
+    default_value: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+  ethercat_target_velocity:
+    type: array<double, 64>
+    hot_key: true
+    description: "EtherCAT 64축 모터 목표 속도 (rad/s 단위)"
+    access:
+      rt_read: true
+      rt_write: true
+      nonrt_read: true
+      nonrt_write: true
+    default_value: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+  ethercat_motor_torque:
+    type: array<double, 64>
+    hot_key: true
+    description: "EtherCAT 64축 모터 토크 (Nm 단위)"
+    access:
+      rt_read: true
+      rt_write: true
+      nonrt_read: true
+      nonrt_write: false
+    default_value: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+  # --- EtherCAT IO 모듈 데이터 (최대 64개) ---
+  ethercat_digital_input:
+    type: array<uint64_t, 64>
+    hot_key: true
+    description: "EtherCAT 64개 디지털 입력 모듈 (각 uint64_t는 64비트 입력)"
+    access:
+      rt_read: true
+      rt_write: true
+      nonrt_read: true
+      nonrt_write: false
+    default_value: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+  ethercat_digital_output:
+    type: array<uint64_t, 64>
+    hot_key: true
+    description: "EtherCAT 64개 디지털 출력 모듈 (각 uint64_t는 64비트 출력)"
+    access:
+      rt_read: true
+      rt_write: true
+      nonrt_read: true
+      nonrt_write: true
+    default_value: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+  ethercat_analog_input:
+    type: array<double, 64>
+    hot_key: true
+    description: "EtherCAT 64개 아날로그 입력 모듈 (voltage/current)"
+    access:
+      rt_read: true
+      rt_write: true
+      nonrt_read: true
+      nonrt_write: false
+    default_value: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+  ethercat_analog_output:
+    type: array<double, 64>
+    hot_key: true
+    description: "EtherCAT 64개 아날로그 출력 모듈 (voltage/current)"
+    access:
+      rt_read: true
+      rt_write: true
+      nonrt_read: true
+      nonrt_write: true
+    default_value: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+  # --- RT Cycle 성능 메트릭 ---
+  rt_cycle_time_us:
+    type: double
+    hot_key: true
+    description: "RT 프로세스 Cycle Time (마이크로초)"
+    access:
+      rt_read: true
+      rt_write: true
+      nonrt_read: true
+      nonrt_write: false
+    default_value: 0.0
+
+  rt_deadline_miss_count:
+    type: uint64_t
+    hot_key: true
+    description: "RT 프로세스 Deadline Miss 누적 횟수"
+    access:
+      rt_read: true
+      rt_write: true
+      nonrt_read: true
+      nonrt_write: false
+    default_value: 0
+
+  # --- Task 상태 (일반 키, Hot Key 아님) ---
+  task_current_id:
+    type: string
+    hot_key: false
+    description: "현재 실행 중인 Task ID"
+    access:
+      rt_read: true
+      rt_write: false
+      nonrt_read: true
+      nonrt_write: true
+    default_value: ""
+
+  task_status:
+    type: TaskStatus
+    hot_key: false
+    description: "현재 Task 상태 (IDLE, RUNNING, SUCCESS, FAILED)"
+    access:
+      rt_read: true
+      rt_write: false
+      nonrt_read: true
+      nonrt_write: true
+    default_value: IDLE
+
+  task_progress:
+    type: double
+    hot_key: false
+    description: "현재 Task 진행률 (0.0 ~ 1.0)"
+    access:
+      rt_read: true
+      rt_write: false
+      nonrt_read: true
+      nonrt_write: true
+    default_value: 0.0
+
+  # --- HA 상태 ---
+  ha_current_state:
+    type: HAState
+    hot_key: false
+    description: "HA 상태 머신 현재 상태"
+    access:
+      rt_read: true
+      rt_write: false
+      nonrt_read: true
+      nonrt_write: true
+    default_value: NORMAL
+
+  ha_recovery_attempt_count:
+    type: uint32_t
+    hot_key: false
+    description: "HA 복구 시도 횟수"
+    access:
+      rt_read: true
+      rt_write: false
+      nonrt_read: true
+      nonrt_write: true
+    default_value: 0
+
+# =============================================================================
+# EventBus 이벤트 타입 정의
+# =============================================================================
+eventbus_events:
+  # --- 안전 관련 이벤트 (CRITICAL) ---
+  AvoidReqEvent:
+    priority: CRITICAL
+    ttl_ms: 5000
+    coalescing: false
+    description: "장애물 회피 요청 이벤트 (즉시 처리 필요)"
+    fields:
+      - name: obstacle_id
+        type: uint32_t
+        description: "장애물 고유 ID"
+      - name: distance
+        type: double
+        description: "장애물까지 거리 (m)"
+      - name: direction
+        type: Vector3d
+        description: "장애물 방향 벡터"
+      - name: timestamp
+        type: uint64_t
+        description: "이벤트 발생 시각 (us)"
+
+  AvoidClearEvent:
+    priority: CRITICAL
+    ttl_ms: 5000
+    coalescing: false
+    description: "장애물 회피 해제 이벤트"
+    fields:
+      - name: obstacle_id
+        type: uint32_t
+        description: "장애물 고유 ID"
+      - name: timestamp
+        type: uint64_t
+        description: "이벤트 발생 시각 (us)"
+
+  EmergencyStopEvent:
+    priority: CRITICAL
+    ttl_ms: null  # 무제한
+    coalescing: false
+    description: "긴급 정지 이벤트"
+    fields:
+      - name: reason
+        type: string
+        description: "긴급 정지 사유"
+      - name: source
+        type: string
+        description: "이벤트 발생 소스 (RT/NonRT)"
+      - name: timestamp
+        type: uint64_t
+        description: "이벤트 발생 시각 (us)"
+
+  # --- EtherCAT 통신 이벤트 (HIGH) ---
+  EtherCATErrorEvent:
+    priority: HIGH
+    ttl_ms: 10000
+    coalescing: false
+    description: "EtherCAT 슬레이브 오류 이벤트"
+    fields:
+      - name: slave_id
+        type: uint16_t
+        description: "슬레이브 ID"
+      - name: error_code
+        type: uint32_t
+        description: "오류 코드"
+      - name: description
+        type: string
+        description: "오류 설명"
+      - name: timestamp
+        type: uint64_t
+        description: "이벤트 발생 시각 (us)"
+
+  EtherCATStateChangedEvent:
+    priority: HIGH
+    ttl_ms: 5000
+    coalescing: true
+    coalescing_key: "ethercat_state"
+    description: "EtherCAT 상태 변경 이벤트 (병합 가능)"
+    fields:
+      - name: old_state
+        type: string
+        description: "이전 상태 (INIT, PREOP, SAFEOP, OP)"
+      - name: new_state
+        type: string
+        description: "새 상태"
+      - name: timestamp
+        type: uint64_t
+        description: "이벤트 발생 시각 (us)"
+
+  # --- Task 실행 이벤트 (NORMAL) ---
+  TaskStartedEvent:
+    priority: NORMAL
+    ttl_ms: 30000
+    coalescing: false
+    description: "Task 시작 이벤트"
+    fields:
+      - name: task_id
+        type: string
+        description: "Task ID"
+      - name: task_type
+        type: string
+        description: "Task 타입 (MoveJ, MoveL, etc.)"
+      - name: timestamp
+        type: uint64_t
+        description: "이벤트 발생 시각 (us)"
+
+  TaskCompletedEvent:
+    priority: NORMAL
+    ttl_ms: 30000
+    coalescing: false
+    description: "Task 완료 이벤트"
+    fields:
+      - name: task_id
+        type: string
+        description: "Task ID"
+      - name: success
+        type: bool
+        description: "성공 여부"
+      - name: duration_ms
+        type: double
+        description: "실행 시간 (ms)"
+      - name: error_message
+        type: string
+        description: "오류 메시지 (실패 시)"
+      - name: timestamp
+        type: uint64_t
+        description: "이벤트 발생 시각 (us)"
+
+  TaskProgressEvent:
+    priority: NORMAL
+    ttl_ms: 1000
+    coalescing: true
+    coalescing_key_template: "task_progress_{task_id}"
+    description: "Task 진행 상태 업데이트 (병합 가능, 최신 값만 유지)"
+    fields:
+      - name: task_id
+        type: string
+        description: "Task ID"
+      - name: progress
+        type: double
+        description: "진행률 (0.0 ~ 1.0)"
+      - name: timestamp
+        type: uint64_t
+        description: "이벤트 발생 시각 (us)"
+
+  # --- DataStore 변경 이벤트 (NORMAL) ---
+  DataStoreChangedEvent:
+    priority: NORMAL
+    ttl_ms: 5000
+    coalescing: true
+    coalescing_key_template: "datastore_{key}"
+    description: "DataStore 키 값 변경 이벤트 (병합 가능)"
+    fields:
+      - name: key
+        type: string
+        description: "변경된 키 이름"
+      - name: old_value
+        type: string
+        description: "이전 값 (JSON 문자열)"
+      - name: new_value
+        type: string
+        description: "새 값 (JSON 문자열)"
+      - name: timestamp
+        type: uint64_t
+        description: "이벤트 발생 시각 (us)"
+
+  # --- HA 상태 변경 이벤트 (HIGH) ---
+  HAStateChangedEvent:
+    priority: HIGH
+    ttl_ms: 10000
+    coalescing: false
+    description: "HA 상태 머신 상태 전이 이벤트"
+    fields:
+      - name: old_state
+        type: string
+        description: "이전 상태"
+      - name: new_state
+        type: string
+        description: "새 상태"
+      - name: failure_type
+        type: string
+        description: "장애 유형 (해당 시)"
+      - name: recovery_action
+        type: string
+        description: "복구 액션 (해당 시)"
+      - name: timestamp
+        type: uint64_t
+        description: "이벤트 발생 시각 (us)"
+
+  # --- 로깅 및 메트릭 이벤트 (LOW) ---
+  LogEvent:
+    priority: LOW
+    ttl_ms: 60000
+    coalescing: false
+    description: "로그 메시지 이벤트 (낮은 우선순위)"
+    fields:
+      - name: level
+        type: string
+        description: "로그 레벨 (DEBUG, INFO, WARN, ERROR, CRITICAL)"
+      - name: message
+        type: string
+        description: "로그 메시지"
+      - name: source
+        type: string
+        description: "로그 소스 (모듈 이름)"
+      - name: timestamp
+        type: uint64_t
+        description: "이벤트 발생 시각 (us)"
+
+  MetricUpdateEvent:
+    priority: LOW
+    ttl_ms: 30000
+    coalescing: true
+    coalescing_key_template: "metric_{metric_name}"
+    description: "메트릭 업데이트 이벤트 (병합 가능, 최신 값만 유지)"
+    fields:
+      - name: metric_name
+        type: string
+        description: "메트릭 이름"
+      - name: value
+        type: double
+        description: "메트릭 값"
+      - name: timestamp
+        type: uint64_t
+        description: "이벤트 발생 시각 (us)"
+
+# =============================================================================
+# 복합 타입 정의 (DataStore 키 및 EventBus 이벤트에서 사용)
+# =============================================================================
+types:
+  Vector3d:
+    fields:
+      - name: x
+        type: double
+      - name: y
+        type: double
+      - name: z
+        type: double
+
+  TaskStatus:
+    enum:
+      - IDLE
+      - RUNNING
+      - SUCCESS
+      - FAILED
+      - ABORTED
+
+  HAState:
+    enum:
+      - NORMAL
+      - DEGRADED
+      - SAFE_MODE
+      - RECOVERY_IN_PROGRESS
+      - MANUAL_INTERVENTION
+      - SHUTDOWN
+
+# =============================================================================
+# 코드 생성 설정
+# =============================================================================
+codegen_config:
+  output_dir: "src/generated/ipc"
+  namespace: "mxrc::ipc::generated"
+  templates:
+    - input: "templates/datastore_keys.h.j2"
+      output: "DataStoreKeys.h"
+    - input: "templates/eventbus_events.h.j2"
+      output: "EventBusEvents.h"
+    - input: "templates/accessor_impl.cpp.j2"
+      output: "DataStoreAccessor.cpp"
+  enable_validation: true
+  enable_backward_compatibility_check: true

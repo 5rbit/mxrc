@@ -30,13 +30,13 @@
 
 **Why this priority**: 새로운 개발자의 온보딩 시간을 단축하고, 환경 차이로 인한 빌드 실패를 방지하는 것이 가장 중요한 가치입니다. 모든 개발자가 동일한 환경에서 작업할 수 있어야 협업이 원활해집니다.
 
-**Independent Test**: 새로운 개발자가 Git Clone 후 `docker compose up dev` 명령 하나로 빌드 및 테스트를 실행하고, 195개의 모든 테스트가 통과하는지 확인합니다.
+**Independent Test**: 새로운 개발자가 Git Clone 후 `docker compose up dev` 명령 하나로 빌드 및 테스트를 실행하고, 1157개의 모든 테스트가 통과하는지 확인합니다.
 
 **Acceptance Scenarios**:
 
 1. **Given** 개발자가 Ubuntu 24.04 LTS 호스트 머신에 Docker만 설치된 상태에서, **When** Git Repository를 클론하고 `docker compose up dev` 명령을 실행하면, **Then** C++20, CMake, spdlog, GTest, TBB, nlohmann_json 등 모든 의존성이 자동 설치되고 MXRC가 빌드됩니다
 
-2. **Given** Docker Container가 실행 중일 때, **When** `docker compose exec dev ./run_tests` 명령을 실행하면, **Then** 195개의 모든 테스트가 통과하고 결과가 표시됩니다
+2. **Given** Docker Container가 실행 중일 때, **When** `docker compose exec dev ./run_tests` 명령을 실행하면, **Then** 1157개의 모든 테스트가 통과하고 결과가 표시됩니다
 
 3. **Given** 개발자가 소스 코드를 수정했을 때, **When** Container 내부에서 `make -j$(nproc)` 명령을 실행하면, **Then** 변경사항이 즉시 반영되어 재빌드됩니다
 
@@ -149,7 +149,7 @@ EtherCAT Master가 설치된 Docker Container에서 Feature 001의 EtherCAT 센�
 
 - **SC-001**: 새로운 개발자가 프로젝트를 클론한 후 10분 이내에 첫 번째 빌드를 완료할 수 있습니다
 - **SC-002**: Docker 기반 CI Pipeline에서 전체 빌드 및 테스트 실행 시간이 5분 이내입니다
-- **SC-003**: 195개의 모든 기존 테스트가 Docker Container에서 100% 통과합니다
+- **SC-003**: 1157개의 모든 기존 테스트가 Docker Container에서 100% 통과합니다
 - **SC-004**: 개발자가 소스 코드를 수정한 후 증분 빌드가 30초 이내에 완료됩니다
 - **SC-005**: Docker Image 크기가 2GB 이하로 유지됩니다 (의존성 모두 포함)
 - **SC-006**: 실시간 테스트 환경에서 Task 실행 오버헤드가 1ms 이하로 측정됩니다

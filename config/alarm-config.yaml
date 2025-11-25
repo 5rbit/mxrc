@@ -1,0 +1,175 @@
+# MXRC Alarm Configuration
+# Feature 016: Pallet Shuttle Control System
+#
+# 이 파일은 팔렛 셔틀 로봇의 모든 alarm 정의를 포함합니다.
+# AlarmManager가 시작 시 이 파일을 로드하여 alarm 설정을 초기화합니다.
+
+version: "1.0"
+description: "Pallet Shuttle Robot Alarm Configuration"
+
+alarms:
+  # ============================================================================
+  # CRITICAL Alarms (심각도: CRITICAL)
+  # - 즉시 작업 중단 필요
+  # - ControlMode를 FAULT로 전환
+  # - Priority::EMERGENCY_STOP 행동 요청 생성
+  # ============================================================================
+
+  - code: E001
+    name: "Emergency Stop Activated"
+    severity: CRITICAL
+    description: "Emergency stop button has been pressed or safety circuit opened"
+    recommended_action: "Check emergency stop button and safety circuit. Reset after confirming safety."
+    category: safety
+    auto_reset: false
+    response_time_ms: 100
+    affects_control_mode: true
+    target_control_mode: FAULT
+    recurrence_window: 300
+    recurrence_threshold: 1  # 한 번만 발생해도 심각
+
+  - code: E002
+    name: "Position Limit Exceeded"
+    severity: CRITICAL
+    description: "Robot position has exceeded mechanical or software limits"
+    recommended_action: "Move robot back within limits using manual mode. Check limit switches."
+    category: position
+    auto_reset: false
+    response_time_ms: 100
+    affects_control_mode: true
+    target_control_mode: FAULT
+    recurrence_window: 60
+    recurrence_threshold: 2
+
+  - code: E003
+    name: "Motor Overcurrent"
+    severity: CRITICAL
+    description: "Motor current exceeds safe operating threshold"
+    recommended_action: "Check for mechanical obstructions. Inspect motor and drive system."
+    category: hardware
+    auto_reset: false
+    response_time_ms: 50
+    affects_control_mode: true
+    target_control_mode: FAULT
+    recurrence_window: 120
+    recurrence_threshold: 2
+
+  - code: E004
+    name: "Communication Timeout"
+    severity: CRITICAL
+    description: "Lost communication with fieldbus or critical subsystem"
+    recommended_action: "Check fieldbus connections and network status. Restart communication."
+    category: communication
+    auto_reset: true  # 통신 복구 시 자동 해제 가능
+    response_time_ms: 200
+    affects_control_mode: true
+    target_control_mode: FAULT
+    recurrence_window: 60
+    recurrence_threshold: 3
+
+  # ============================================================================
+  # WARNING Alarms (심각도: WARNING)
+  # - 주의 필요하지만 즉시 위험하지 않음
+  # - 현재 작업 완료 후 대응
+  # - Priority::SAFETY_ISSUE 행동 요청 생성
+  # ============================================================================
+
+  - code: W001
+    name: "Battery Low"
+    severity: WARNING
+    description: "Battery level below 20% threshold"
+    recommended_action: "Complete current task and move to charging station"
+    category: battery
+    auto_reset: true
+    response_time_ms: 5000
+    affects_control_mode: true
+    target_control_mode: STANDBY
+    recurrence_window: 300
+    recurrence_threshold: 3
+
+  - code: W002
+    name: "Sensor Value Out of Range"
+    severity: WARNING
+    description: "Sensor reading is outside normal operating range but within tolerance"
+    recommended_action: "Monitor sensor. Schedule calibration if persists."
+    category: hardware
+    auto_reset: true
+    response_time_ms: 1000
+    affects_control_mode: false
+    recurrence_window: 600
+    recurrence_threshold: 5
+
+  - code: W003
+    name: "Task Completion Delayed"
+    severity: WARNING
+    description: "Task is taking longer than expected to complete"
+    recommended_action: "Monitor task progress. Check for obstacles or performance issues."
+    category: system
+    auto_reset: true
+    response_time_ms: 2000
+    affects_control_mode: false
+    recurrence_window: 300
+    recurrence_threshold: 3
+
+  - code: W004
+    name: "Component Wear Threshold"
+    severity: WARNING
+    description: "Mechanical component approaching end of service life"
+    recommended_action: "Schedule preventive maintenance for affected component"
+    category: maintenance
+    auto_reset: false
+    response_time_ms: 5000
+    affects_control_mode: false
+    recurrence_window: 86400  # 24시간
+    recurrence_threshold: 1
+
+  # ============================================================================
+  # INFO Alarms (심각도: INFO)
+  # - 정보성 알림
+  # - 로그만 기록, 작업 중단 없음
+  # - 즉각적인 조치 불필요
+  # ============================================================================
+
+  - code: I001
+    name: "Maintenance Due"
+    severity: INFO
+    description: "Scheduled maintenance period has arrived"
+    recommended_action: "Schedule maintenance task during idle time"
+    category: maintenance
+    auto_reset: false
+    response_time_ms: 10000
+    affects_control_mode: false
+    recurrence_window: 86400
+    recurrence_threshold: 10
+
+  - code: I002
+    name: "Sensor Calibration Recommended"
+    severity: INFO
+    description: "Sensor drift detected, calibration recommended for optimal accuracy"
+    recommended_action: "Schedule sensor calibration during next maintenance window"
+    category: maintenance
+    auto_reset: false
+    response_time_ms: 10000
+    affects_control_mode: false
+    recurrence_window: 604800  # 7일
+    recurrence_threshold: 1
+
+# ============================================================================
+# Alarm Code Naming Convention:
+# - E### (E001-E999): Error/Critical - 즉시 조치 필요
+# - W### (W001-W999): Warning - 주의 필요
+# - I### (I001-I999): Info - 정보성 알림
+#
+# Category Options:
+# - safety: 안전 관련
+# - hardware: 하드웨어 고장
+# - communication: 통신 이슈
+# - battery: 배터리 상태
+# - position: 위치/이동 관련
+# - maintenance: 유지보수
+# - system: 시스템 전반
+#
+# Severity Escalation:
+# - recurrence_threshold회 이상 재발 시 심각도 자동 상향
+# - INFO → WARNING → CRITICAL
+# ============================================================================

@@ -15,6 +15,10 @@ namespace event {
 class IEventBus;
 }
 
+namespace fieldbus {
+class IFieldbus;
+}
+
 namespace rt {
 
 // Forward declarations
@@ -80,6 +84,20 @@ public:
 
     // RTDataStore 설정
     void setDataStore(RTDataStore* data_store);
+
+    /**
+     * @brief Set fieldbus interface (Feature 019 US4 - T043)
+     *
+     * @param fieldbus Fieldbus interface pointer (must outlive RTExecutive)
+     */
+    void setFieldbus(fieldbus::IFieldbus* fieldbus);
+
+    /**
+     * @brief Get fieldbus interface
+     *
+     * @return Fieldbus pointer (may be nullptr)
+     */
+    fieldbus::IFieldbus* getFieldbus() { return fieldbus_; }
 
     // 스케줄 파라미터 조회
     uint32_t getMinorCycleMs() const { return minor_cycle_ms_; }
@@ -171,6 +189,9 @@ private:
 
     // EventBus for publishing state change events
     std::shared_ptr<event::IEventBus> event_bus_;
+
+    // Fieldbus interface (Feature 019 US4 - T043)
+    fieldbus::IFieldbus* fieldbus_;  // Non-owning pointer, managed by caller
 
     // Action storage
     struct ActionSlot {

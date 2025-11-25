@@ -1,0 +1,397 @@
+openapi: 3.0.0
+info:
+  title: MXRC Datastore WebAPI
+  description: |
+    MXRC Core Datastore에 접근하기 위한 RESTful API.
+    IPC (Unix Domain Socket)를 통해 공유 메모리 기반 Datastore와 통신합니다.
+  version: 1.0.0
+  contact:
+    name: MXRC Team
+
+servers:
+  - url: http://localhost:3000
+    description: 로컬 개발 서버
+  - url: http://localhost:8080
+    description: 프로덕션 서버
+
+tags:
+  - name: datastore
+    description: Datastore CRUD 작업
+  - name: health
+    description: 시스템 상태 모니터링
+
+paths:
+  /api/datastore/{key}:
+    get:
+      tags:
+        - datastore
+      summary: Datastore 키 읽기
+      description: |
+        지정된 키의 현재 값을 Datastore에서 읽어옵니다.
+        `nonrt_read` 권한이 있는 키만 읽을 수 있습니다.
+      operationId: getDatastoreKey
+      parameters:
+        - name: key
+          in: path
+          required: true
+          description: Datastore 키 이름 (예: robot_position, ethercat_sensor_position)
+          schema:
+            type: string
+            example: robot_position
+      responses:
+        '200':
+          description: 성공적으로 값을 읽음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatastoreValue'
+              examples:
+                robotPosition:
+                  summary: 로봇 위치 읽기
+                  value:
+                    key: robot_position
+                    value: [1.5, 2.3, 0.8]
+                    version: 12345
+                    timestamp: '2025-01-24T10:30:00.123Z'
+                sensorPosition:
+                  summary: 센서 위치 읽기 (64축)
+                  value:
+                    key: ethercat_sensor_position
+                    value: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.0, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 5.0, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 6.0, 6.1, 6.2, 6.3]
+                    version: 67890
+                    timestamp: '2025-01-24T10:30:01.456Z'
+        '403':
+          description: 읽기 권한 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: PERMISSION_DENIED
+                message: Read permission denied for key 'internal_state'
+                key: internal_state
+        '404':
+          description: 키가 존재하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: KEY_NOT_FOUND
+                message: Datastore key 'unknown_key' not found in schema
+                key: unknown_key
+        '503':
+          description: MXRC Core 연결 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: SERVICE_UNAVAILABLE
+                message: IPC connection to MXRC Core failed
+
+    put:
+      tags:
+        - datastore
+      summary: Datastore 키 쓰기
+      description: |
+        지정된 키에 새로운 값을 씁니다.
+        `nonrt_write` 권한이 있는 키만 쓸 수 있습니다 (RT 전용 키는 금지).
+      operationId: putDatastoreKey
+      parameters:
+        - name: key
+          in: path
+          required: true
+          description: Datastore 키 이름
+          schema:
+            type: string
+            example: ethercat_target_position
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value:
+                  description: 쓸 값 (타입은 IPC 스키마에 정의된 타입과 일치해야 함)
+                  example: [1.0, 2.0, 3.0]
+              required:
+                - value
+            examples:
+              vector3d:
+                summary: Vector3d 타입 쓰기
+                value:
+                  value: [1.57, 0.0, 3.14]
+              array64:
+                summary: 64축 배열 쓰기
+                value:
+                  value: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.0, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 5.0, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 6.0, 6.1, 6.2, 6.3]
+      responses:
+        '200':
+          description: 성공적으로 값을 씀
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:
+                    type: string
+                  success:
+                    type: boolean
+                    example: true
+                  version:
+                    type: integer
+                    description: 새로 할당된 버전 번호
+                    example: 12346
+              example:
+                key: ethercat_target_position
+                success: true
+                version: 12346
+        '400':
+          description: 타입 불일치 또는 잘못된 요청
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                typeMismatch:
+                  summary: 타입 불일치
+                  value:
+                    error: TYPE_MISMATCH
+                    message: Expected Vector3d (3 numbers), got string
+                    key: robot_position
+                    expected: Vector3d
+                    received: string
+                invalidArraySize:
+                  summary: 배열 크기 불일치
+                  value:
+                    error: TYPE_MISMATCH
+                    message: Expected array of size 64, got 63
+                    key: ethercat_target_position
+                    expected: 64
+                    received: 63
+        '403':
+          description: 쓰기 권한 없음 (RT 전용 키)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: PERMISSION_DENIED
+                message: Write permission denied for key 'robot_position' (RT-only write key)
+                key: robot_position
+        '404':
+          description: 키가 존재하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: KEY_NOT_FOUND
+                message: Datastore key 'unknown_key' not found in schema
+                key: unknown_key
+
+  /api/health:
+    get:
+      tags:
+        - health
+      summary: Health check
+      description: |
+        API 서버 및 MXRC Core 프로세스의 상태를 확인합니다.
+        systemd 서비스 상태 및 IPC 연결 상태를 포함합니다.
+      operationId: getHealthStatus
+      responses:
+        '200':
+          description: Health check 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              examples:
+                healthy:
+                  summary: 모든 서비스 정상
+                  value:
+                    status: healthy
+                    services:
+                      mxrc_rt: running
+                      mxrc_nonrt: running
+                      api_server: running
+                    timestamp: '2025-01-24T10:30:00.000Z'
+                    details:
+                      ipc_latency_ms: 1.5
+                      memory_usage_mb: 128
+                      uptime_seconds: 3600
+                degraded:
+                  summary: 일부 서비스 중단
+                  value:
+                    status: degraded
+                    services:
+                      mxrc_rt: running
+                      mxrc_nonrt: stopped
+                      api_server: running
+                    timestamp: '2025-01-24T10:30:00.000Z'
+                    details:
+                      ipc_latency_ms: 2.5
+                      memory_usage_mb: 150
+                      uptime_seconds: 1800
+                unhealthy:
+                  summary: IPC 연결 실패
+                  value:
+                    status: unhealthy
+                    services:
+                      mxrc_rt: failed
+                      mxrc_nonrt: stopped
+                      api_server: running
+                    timestamp: '2025-01-24T10:30:00.000Z'
+                    details:
+                      error: IPC connection failed
+
+components:
+  schemas:
+    DatastoreValue:
+      type: object
+      description: Datastore에 저장된 값 (VersionedData 래핑)
+      properties:
+        key:
+          type: string
+          description: Datastore 키 이름
+          example: robot_position
+        value:
+          description: 실제 데이터 값 (타입은 IPC 스키마에 정의됨)
+          oneOf:
+            - type: array
+              items:
+                type: number
+              description: Vector3d 또는 array<T, N>
+            - type: number
+              description: 단일 숫자
+            - type: string
+              description: 문자열
+            - type: boolean
+              description: 불리언
+          example: [1.5, 2.3, 0.8]
+        version:
+          type: integer
+          format: uint64
+          description: VersionedData 버전 번호
+          example: 12345
+        timestamp:
+          type: string
+          format: date-time
+          description: 값이 마지막으로 업데이트된 시간
+          example: '2025-01-24T10:30:00.123Z'
+      required:
+        - key
+        - value
+        - version
+        - timestamp
+
+    HealthStatus:
+      type: object
+      description: 시스템 health check 결과
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+          description: |
+            전체 시스템 상태:
+            - healthy: 모든 서비스 정상
+            - degraded: 일부 서비스 중단
+            - unhealthy: 핵심 서비스 중단 또는 IPC 연결 실패
+          example: healthy
+        services:
+          type: object
+          description: 각 서비스별 상태
+          properties:
+            mxrc_rt:
+              type: string
+              enum: [running, stopped, failed]
+              description: MXRC RT 프로세스 상태
+              example: running
+            mxrc_nonrt:
+              type: string
+              enum: [running, stopped, failed]
+              description: MXRC Non-RT 프로세스 상태
+              example: running
+            api_server:
+              type: string
+              enum: [running, stopped, failed]
+              description: API 서버 자체 상태
+              example: running
+          required:
+            - mxrc_rt
+            - mxrc_nonrt
+            - api_server
+        timestamp:
+          type: string
+          format: date-time
+          description: Health check 수행 시간
+          example: '2025-01-24T10:30:00.000Z'
+        details:
+          type: object
+          description: 추가 상세 정보 (선택적)
+          properties:
+            ipc_latency_ms:
+              type: number
+              description: IPC 통신 지연 시간 (밀리초)
+              example: 1.5
+            memory_usage_mb:
+              type: number
+              description: API 서버 메모리 사용량 (MB)
+              example: 128
+            uptime_seconds:
+              type: number
+              description: API 서버 가동 시간 (초)
+              example: 3600
+            error:
+              type: string
+              description: 오류 메시지 (status가 unhealthy일 때)
+              example: IPC connection failed
+      required:
+        - status
+        - services
+        - timestamp
+
+    Error:
+      type: object
+      description: 오류 응답
+      properties:
+        error:
+          type: string
+          description: 오류 코드
+          enum:
+            - PERMISSION_DENIED
+            - KEY_NOT_FOUND
+            - TYPE_MISMATCH
+            - SERVICE_UNAVAILABLE
+            - INTERNAL_ERROR
+          example: PERMISSION_DENIED
+        message:
+          type: string
+          description: 사람이 읽을 수 있는 오류 메시지
+          example: Read permission denied for key 'internal_state'
+        key:
+          type: string
+          description: 오류와 관련된 키 (있는 경우)
+          example: internal_state
+        expected:
+          description: 예상된 값 (타입 불일치 시)
+          example: Vector3d
+        received:
+          description: 받은 값 (타입 불일치 시)
+          example: string
+      required:
+        - error
+        - message
+
+  securitySchemes:
+    # 현재 버전은 인증 없음 (localhost 전용)
+    # 향후 API Key 또는 OAuth2 추가 예정
+    noAuth:
+      type: http
+      scheme: basic
+      description: 현재 버전은 인증이 필요하지 않습니다 (localhost 전용)
+
+security:
+  - noAuth: []

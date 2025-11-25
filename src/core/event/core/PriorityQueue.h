@@ -5,6 +5,8 @@
 #include <mutex>
 #include <atomic>
 #include <optional>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace mxrc::core::event {
 
@@ -23,6 +25,8 @@ struct PriorityQueueMetrics {
     std::atomic<uint64_t> low_events_dropped{0};
 
     std::atomic<uint64_t> events_popped{0};
+    std::atomic<uint64_t> events_expired{0};  ///< Feature 019 - US3: TTL expiration count
+    std::atomic<uint64_t> events_coalesced{0};  ///< Feature 019 - US3: Coalescing count
     std::atomic<size_t> current_size{0};
     std::atomic<size_t> peak_size{0};
 };
@@ -81,6 +85,9 @@ public:
      * - HIGH: Dropped if queue > 90%
      * - NORMAL: Dropped if queue > 90%
      * - LOW: Dropped if queue > 80%
+     *
+     * Feature 019 - US3: Coalescing policy
+     * - If event has a coalescing_key, replaces any existing event with same key
      *
      * @param event Event to push (moved)
      * @return true if accepted, false if dropped
@@ -149,6 +156,8 @@ public:
         metrics_.normal_events_dropped = 0;
         metrics_.low_events_dropped = 0;
         metrics_.events_popped = 0;
+        metrics_.events_expired = 0;
+        metrics_.events_coalesced = 0;
         metrics_.current_size = 0;
         metrics_.peak_size = 0;
     }
@@ -179,6 +188,11 @@ private:
     std::priority_queue<PrioritizedEvent> queue_;  ///< Internal priority queue
     mutable std::mutex mutex_;                     ///< Protects queue access
     std::atomic<size_t> size_{0};                  ///< Current queue size
+
+    // Feature 019 - US3: Coalescing support
+    // Maps coalescing_key -> latest sequence_number
+    // When popping, events with older sequence numbers for the same key are skipped
+    std::unordered_map<std::string, uint64_t> coalescing_latest_seq_;  ///< Latest seq for each coalescing key
 
     // Metrics
     PriorityQueueMetrics metrics_;

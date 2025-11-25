@@ -1,8 +1,8 @@
 # Tasks: 팔렛 셔틀 제어 시스템
 
 **Input**: Design documents from `/docs/specs/016-pallet-shuttle-control/`
-**Status**: In Progress - Phase 4 Complete
-**Progress**: 48/93 tasks completed (51.6%)
+**Status**: In Progress - Phase 4 Mostly Complete
+**Progress**: 54/93 tasks completed (58.1%)
 **Last Updated**: 2025-01-25
 **Prerequisites**: plan.md, spec.md, research.md
 
@@ -147,18 +147,18 @@
 - [X] T047 [P] [US5] ControlMode 상태 전환 검증 테스트 (included in T045) ✅
 - [ ] T048 [P] [US5] Behavior Arbitration 통합 테스트 (경쟁 상황) in tests/integration/robot/pallet_shuttle/behavior_arbitration_test.cpp
 
-### 구현
+### 구현 ✅
 
-- [ ] T049 [US5] BehaviorArbiter tick() 메서드 구현 (100ms 주기) in src/core/control/impl/BehaviorArbiter.cpp
-- [ ] T050 [US5] selectNextBehavior() 알고리즘 구현 in src/core/control/impl/BehaviorArbiter.cpp
-- [ ] T051 [US5] shouldPreemptCurrentTask() 로직 구현 in src/core/control/impl/BehaviorArbiter.cpp
-- [ ] T052 [US5] handleUrgentTask() 구현 (Suspend/Resume) in src/core/control/impl/BehaviorArbiter.cpp
-- [ ] T053 [US5] handleEmergency() 구현 (즉시 중단) in src/core/control/impl/BehaviorArbiter.cpp
-- [ ] T054 [US5] transitionTo() 메서드 구현 (ControlMode 전환) in src/core/control/impl/BehaviorArbiter.cpp
-- [ ] T055 [US5] DataStore에 제어 모드 상태 기록 in src/core/control/impl/BehaviorArbiter.cpp
-- [ ] T056 [US5] 동일 우선순위 부가 규칙 (FIFO) 구현 in src/core/control/impl/BehaviorArbiter.cpp
+- [X] T049 [US5] BehaviorArbiter tick() 메서드 구현 (100ms 주기) in src/core/control/impl/BehaviorArbiter.cpp ✅
+- [X] T050 [US5] selectNextBehavior() 알고리즘 구현 in src/core/control/impl/BehaviorArbiter.cpp ✅
+- [X] T051 [US5] shouldPreemptCurrentTask() 로직 구현 in src/core/control/impl/BehaviorArbiter.cpp ✅
+- [X] T052 [US5] handleUrgentTask() 구현 (Suspend/Resume) in src/core/control/impl/BehaviorArbiter.cpp ✅
+- [X] T053 [US5] handleEmergency() 구현 (즉시 중단) in src/core/control/impl/BehaviorArbiter.cpp ✅
+- [X] T054 [US5] transitionTo() 메서드 구현 (ControlMode 전환) in src/core/control/impl/BehaviorArbiter.cpp ✅
+- [ ] T055 [US5] DataStore에 제어 모드 상태 기록 in src/core/control/impl/BehaviorArbiter.cpp (TODO 마커)
+- [X] T056 [US5] 동일 우선순위 부가 규칙 (FIFO) 구현 in src/core/control/impl/BehaviorPriorityQueue.cpp ✅
 
-**Checkpoint**: Tests 완료 - 구현 작업 필요 (T049-T056)
+**Checkpoint**: Phase 4 거의 완료 - DataStore 통합만 남음 (T055)
 
 ---
 

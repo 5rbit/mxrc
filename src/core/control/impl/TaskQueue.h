@@ -45,6 +45,10 @@ public:
 
     bool remove(const std::string& task_id) override;
 
+    std::vector<std::shared_ptr<task::ITask>> getAllTasks() const override;
+
+    std::optional<std::shared_ptr<task::ITask>> peek() const override;
+
 private:
     /**
      * @brief Priority별 Task 큐

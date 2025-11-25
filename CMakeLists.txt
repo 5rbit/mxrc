@@ -870,6 +870,8 @@ add_executable(run_tests
     tests/unit/systemd/watchdog_timer_test.cpp
     # Feature 016: Pallet Shuttle Control tests
     tests/unit/core/alarm/AlarmManager_test.cpp
+    tests/unit/core/control/BehaviorArbiter_test.cpp
+    tests/unit/core/control/TaskQueue_test.cpp
     # Feature 016: Implementation sources for tests
     src/core/alarm/impl/Alarm.cpp
     src/core/alarm/impl/AlarmConfiguration.cpp

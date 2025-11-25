@@ -117,6 +117,44 @@ bool TaskQueue::remove(const std::string& task_id) {
     return removed;
 }
 
+std::vector<std::shared_ptr<task::ITask>> TaskQueue::getAllTasks() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    std::vector<std::shared_ptr<task::ITask>> all_tasks;
+
+    // Priority 순서대로 추가
+    all_tasks.insert(all_tasks.end(), emergency_stop_.tasks.begin(), emergency_stop_.tasks.end());
+    all_tasks.insert(all_tasks.end(), safety_issue_.tasks.begin(), safety_issue_.tasks.end());
+    all_tasks.insert(all_tasks.end(), urgent_task_.tasks.begin(), urgent_task_.tasks.end());
+    all_tasks.insert(all_tasks.end(), normal_task_.tasks.begin(), normal_task_.tasks.end());
+    all_tasks.insert(all_tasks.end(), maintenance_.tasks.begin(), maintenance_.tasks.end());
+
+    return all_tasks;
+}
+
+std::optional<std::shared_ptr<task::ITask>> TaskQueue::peek() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    // 우선순위 순서대로 확인
+    if (!emergency_stop_.empty()) {
+        return emergency_stop_.tasks.front();
+    }
+    if (!safety_issue_.empty()) {
+        return safety_issue_.tasks.front();
+    }
+    if (!urgent_task_.empty()) {
+        return urgent_task_.tasks.front();
+    }
+    if (!normal_task_.empty()) {
+        return normal_task_.tasks.front();
+    }
+    if (!maintenance_.empty()) {
+        return maintenance_.tasks.front();
+    }
+
+    return std::nullopt;
+}
+
 TaskQueue::PriorityQueue& TaskQueue::getQueue(Priority priority) {
     switch (priority) {
         case Priority::EMERGENCY_STOP:

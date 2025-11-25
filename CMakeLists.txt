@@ -271,6 +271,13 @@ add_executable(mxrc
     src/core/tracing/TracerProvider.cpp
     src/core/tracing/EventBusTracer.cpp
     src/core/tracing/RTCycleTracer.cpp
+    # Feature 016: Pallet Shuttle Control
+    src/core/alarm/impl/Alarm.cpp
+    src/core/alarm/impl/AlarmConfiguration.cpp
+    src/core/alarm/impl/AlarmManager.cpp
+    src/core/control/impl/BehaviorPriorityQueue.cpp
+    src/core/control/impl/BehaviorArbiter.cpp
+    src/core/control/impl/TaskQueue.cpp
 )
 
 # Link dependencies
@@ -282,6 +289,9 @@ target_link_libraries(mxrc PRIVATE
     nlohmann_json::nlohmann_json
     ${SYSTEMD_LIBRARIES}
 )
+if(yaml-cpp_FOUND)
+    target_link_libraries(mxrc PRIVATE yaml-cpp)
+endif()
 if(Boost_FOUND)
     target_link_libraries(mxrc PRIVATE Boost::boost)
 endif()
@@ -340,6 +350,21 @@ target_include_directories(mxrc PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/systemd/impl
     ${PROJECT_SOURCE_DIR}/src/core/systemd/util
     ${PROJECT_SOURCE_DIR}/src/core/systemd/dto
+    ${PROJECT_SOURCE_DIR}/src/core/control
+    ${PROJECT_SOURCE_DIR}/src/core/control/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/control/impl
+    ${PROJECT_SOURCE_DIR}/src/core/control/dto
+    ${PROJECT_SOURCE_DIR}/src/core/alarm
+    ${PROJECT_SOURCE_DIR}/src/core/alarm/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/alarm/impl
+    ${PROJECT_SOURCE_DIR}/src/core/alarm/dto
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/control
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/actions
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/sequences
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/tasks
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/state
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/config
     ${SYSTEMD_INCLUDE_DIRS}
 )
 
@@ -540,6 +565,21 @@ target_include_directories(nonrt PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/systemd/impl
     ${PROJECT_SOURCE_DIR}/src/core/systemd/util
     ${PROJECT_SOURCE_DIR}/src/core/systemd/dto
+    ${PROJECT_SOURCE_DIR}/src/core/control
+    ${PROJECT_SOURCE_DIR}/src/core/control/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/control/impl
+    ${PROJECT_SOURCE_DIR}/src/core/control/dto
+    ${PROJECT_SOURCE_DIR}/src/core/alarm
+    ${PROJECT_SOURCE_DIR}/src/core/alarm/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/alarm/impl
+    ${PROJECT_SOURCE_DIR}/src/core/alarm/dto
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/control
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/actions
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/sequences
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/tasks
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/state
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/config
     ${SYSTEMD_INCLUDE_DIRS}
 )
 
@@ -637,6 +677,21 @@ target_include_directories(rt PUBLIC
     ${PROJECT_SOURCE_DIR}/src/core/ethercat/dto
     ${PROJECT_SOURCE_DIR}/src/core/ethercat/util
     ${PROJECT_SOURCE_DIR}/src/core/ethercat/adapters
+    ${PROJECT_SOURCE_DIR}/src/core/control
+    ${PROJECT_SOURCE_DIR}/src/core/control/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/control/impl
+    ${PROJECT_SOURCE_DIR}/src/core/control/dto
+    ${PROJECT_SOURCE_DIR}/src/core/alarm
+    ${PROJECT_SOURCE_DIR}/src/core/alarm/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/alarm/impl
+    ${PROJECT_SOURCE_DIR}/src/core/alarm/dto
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/control
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/actions
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/sequences
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/tasks
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/state
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/config
     ${SYSTEMD_INCLUDE_DIRS}
     ${CMAKE_BINARY_DIR}/generated
 )
@@ -813,6 +868,15 @@ add_executable(run_tests
     tests/unit/systemd/systemd_util_test.cpp
     tests/unit/systemd/watchdog_notifier_test.cpp
     tests/unit/systemd/watchdog_timer_test.cpp
+    # Feature 016: Pallet Shuttle Control tests
+    tests/unit/core/alarm/AlarmManager_test.cpp
+    # Feature 016: Implementation sources for tests
+    src/core/alarm/impl/Alarm.cpp
+    src/core/alarm/impl/AlarmConfiguration.cpp
+    src/core/alarm/impl/AlarmManager.cpp
+    src/core/control/impl/BehaviorPriorityQueue.cpp
+    src/core/control/impl/BehaviorArbiter.cpp
+    src/core/control/impl/TaskQueue.cpp
     # systemd integration tests (Feature 022: P1 Startup Order)
     tests/integration/systemd/startup_order_test.cpp
     tests/integration/systemd/retry_logic_test.cpp
@@ -933,6 +997,25 @@ target_include_directories(run_tests PUBLIC
     ${PROJECT_SOURCE_DIR}/tests/unit/ethercat
     ${PROJECT_SOURCE_DIR}/tests/integration/ethercat
     ${PROJECT_SOURCE_DIR}/tests/mocks
+    ${PROJECT_SOURCE_DIR}/src/core/control
+    ${PROJECT_SOURCE_DIR}/src/core/control/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/control/impl
+    ${PROJECT_SOURCE_DIR}/src/core/control/dto
+    ${PROJECT_SOURCE_DIR}/src/core/alarm
+    ${PROJECT_SOURCE_DIR}/src/core/alarm/interfaces
+    ${PROJECT_SOURCE_DIR}/src/core/alarm/impl
+    ${PROJECT_SOURCE_DIR}/src/core/alarm/dto
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/control
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/actions
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/sequences
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/tasks
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/state
+    ${PROJECT_SOURCE_DIR}/src/robot/pallet_shuttle/config
+    ${PROJECT_SOURCE_DIR}/tests/unit/core/control
+    ${PROJECT_SOURCE_DIR}/tests/unit/core/alarm
+    ${PROJECT_SOURCE_DIR}/tests/unit/robot/pallet_shuttle
+    ${PROJECT_SOURCE_DIR}/tests/integration/robot/pallet_shuttle
     ${SYSTEMD_INCLUDE_DIRS}
 )
 

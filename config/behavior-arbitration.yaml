@@ -1,0 +1,146 @@
+# MXRC Behavior Arbitration Configuration
+# Feature 016: Pallet Shuttle Control System
+#
+# 이 파일은 BehaviorArbiter의 동작 설정을 정의합니다.
+
+version: "1.0"
+description: "Behavior Arbitration Configuration for Pallet Shuttle Robot"
+
+# Arbiter 설정
+arbiter:
+  # Tick 주기 (ms)
+  tick_interval_ms: 100
+
+  # 최대 대기 행동 수
+  max_pending_behaviors: 100
+
+  # 타임아웃 체크 활성화
+  enable_timeout_check: true
+
+  # 통계 수집 활성화
+  enable_statistics: true
+
+# ControlMode 전환 규칙
+control_mode_transitions:
+  # BOOT → INIT 전환 조건
+  boot_to_init:
+    auto_transition: true
+    timeout_ms: 5000
+
+  # INIT → STANDBY 전환 조건
+  init_to_standby:
+    auto_transition: true
+    requires_homing: true
+    timeout_ms: 30000
+
+  # STANDBY → AUTO 전환 조건
+  standby_to_auto:
+    requires_safety_check: true
+    requires_no_critical_alarms: true
+
+  # AUTO → FAULT 전환 조건 (Critical Alarm 발생 시)
+  auto_to_fault:
+    immediate: true
+    stop_all_tasks: true
+
+  # FAULT → STANDBY 복구 조건
+  fault_to_standby:
+    requires_alarm_reset: true
+    requires_manual_confirmation: false
+
+# Priority별 Preemption 규칙
+preemption_rules:
+  # Priority 0: EMERGENCY_STOP
+  emergency_stop:
+    can_preempt: true
+    preempt_method: "cancel"  # 즉시 중단
+    target_control_mode: "FAULT"
+
+  # Priority 1: SAFETY_ISSUE
+  safety_issue:
+    can_preempt: true
+    preempt_method: "pause"  # 일시 중지 (재개 가능)
+    target_control_mode: "STANDBY"
+
+  # Priority 2: URGENT_TASK
+  urgent_task:
+    can_preempt: true
+    preempt_method: "pause"  # NORMAL_TASK만 일시 중지
+    preempt_only: ["NORMAL_TASK", "MAINTENANCE"]
+
+  # Priority 3: NORMAL_TASK
+  normal_task:
+    can_preempt: false  # 완료될 때까지 실행
+
+  # Priority 4: MAINTENANCE
+  maintenance:
+    can_preempt: false
+    run_only_when_idle: true
+
+# 동일 Priority 내 부가 규칙
+same_priority_rules:
+  # 동일 우선순위 작업 처리 방식
+  ordering: "FIFO"  # First-In-First-Out
+
+  # 동일 우선순위 작업 간 전환 허용
+  allow_switching: false
+
+# Suspend/Resume 설정
+suspend_resume:
+  # Resume 시 재시작 위치
+  resume_from: "last_checkpoint"  # 또는 "beginning"
+
+  # Suspend 타임아웃 (ms)
+  # 이 시간 내에 Resume되지 않으면 취소
+  suspend_timeout_ms: 300000  # 5분
+
+  # Suspend 상태에서 허용되는 최대 작업 수
+  max_suspended_tasks: 5
+
+# 성능 설정
+performance:
+  # Behavior 선택 알고리즘 최대 실행 시간 (ms)
+  max_selection_time_ms: 10
+
+  # 큐 검색 최적화
+  enable_queue_caching: true
+
+  # 통계 업데이트 주기 (tick 횟수)
+  statistics_update_interval: 10
+
+# 로깅 설정
+logging:
+  # 모든 behavior 요청 로깅
+  log_all_requests: true
+
+  # 모드 전환 로깅
+  log_mode_transitions: true
+
+  # 선점 이벤트 로깅
+  log_preemptions: true
+
+  # 상세 디버그 로깅
+  enable_debug: false
+
+# 안전 설정
+safety:
+  # Critical Alarm 발생 시 자동 FAULT 전환
+  auto_fault_on_critical_alarm: true
+
+  # FAULT 모드에서 허용되는 작업
+  allowed_in_fault_mode: ["alarm_reset", "manual_control"]
+
+  # Emergency Stop 시 브레이크 작동
+  engage_brakes_on_emergency: true
+
+# 모니터링
+monitoring:
+  # DataStore에 상태 기록 주기 (ms)
+  datastore_update_interval_ms: 1000
+
+  # EventBus에 이벤트 발행
+  publish_behavior_events: true
+  publish_mode_change_events: true
+
+  # 성능 메트릭 수집
+  collect_performance_metrics: true

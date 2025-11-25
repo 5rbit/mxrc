@@ -10,6 +10,9 @@
 #include "BehaviorPriorityQueue.h"
 #include "../../task/interfaces/ITask.h"
 
+// Forward declarations
+class DataStore;
+
 namespace mxrc::core::control {
 
 /**
@@ -38,8 +41,11 @@ public:
      * @brief 생성자
      *
      * @param alarm_manager Alarm 관리자 (Critical Alarm 체크용)
+     * @param data_store DataStore 인스턴스 (optional)
      */
-    explicit BehaviorArbiter(std::shared_ptr<alarm::IAlarmManager> alarm_manager);
+    explicit BehaviorArbiter(
+        std::shared_ptr<alarm::IAlarmManager> alarm_manager,
+        std::shared_ptr<DataStore> data_store = nullptr);
 
     ~BehaviorArbiter() override = default;
 
@@ -124,6 +130,13 @@ private:
     void checkCriticalAlarms();
 
     /**
+     * @brief Warning Alarm 체크 및 처리
+     *
+     * Warning alarm이 있으면 현재 작업 완료 후 SAFE_MODE로 전환
+     */
+    void checkWarningAlarms();
+
+    /**
      * @brief Timeout된 behavior 제거
      */
     void removeTimedOutBehaviors();
@@ -131,8 +144,14 @@ private:
     // Alarm 관리자 (Critical Alarm 확인용)
     std::shared_ptr<alarm::IAlarmManager> alarm_manager_;
 
+    // DataStore (optional)
+    std::shared_ptr<DataStore> data_store_;
+
     // 현재 ControlMode
     std::atomic<ControlMode> current_mode_{ControlMode::STANDBY};
+
+    // Warning alarm 발생 시 SAFE_MODE 전환 대기 플래그
+    std::atomic<bool> pending_safe_mode_{false};
 
     // Priority Queue (lock-free)
     BehaviorPriorityQueue pending_behaviors_;

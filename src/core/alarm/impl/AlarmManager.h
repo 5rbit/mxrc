@@ -8,6 +8,12 @@
 #include "../interfaces/IAlarmConfiguration.h"
 #include "Alarm.h"
 
+// Forward declarations
+namespace mxrc::core::event {
+    class IEventBus;
+}
+class DataStore;
+
 namespace mxrc::core::alarm {
 
 /**
@@ -24,8 +30,13 @@ public:
      * @brief 생성자
      *
      * @param config Alarm 설정 인터페이스
+     * @param data_store DataStore 인스턴스 (optional)
+     * @param event_bus EventBus 인스턴스 (optional)
      */
-    explicit AlarmManager(std::shared_ptr<IAlarmConfiguration> config);
+    explicit AlarmManager(
+        std::shared_ptr<IAlarmConfiguration> config,
+        std::shared_ptr<DataStore> data_store = nullptr,
+        std::shared_ptr<event::IEventBus> event_bus = nullptr);
 
     ~AlarmManager() override = default;
 
@@ -86,8 +97,22 @@ private:
      */
     void publishEvent(const AlarmDto& alarm);
 
+    /**
+     * @brief EventBus에 alarm 해제 이벤트 발행
+     */
+    void publishClearEvent(const std::string& alarm_id, const std::string& alarm_type);
+
+    /**
+     * @brief EventBus에 alarm 심각도 상향 이벤트 발행
+     */
+    void publishEscalateEvent(const AlarmDto& alarm, AlarmSeverity old_severity);
+
     // Alarm 설정
     std::shared_ptr<IAlarmConfiguration> config_;
+
+    // DataStore와 EventBus (optional)
+    std::shared_ptr<DataStore> data_store_;
+    std::shared_ptr<event::IEventBus> event_bus_;
 
     // alarm_id -> Alarm 매핑
     std::unordered_map<std::string, std::shared_ptr<Alarm>> alarms_;
@@ -97,6 +122,10 @@ private:
 
     // alarm_code -> 재발 횟수 (시간 윈도우 내)
     std::unordered_map<std::string, uint32_t> recurrence_count_;
+
+    // Alarm 이력 (최근 발생/해제된 alarm들)
+    std::vector<AlarmDto> alarm_history_;
+    static constexpr size_t MAX_HISTORY_SIZE = 1000;
 
     // 통계
     AlarmStats stats_;

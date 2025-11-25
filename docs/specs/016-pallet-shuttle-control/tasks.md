@@ -2,7 +2,7 @@
 
 **Input**: Design documents from `/docs/specs/016-pallet-shuttle-control/`
 **Status**: In Progress - Phase 3-4 Mostly Complete
-**Progress**: 56/93 tasks completed (60.2%)
+**Progress**: 64/93 tasks completed (68.8%)
 **Last Updated**: 2025-11-25
 **Prerequisites**: plan.md, spec.md, research.md
 
@@ -116,19 +116,19 @@
 - [X] T034 [P] [US2] AlarmManager 단위 테스트 (생성, 조회, 리셋, 재발 추적, 심각도 상향) in tests/unit/core/alarm/AlarmManager_test.cpp ✅
 - [X] T035 [P] [US2] AlarmConfiguration 단위 테스트 (YAML 파싱, 심각도 상향) in tests/unit/core/alarm/AlarmConfiguration_test.cpp ✅
 - [X] T036 [P] [US2] Alarm 재발 빈도 추적 테스트 in tests/unit/core/alarm/AlarmManager_test.cpp ✅
-- [ ] T037 [P] [US2] Critical Alarm 발생 시 즉시 중단 통합 테스트 in tests/integration/robot/pallet_shuttle/alarm_handling_test.cpp (Phase 5 의존)
+- [X] T037 [P] [US2] Critical Alarm 발생 시 즉시 중단 통합 테스트 in tests/integration/robot/pallet_shuttle/alarm_handling_test.cpp ✅
 
 ### 구현
 
 - [X] T038 [US2] Alarm 재발 빈도 추적 로직 구현 (sliding window) in src/core/alarm/impl/AlarmManager.cpp ✅
 - [X] T039 [US2] Alarm 심각도 자동 상향 조정 로직 구현 in src/core/alarm/impl/AlarmManager.cpp ✅
-- [ ] T040 [US2] DataStore Alarm 정보 저장 통합 in src/core/alarm/impl/AlarmManager.cpp (TODO 마커 존재)
-- [ ] T041 [US2] EventBus Alarm 이벤트 발행 통합 in src/core/alarm/impl/AlarmManager.cpp (TODO 마커 존재)
+- [X] T040 [US2] DataStore Alarm 정보 저장 통합 in src/core/alarm/impl/AlarmManager.cpp ✅
+- [X] T041 [US2] EventBus Alarm 이벤트 발행 통합 in src/core/alarm/impl/AlarmManager.cpp ✅
 - [X] T042 [US2] Critical Alarm 처리 흐름 구현 (즉시 중단) in src/core/control/impl/BehaviorArbiter.cpp ✅
-- [ ] T043 [US2] Warning Alarm 처리 흐름 구현 (작업 완료 후 대기) in src/core/control/impl/BehaviorArbiter.cpp
-- [ ] T044 [US2] Alarm 이력 조회 기능 구현 in src/core/alarm/impl/AlarmManager.cpp
+- [X] T043 [US2] Warning Alarm 처리 흐름 구현 (작업 완료 후 대기) in src/core/control/impl/BehaviorArbiter.cpp ✅
+- [X] T044 [US2] Alarm 이력 조회 기능 구현 in src/core/alarm/impl/AlarmManager.cpp ✅
 
-**Checkpoint**: Alarm 시스템 부분 완료 - 핵심 기능 동작, TODO 마커 남아있음
+**Checkpoint**: Alarm 시스템 완료 ✅ - DataStore/EventBus 통합 완료
 
 ---
 
@@ -145,7 +145,7 @@
 - [X] T045 [P] [US5] BehaviorArbiter 우선순위 선택 단위 테스트 (11 tests) in tests/unit/core/control/BehaviorArbiter_test.cpp ✅
 - [X] T046 [P] [US5] TaskQueue 우선순위 정렬 단위 테스트 (10 tests) in tests/unit/core/control/TaskQueue_test.cpp ✅
 - [X] T047 [P] [US5] ControlMode 상태 전환 검증 테스트 (included in T045) ✅
-- [ ] T048 [P] [US5] Behavior Arbitration 통합 테스트 (경쟁 상황) in tests/integration/robot/pallet_shuttle/behavior_arbitration_test.cpp
+- [x] T048 [P] [US5] Behavior Arbitration 통합 테스트 (경쟁 상황) in tests/integration/robot/pallet_shuttle/behavior_arbitration_test.cpp
 
 ### 구현 ✅
 
@@ -155,10 +155,10 @@
 - [X] T052 [US5] handleUrgentTask() 구현 (Suspend/Resume) in src/core/control/impl/BehaviorArbiter.cpp ✅
 - [X] T053 [US5] handleEmergency() 구현 (즉시 중단) in src/core/control/impl/BehaviorArbiter.cpp ✅
 - [X] T054 [US5] transitionTo() 메서드 구현 (ControlMode 전환) in src/core/control/impl/BehaviorArbiter.cpp ✅
-- [ ] T055 [US5] DataStore에 제어 모드 상태 기록 in src/core/control/impl/BehaviorArbiter.cpp (TODO 마커)
+- [X] T055 [US5] DataStore에 제어 모드 상태 기록 in src/core/control/impl/BehaviorArbiter.cpp ✅
 - [X] T056 [US5] 동일 우선순위 부가 규칙 (FIFO) 구현 in src/core/control/impl/BehaviorPriorityQueue.cpp ✅
 
-**Checkpoint**: Phase 4 거의 완료 - DataStore 통합만 남음 (T055)
+**Checkpoint**: Phase 4 완료 ✅ - DataStore 통합 완료
 
 ---
 
@@ -170,24 +170,24 @@
 
 ### 테스트 작성 (TDD)
 
-- [ ] T057 [P] [US1] MoveToPositionAction 단위 테스트 in tests/unit/robot/pallet_shuttle/actions/MoveToPositionActionTest.cpp
-- [ ] T058 [P] [US1] PickPalletAction 단위 테스트 in tests/unit/robot/pallet_shuttle/actions/PickPalletActionTest.cpp
-- [ ] T059 [P] [US1] PlacePalletAction 단위 테스트 in tests/unit/robot/pallet_shuttle/actions/PlacePalletActionTest.cpp
-- [ ] T060 [P] [US1] PalletTransportSequence 단위 테스트 in tests/unit/robot/pallet_shuttle/sequences/PalletTransportSequenceTest.cpp
-- [ ] T061 [P] [US1] PalletTransportTask 단위 테스트 in tests/unit/robot/pallet_shuttle/tasks/PalletTransportTaskTest.cpp
-- [ ] T062 [US1] 기본 팔렛 운반 통합 테스트 in tests/integration/robot/pallet_shuttle/basic_transport_test.cpp
+- [X] T057 [P] [US1] MoveToPositionAction 단위 테스트 in tests/unit/robot/pallet_shuttle/actions/MoveToPositionActionTest.cpp ✅
+- [X] T058 [P] [US1] PickPalletAction 단위 테스트 in tests/unit/robot/pallet_shuttle/actions/PickPalletActionTest.cpp ✅
+- [X] T059 [P] [US1] PlacePalletAction 단위 테스트 in tests/unit/robot/pallet_shuttle/actions/PlacePalletActionTest.cpp ✅
+- [x] T060 [P] [US1] PalletTransportSequence 단위 테스트 in tests/unit/robot/pallet_shuttle/sequences/PalletTransportSequenceTest.cpp
+- [x] T061 [P] [US1] PalletTransportTask 단위 테스트 in tests/unit/robot/pallet_shuttle/tasks/PalletTransportTaskTest.cpp
+- [x] T062 [US1] 기본 팔렛 운반 통합 테스트 in tests/integration/robot/pallet_shuttle/basic_transport_test.cpp
 
 ### 구현
 
-- [ ] T063 [P] [US1] MoveToPositionAction 구현 (Mock Driver 사용) in src/robot/pallet_shuttle/actions/MoveToPositionAction.cpp
-- [ ] T064 [P] [US1] PickPalletAction 구현 in src/robot/pallet_shuttle/actions/PickPalletAction.cpp
-- [ ] T065 [P] [US1] PlacePalletAction 구현 in src/robot/pallet_shuttle/actions/PlacePalletAction.cpp
-- [ ] T066 [US1] PalletTransportSequence 구현 (픽업→이동→배치) in src/robot/pallet_shuttle/sequences/PalletTransportSequence.cpp
-- [ ] T067 [US1] PalletTransportTask 구현 in src/robot/pallet_shuttle/tasks/PalletTransportTask.cpp
-- [ ] T068 [US1] PalletShuttleState 클래스 구현 (로봇 상태 관리) in src/robot/pallet_shuttle/state/PalletShuttleState.cpp
-- [ ] T069 [US1] PalletShuttleController 구현 (IRobotController) in src/robot/pallet_shuttle/control/PalletShuttleController.cpp
-- [ ] T070 [US1] PalletShuttleConfig 클래스 구현 (설정 파일 파싱) in src/robot/pallet_shuttle/config/PalletShuttleConfig.cpp
-- [ ] T071 [US1] Sequence 실행 중 오류 처리 (Alarm 발생) in src/robot/pallet_shuttle/sequences/PalletTransportSequence.cpp
+- [x] T063 [P] [US1] MoveToPositionAction 구현 (Mock Driver 사용) in src/robot/pallet_shuttle/actions/MoveToPositionAction.cpp
+- [x] T064 [P] [US1] PickPalletAction 구현 in src/robot/pallet_shuttle/actions/PickPalletAction.cpp
+- [x] T065 [P] [US1] PlacePalletAction 구현 in src/robot/pallet_shuttle/actions/PlacePalletAction.cpp
+- [x] T066 [US1] PalletTransportSequence 구현 (픽업→이동→배치) in src/robot/pallet_shuttle/sequences/PalletTransportSequence.cpp
+- [x] T067 [US1] PalletTransportTask 구현 in src/robot/pallet_shuttle/tasks/PalletTransportTask.cpp
+- [x] T068 [US1] PalletShuttleState 클래스 구현 (로봇 상태 관리) in src/robot/pallet_shuttle/state/PalletShuttleState.cpp
+- [x] T069 [US1] PalletShuttleController 구현 (IRobotController) in src/robot/pallet_shuttle/control/PalletShuttleController.cpp
+- [x] T070 [US1] PalletShuttleConfig 클래스 구현 (설정 파일 파싱) in src/robot/pallet_shuttle/config/PalletShuttleConfig.cpp
+- [x] T071 [US1] Sequence 실행 중 오류 처리 (Alarm 발생) in src/robot/pallet_shuttle/sequences/PalletTransportSequence.cpp
 
 **Checkpoint**: MVP 완료 - 단일 팔렛 운반 작업 성공
 

@@ -1,13 +1,24 @@
 #include "AlarmManager.h"
+#include "../dto/AlarmEvents.h"
+#include "core/datastore/DataStore.h"
+#include "core/event/interfaces/IEventBus.h"
 #include <spdlog/spdlog.h>
 #include <algorithm>
+#include <sstream>
 
 namespace mxrc::core::alarm {
 
-AlarmManager::AlarmManager(std::shared_ptr<IAlarmConfiguration> config)
-    : config_(std::move(config))
+AlarmManager::AlarmManager(
+    std::shared_ptr<IAlarmConfiguration> config,
+    std::shared_ptr<DataStore> data_store,
+    std::shared_ptr<event::IEventBus> event_bus)
+    : config_(std::move(config)),
+      data_store_(std::move(data_store)),
+      event_bus_(std::move(event_bus))
 {
-    spdlog::info("[AlarmManager] Initialized");
+    spdlog::info("[AlarmManager] Initialized with DataStore: {}, EventBus: {}",
+                 data_store_ ? "yes" : "no",
+                 event_bus_ ? "yes" : "no");
 }
 
 std::optional<AlarmDto> AlarmManager::raiseAlarm(
@@ -26,6 +37,9 @@ std::optional<AlarmDto> AlarmManager::raiseAlarm(
 
     // 재발 확인
     uint32_t recurrence = checkRecurrence(alarm_code);
+
+    // 기본 심각도
+    AlarmSeverity base_severity = alarm_config->severity;
 
     // 심각도 상향 확인
     AlarmSeverity severity = checkEscalation(alarm_code, recurrence);
@@ -64,9 +78,21 @@ std::optional<AlarmDto> AlarmManager::raiseAlarm(
 
     auto dto = alarm->toDto();
 
+    // 이력에 추가
+    alarm_history_.push_back(dto);
+    if (alarm_history_.size() > MAX_HISTORY_SIZE) {
+        alarm_history_.erase(alarm_history_.begin());
+    }
+
     // DataStore 저장 및 이벤트 발행
     storeToDataStore(dto);
-    publishEvent(dto);
+
+    // 심각도가 상향되었으면 escalate 이벤트, 아니면 일반 raise 이벤트
+    if (severity > base_severity && recurrence > 1) {
+        publishEscalateEvent(dto, base_severity);
+    } else {
+        publishEvent(dto);
+    }
 
     spdlog::warn("[AlarmManager] Raised: {} - {} (severity: {}, recurrence: {})",
         alarm_code, alarm_config->name, toString(severity), recurrence);
@@ -126,16 +152,16 @@ std::vector<AlarmDto> AlarmManager::getAlarmHistory(size_t limit) const {
     std::lock_guard<std::mutex> lock(mutex_);
 
     std::vector<AlarmDto> result;
-    result.reserve(std::min(limit, alarms_.size()));
 
-    for (const auto& [id, alarm] : alarms_) {
-        result.push_back(alarm->toDto());
-        if (result.size() >= limit) {
-            break;
-        }
+    // 이력에서 최신 limit개 반환 (역순)
+    size_t start_idx = alarm_history_.size() > limit ?
+                       alarm_history_.size() - limit : 0;
+
+    for (size_t i = alarm_history_.size(); i > start_idx; --i) {
+        result.push_back(alarm_history_[i - 1]);
     }
 
-    // 최신 순으로 정렬
+    // 최신 순으로 정렬 (이미 역순으로 추가했으므로 정렬 완료)
     std::sort(result.begin(), result.end(),
         [](const AlarmDto& a, const AlarmDto& b) {
             return a.timestamp > b.timestamp;
@@ -193,6 +219,31 @@ bool AlarmManager::resolveAlarm(const std::string& alarm_id) {
             stats_.info_count--;
             break;
     }
+
+    // 이력에 해제된 상태로 추가
+    auto dto = alarm->toDto();
+    alarm_history_.push_back(dto);
+    if (alarm_history_.size() > MAX_HISTORY_SIZE) {
+        alarm_history_.erase(alarm_history_.begin());
+    }
+
+    // DataStore 업데이트
+    if (data_store_) {
+        try {
+            std::string key = "alarm/" + alarm_id;
+            // TODO: DataStore doesn't have remove method yet
+            // data_store_->remove(key);  // 해결된 alarm 제거
+
+            // 활성 Alarm 카운트 업데이트
+            std::string count_key = "alarm/active_count";
+            data_store_->set(count_key, static_cast<int>(stats_.active_count), DataType::Alarm);
+        } catch (const std::exception& e) {
+            spdlog::error("[AlarmManager] Failed to update DataStore on resolve: {}", e.what());
+        }
+    }
+
+    // 이벤트 발행
+    publishClearEvent(alarm_id, dto.alarm_code);
 
     spdlog::info("[AlarmManager] Resolved: {}", alarm_id);
 
@@ -271,13 +322,97 @@ AlarmSeverity AlarmManager::checkEscalation(
 }
 
 void AlarmManager::storeToDataStore(const AlarmDto& alarm) {
-    // TODO: DataStore 통합 (Feature 016 후속 작업)
-    // DataStore에 "alarm/{alarm_id}" 키로 저장
+    if (!data_store_) {
+        return;
+    }
+
+    try {
+        // "alarm/{alarm_id}" 키로 저장
+        std::string key = "alarm/" + alarm.alarm_id;
+
+        // AlarmDto를 map으로 변환
+        std::map<std::string, std::any> alarm_data;
+        alarm_data["alarm_id"] = alarm.alarm_id;
+        alarm_data["alarm_code"] = alarm.alarm_code;
+        alarm_data["alarm_name"] = alarm.alarm_name;
+        alarm_data["severity"] = static_cast<int>(alarm.severity);
+        alarm_data["state"] = static_cast<int>(alarm.state);
+        alarm_data["details"] = alarm.details.value_or("");
+        alarm_data["source"] = alarm.source;
+        alarm_data["timestamp"] = std::chrono::system_clock::to_time_t(alarm.timestamp);
+        alarm_data["recurrence_count"] = alarm.recurrence_count;
+
+        // Already handled details above
+        if (alarm.acknowledged_by.has_value()) {
+            alarm_data["acknowledged_by"] = alarm.acknowledged_by.value();
+        }
+        if (alarm.acknowledged_time.has_value()) {
+            alarm_data["acknowledged_time"] = std::chrono::system_clock::to_time_t(alarm.acknowledged_time.value());
+        }
+        if (alarm.resolved_time.has_value()) {
+            alarm_data["resolved_time"] = std::chrono::system_clock::to_time_t(alarm.resolved_time.value());
+        }
+
+        // DataStore에 저장
+        data_store_->set(key, alarm_data, DataType::Alarm);
+
+        // 활성 Alarm 카운트 업데이트
+        std::string count_key = "alarm/active_count";
+        data_store_->set(count_key, static_cast<int>(stats_.active_count), DataType::Alarm);
+
+        spdlog::debug("[AlarmManager] Stored alarm {} to DataStore", alarm.alarm_id);
+    } catch (const std::exception& e) {
+        spdlog::error("[AlarmManager] Failed to store alarm to DataStore: {}", e.what());
+    }
 }
 
 void AlarmManager::publishEvent(const AlarmDto& alarm) {
-    // TODO: EventBus 통합 (Feature 016 후속 작업)
-    // AlarmEvent 발행
+    if (!event_bus_) {
+        return;
+    }
+
+    try {
+        // AlarmRaisedEvent 생성 및 발행
+        auto event = std::make_shared<AlarmRaisedEvent>(alarm);
+        event_bus_->publish(event);
+
+        spdlog::debug("[AlarmManager] Published AlarmRaisedEvent for {}", alarm.alarm_id);
+    } catch (const std::exception& e) {
+        spdlog::error("[AlarmManager] Failed to publish alarm event: {}", e.what());
+    }
+}
+
+void AlarmManager::publishClearEvent(const std::string& alarm_id, const std::string& alarm_type) {
+    if (!event_bus_) {
+        return;
+    }
+
+    try {
+        auto event = std::make_shared<AlarmClearedEvent>(alarm_id, alarm_type, "system");
+        event_bus_->publish(event);
+
+        spdlog::debug("[AlarmManager] Published AlarmClearedEvent for {}", alarm_id);
+    } catch (const std::exception& e) {
+        spdlog::error("[AlarmManager] Failed to publish clear event: {}", e.what());
+    }
+}
+
+void AlarmManager::publishEscalateEvent(const AlarmDto& alarm, AlarmSeverity old_severity) {
+    if (!event_bus_) {
+        return;
+    }
+
+    try {
+        auto event = std::make_shared<AlarmEscalatedEvent>(
+            alarm.alarm_id, alarm.alarm_code,
+            old_severity, alarm.severity,
+            alarm.recurrence_count);
+        event_bus_->publish(event);
+
+        spdlog::debug("[AlarmManager] Published AlarmEscalatedEvent for {}", alarm.alarm_id);
+    } catch (const std::exception& e) {
+        spdlog::error("[AlarmManager] Failed to publish escalate event: {}", e.what());
+    }
 }
 
 } // namespace mxrc::core::alarm

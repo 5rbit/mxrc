@@ -1,12 +1,18 @@
 #include "BehaviorArbiter.h"
+#include "core/datastore/DataStore.h"
+#include "core/alarm/dto/AlarmSeverity.h"
 #include <spdlog/spdlog.h>
 
 namespace mxrc::core::control {
 
-BehaviorArbiter::BehaviorArbiter(std::shared_ptr<alarm::IAlarmManager> alarm_manager)
-    : alarm_manager_(std::move(alarm_manager))
+BehaviorArbiter::BehaviorArbiter(
+    std::shared_ptr<alarm::IAlarmManager> alarm_manager,
+    std::shared_ptr<DataStore> data_store)
+    : alarm_manager_(std::move(alarm_manager)),
+      data_store_(std::move(data_store))
 {
-    spdlog::info("[BehaviorArbiter] Initialized");
+    spdlog::info("[BehaviorArbiter] Initialized with DataStore: {}",
+                 data_store_ ? "yes" : "no");
 }
 
 bool BehaviorArbiter::requestBehavior(const BehaviorRequest& request) {
@@ -29,15 +35,18 @@ void BehaviorArbiter::tick() {
     // 1. Critical Alarm 체크
     checkCriticalAlarms();
 
-    // 2. 일시 정지 상태면 처리 안 함
+    // 2. Warning Alarm 체크
+    checkWarningAlarms();
+
+    // 3. 일시 정지 상태면 처리 안 함
     if (paused_.load()) {
         return;
     }
 
-    // 3. Timeout된 behavior 제거
+    // 4. Timeout된 behavior 제거
     removeTimedOutBehaviors();
 
-    // 4. 현재 실행 중인 task 확인
+    // 5. 현재 실행 중인 task 확인
     if (current_behavior_) {
         auto& current_task = current_behavior_->task;
         auto status = current_task->getStatus();
@@ -51,6 +60,14 @@ void BehaviorArbiter::tick() {
                 current_behavior_->behavior_id, static_cast<int>(status));
 
             current_behavior_.reset();
+
+            // Warning alarm으로 인한 MAINT 모드 전환 대기 중이면 지금 전환
+            if (pending_safe_mode_.load()) {
+                spdlog::warn("[BehaviorArbiter] Transitioning to MAINT mode after task completion (Warning Alarm)");
+                transitionTo(ControlMode::MAINT);
+                pending_safe_mode_ = false;
+                return;
+            }
         } else {
             // 아직 실행 중이면 선점 가능한지 확인
             auto next_behavior = selectNextBehavior();
@@ -64,7 +81,7 @@ void BehaviorArbiter::tick() {
         }
     }
 
-    // 5. 다음 behavior 선택 및 시작
+    // 6. 다음 behavior 선택 및 시작
     auto next_behavior = selectNextBehavior();
     if (next_behavior) {
         startTask(*next_behavior);
@@ -109,6 +126,28 @@ bool BehaviorArbiter::transitionTo(ControlMode newMode) {
 
     current_mode_.store(newMode);
     stats_.mode_transitions++;
+
+    // DataStore에 모드 변경 기록
+    if (data_store_) {
+        try {
+            // 현재 모드 저장
+            std::string mode_key = "control/current_mode";
+            data_store_->set(mode_key, static_cast<int>(newMode), DataType::RobotMode);
+
+            // 모드 전환 이력 저장
+            std::string history_key = "control/mode_transition_history";
+            std::string transition = toString(current) + " -> " + toString(newMode);
+            data_store_->set(history_key, transition, DataType::Event);
+
+            // 모드별 카운터 업데이트
+            std::string counter_key = "control/mode_transitions_count";
+            data_store_->set(counter_key, static_cast<int>(stats_.mode_transitions), DataType::RobotMode);
+
+            spdlog::debug("[BehaviorArbiter] Stored mode transition to DataStore");
+        } catch (const std::exception& e) {
+            spdlog::error("[BehaviorArbiter] Failed to store mode transition to DataStore: {}", e.what());
+        }
+    }
 
     spdlog::info("[BehaviorArbiter] Mode transition: {} -> {}",
         toString(current), toString(newMode));
@@ -290,6 +329,32 @@ void BehaviorArbiter::checkCriticalAlarms() {
         if (current != ControlMode::FAULT) {
             spdlog::error("[BehaviorArbiter] Critical alarm detected! Transitioning to FAULT");
             transitionTo(ControlMode::FAULT);
+        }
+    }
+}
+
+void BehaviorArbiter::checkWarningAlarms() {
+    // Warning Alarm이 활성화되어 있는지 확인
+    auto warning_alarms = alarm_manager_->getActiveAlarmsBySeverity(
+        alarm::AlarmSeverity::WARNING);
+
+    if (!warning_alarms.empty()) {
+        ControlMode current = current_mode_.load();
+
+        // MAINT 모드가 아니고, 아직 대기 플래그가 없으면 설정
+        if (current != ControlMode::MAINT &&
+            current != ControlMode::FAULT &&
+            !pending_safe_mode_.load()) {
+
+            if (current_behavior_) {
+                // 현재 작업이 진행 중이면 완료 후 MAINT 전환 예약
+                pending_safe_mode_ = true;
+                spdlog::warn("[BehaviorArbiter] Warning alarm detected! Will transition to MAINT mode after current task completes");
+            } else {
+                // 현재 작업이 없으면 즉시 MAINT 전환
+                spdlog::warn("[BehaviorArbiter] Warning alarm detected! Transitioning to MAINT mode immediately");
+                transitionTo(ControlMode::MAINT);
+            }
         }
     }
 }

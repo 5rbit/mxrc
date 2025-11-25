@@ -66,6 +66,11 @@ Action Layer (기본 동작 실행)
 
 > 기능 완료 후 30일이 지나면 자동으로 제거됩니다.
 
+### 001-datastore-webui-api
+- **Status**: Review
+- **Spec**: [docs/specs/001-datastore-webui-api/spec.md](../docs/specs/001-datastore-webui-api/spec.md)
+- 상세: Spec 문서 참조
+
 ### 018-systemd-process-management
 - **Status**: Review
 - **Spec**: [docs/specs/018-systemd-process-management/spec.md](../docs/specs/018-systemd-process-management/spec.md)
@@ -277,7 +282,7 @@ tests/
 
 ---
 
-**Last Updated**: 2025-01-20
+**Last Updated**: 2025-01-24
 **Total Tests**: 1157+ passing ✅
 **Memory Safe**: AddressSanitizer enabled 🔒
 

@@ -4,6 +4,7 @@
 
 namespace mxrc::core::fieldbus {
 
+// Mock 드라이버 생성자
 MockDriver::MockDriver(const FieldbusConfig& config, size_t device_count)
     : config_(config),
       device_count_(device_count),
@@ -14,6 +15,7 @@ MockDriver::MockDriver(const FieldbusConfig& config, size_t device_count)
     spdlog::debug("[MockDriver] Created with {} devices", device_count);
 }
 
+// Mock 드라이버 소멸자
 MockDriver::~MockDriver() {
     if (status_ != FieldbusStatus::UNINITIALIZED &&
         status_ != FieldbusStatus::STOPPED) {
@@ -21,6 +23,7 @@ MockDriver::~MockDriver() {
     }
 }
 
+// 드라이버 초기화
 bool MockDriver::initialize() {
     std::lock_guard<std::mutex> lock(mutex_);
 
@@ -29,10 +32,10 @@ bool MockDriver::initialize() {
         return false;
     }
 
-    // Simulate initialization delay
+    // 초기화 지연 시뮬레이션
     spdlog::info("[MockDriver] Initializing {} devices...", device_count_);
 
-    // Initialize sensor data with pattern
+    // 센서 데이터를 패턴으로 초기화
     for (size_t i = 0; i < device_count_; ++i) {
         sensor_data_[i] = std::sin(i * 0.1);
     }
@@ -42,10 +45,11 @@ bool MockDriver::initialize() {
     return true;
 }
 
+// 드라이버 시작
 bool MockDriver::start() {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    // Allow starting from INITIALIZED or STOPPED state
+    // INITIALIZED 또는 STOPPED 상태에서 시작 허용
     if (status_ != FieldbusStatus::INITIALIZED &&
         status_ != FieldbusStatus::STOPPED) {
         last_error_ = "Cannot start: not initialized or stopped";
@@ -62,6 +66,7 @@ bool MockDriver::start() {
     return true;
 }
 
+// 드라이버 정지
 bool MockDriver::stop() {
     std::lock_guard<std::mutex> lock(mutex_);
 
@@ -75,12 +80,13 @@ bool MockDriver::stop() {
     return true;
 }
 
+// 드라이버 종료
 void MockDriver::shutdown() {
     std::lock_guard<std::mutex> lock(mutex_);
 
     spdlog::info("[MockDriver] Shutting down...");
 
-    // Clear all data
+    // 모든 데이터 클리어
     std::fill(sensor_data_.begin(), sensor_data_.end(), 0.0);
     std::fill(actuator_data_.begin(), actuator_data_.end(), 0.0);
     std::fill(digital_inputs_.begin(), digital_inputs_.end(), false);
@@ -93,6 +99,7 @@ void MockDriver::shutdown() {
     spdlog::info("[MockDriver] Shutdown complete");
 }
 
+// 센서 데이터 읽기
 bool MockDriver::readSensors(std::vector<double>& data) {
     std::lock_guard<std::mutex> lock(mutex_);
 
@@ -102,25 +109,25 @@ bool MockDriver::readSensors(std::vector<double>& data) {
     }
 
     if (emergency_stopped_) {
-        // Return zeros when emergency stopped
+        // 비상 정지 시 0을 반환
         data.assign(device_count_, 0.0);
         return true;
     }
 
-    // Simulate sensor data (sine wave + actuator echo)
+    // 센서 데이터 시뮬레이션 (사인파 + 액추에이터 에코)
     simulation_tick_++;
     for (size_t i = 0; i < device_count_; ++i) {
         sensor_data_[i] = actuator_data_[i] +
                           0.1 * std::sin(simulation_tick_ * 0.01 + i * 0.1);
     }
 
-    // Copy to output
+    // 출력으로 복사
     if (data.size() != device_count_) {
         data.resize(device_count_);
     }
     data = sensor_data_;
 
-    // Update statistics
+    // 통계 업데이트
     auto now = std::chrono::steady_clock::now();
     auto cycle_time_us = std::chrono::duration<double, std::micro>(
         now - last_cycle_time_).count();
@@ -130,6 +137,7 @@ bool MockDriver::readSensors(std::vector<double>& data) {
     return true;
 }
 
+// 액추에이터 데이터 쓰기
 bool MockDriver::writeActuators(const std::vector<double>& data) {
     std::lock_guard<std::mutex> lock(mutex_);
 
@@ -150,13 +158,14 @@ bool MockDriver::writeActuators(const std::vector<double>& data) {
         return false;
     }
 
-    // Store actuator commands
+    // 액추에이터 명령 저장
     actuator_data_ = data;
 
     stats_.bytes_sent += data.size() * sizeof(double);
     return true;
 }
 
+// 디지털 입력 읽기
 bool MockDriver::readDigitalInputs(std::vector<bool>& data) {
     std::lock_guard<std::mutex> lock(mutex_);
 
@@ -172,6 +181,7 @@ bool MockDriver::readDigitalInputs(std::vector<bool>& data) {
     return true;
 }
 
+// 디지털 출력 쓰기
 bool MockDriver::writeDigitalOutputs(const std::vector<bool>& data) {
     std::lock_guard<std::mutex> lock(mutex_);
 
@@ -188,34 +198,40 @@ bool MockDriver::writeDigitalOutputs(const std::vector<bool>& data) {
     return true;
 }
 
+// 현재 상태 반환
 FieldbusStatus MockDriver::getStatus() const {
     return status_.load();
 }
 
+// 통계 정보 반환
 FieldbusStats MockDriver::getStatistics() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return stats_;
 }
 
+// 프로토콜 이름 반환
 std::string MockDriver::getProtocolName() const {
     return "Mock";
 }
 
+// 장치 수 반환
 size_t MockDriver::getDeviceCount() const {
     return device_count_;
 }
 
+// 마지막 오류 메시지 반환
 std::optional<std::string> MockDriver::getLastError() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return last_error_;
 }
 
+// 비상 정지
 bool MockDriver::emergencyStop() {
     std::lock_guard<std::mutex> lock(mutex_);
 
     emergency_stopped_ = true;
 
-    // Zero all actuators
+    // 모든 액추에이터를 0으로 설정
     std::fill(actuator_data_.begin(), actuator_data_.end(), 0.0);
     std::fill(digital_outputs_.begin(), digital_outputs_.end(), false);
 
@@ -223,6 +239,7 @@ bool MockDriver::emergencyStop() {
     return true;
 }
 
+// 오류 리셋
 bool MockDriver::resetErrors() {
     std::lock_guard<std::mutex> lock(mutex_);
 
@@ -237,6 +254,7 @@ bool MockDriver::resetErrors() {
     return false;
 }
 
+// 시뮬레이션된 오류 설정
 void MockDriver::setSimulatedError(const std::string& error_msg) {
     std::lock_guard<std::mutex> lock(mutex_);
 
@@ -252,11 +270,12 @@ void MockDriver::setSimulatedError(const std::string& error_msg) {
     }
 }
 
+// 통계 업데이트
 void MockDriver::updateStatistics(double cycle_time_us) {
     stats_.total_cycles++;
     stats_.bytes_received += device_count_ * sizeof(double);
 
-    // Update average cycle time (exponential moving average)
+    // 평균 사이클 시간 업데이트 (지수 이동 평균)
     const double alpha = 0.1;
     if (stats_.avg_cycle_time_us == 0.0) {
         stats_.avg_cycle_time_us = cycle_time_us;
@@ -265,13 +284,13 @@ void MockDriver::updateStatistics(double cycle_time_us) {
                                     (1.0 - alpha) * stats_.avg_cycle_time_us;
     }
 
-    // Update max cycle time
+    // 최대 사이클 시간 업데이트
     if (cycle_time_us > stats_.max_cycle_time_us) {
         stats_.max_cycle_time_us = cycle_time_us;
     }
 
-    // Check for missed deadline
-    if (cycle_time_us > config_.cycle_time_us * 1.1) {  // 10% tolerance
+    // 마감 시간 누락 확인
+    if (cycle_time_us > config_.cycle_time_us * 1.1) {  // 10% 허용 오차
         stats_.missed_cycles++;
     }
 }

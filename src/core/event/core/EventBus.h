@@ -16,6 +16,9 @@
 #include <functional>
 #include <vector>
 
+// Feature 019: IPC Schema - Type-safe event definitions (auto-generated)
+#include "ipc/EventBusEvents.h"
+
 namespace mxrc::core::event {
 
 /**

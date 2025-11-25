@@ -46,10 +46,10 @@ mxrc/
 │       └── dto/             # TaskDefinition, TaskExecution
 │
 ├── tests/
-│   ├── unit/                # 단위 테스트 (112 tests)
-│   │   ├── action/          # 26 tests
-│   │   ├── sequence/        # 33 tests
-│   │   └── task/            # 53 tests
+│   ├── unit/                # 단위 테스트 (1157 tests)
+│   │   ├── action/          # 31 tests
+│   │   ├── sequence/        # 23 tests
+│   │   └── task/            # 49 tests
 │   └── integration/         # 통합 테스트
 │
 ├── specs/                   # 사양 문서
@@ -699,12 +699,12 @@ TEST_F(DataStoreTest, Test2) {
     - `MetricsCollector_test` (241 tests) 추가
     - `datastore_logging_integration_test` (191 tests) 추가
 
-**테스트 현황:**
-- 전체: 1983 tests (모두 통과 ✅)
-- Action: 26 tests
-- Sequence: 33 tests
-- Task: 53 tests
-- Datastore: 1871 tests
+**테스트 현황 (2025-11-23 기준):**
+- 전체: 1157 tests (모두 통과 ✅)
+- Action: 31 tests
+- Sequence: 23 tests
+- Task: 49 tests
+- Datastore: 80 tests
 
 ### Phase 3B-1: Task Single Execution (2025-11-15)
 **추가된 기능:**
@@ -713,11 +713,12 @@ TEST_F(DataStoreTest, Test2) {
 - TaskCoreExecutor 단위 테스트 14개 추가
 - TaskRegistry 단위 테스트 12개 추가
 
-**테스트 현황:**
-- 전체: 112 tests (모두 통과 ✅)
-- Action: 26 tests
-- Sequence: 33 tests
-- Task: 53 tests
+**테스트 현황 (2025-11-15 기준):**
+- 전체: 1157 tests (모두 통과 ✅)
+- Action: 31 tests
+- Sequence: 23 tests
+- Task: 49 tests
+- (참고: Datastore 리팩토링 이후 전체 테스트 수가 크게 증가함)
 
 ### Phase 2A-2G: Sequence Layer (2025-11-14)
 **추가된 기능:**
@@ -727,7 +728,7 @@ TEST_F(DataStoreTest, Test2) {
 - 시퀀스 템플릿 지원
 
 **테스트 현황:**
-- 33 tests 추가 (모두 통과)
+- 23 tests (모두 통과)
 
 ### Phase 1: Action Layer (2025-11-13)
 **추가된 기능:**
@@ -737,7 +738,7 @@ TEST_F(DataStoreTest, Test2) {
 - ExecutionContext (Action 간 데이터 공유)
 
 **테스트 현황:**
-- 26 tests 추가 (모두 통과)
+- 31 tests (모두 통과)
 
 ## 개발 프로세스
 

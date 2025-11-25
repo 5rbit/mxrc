@@ -55,7 +55,7 @@ Action Layer (기본 동작 실행)
 - 계층별 책임 및 컴포넌트 정보
 
 **현재 상태**:
-- Phase 017 완료: Action/Sequence/Task Layer (195 tests)
+- Phase 017 완료: Action/Sequence/Task Layer (1157 tests)
 - Phase 019 진행: Event System & DataStore
 
 ---
@@ -65,6 +65,11 @@ Action Layer (기본 동작 실행)
 현재 개발 중이거나 최근 완료된 기능들 (최대 5개)
 
 > 기능 완료 후 30일이 지나면 자동으로 제거됩니다.
+
+### 001-datastore-webui-api
+- **Status**: Review
+- **Spec**: [docs/specs/001-datastore-webui-api/spec.md](../docs/specs/001-datastore-webui-api/spec.md)
+- 상세: Spec 문서 참조
 
 ### 018-systemd-process-management
 - **Status**: Review
@@ -153,12 +158,11 @@ class IAction {
 ## 🧪 테스트 규칙
 
 ### 테스트 커버리지
-- Action Layer: 12 tests
-- Sequence Layer: 14 tests
-- Task Layer: 67 tests
-- Event Layer: 42+ tests
-- DataStore: 66 tests
-- **전체**: 195+ tests
+- Action Layer: 31 tests
+- Sequence Layer: 23 tests
+- Task Layer: 49 tests
+- DataStore: 80 tests
+- **전체**: 1157+ tests
 
 ### 메모리 안전성
 ```bash
@@ -278,8 +282,8 @@ tests/
 
 ---
 
-**Last Updated**: 2025-01-20
-**Total Tests**: 195+ passing ✅
+**Last Updated**: 2025-01-24
+**Total Tests**: 1157+ passing ✅
 **Memory Safe**: AddressSanitizer enabled 🔒
 
 ---
@@ -292,6 +296,8 @@ tests/
 - C++20 (GCC 11+) (001-ethercat-integration)
 - RTDataStore (versioned in-memory key-value), SharedMemory (RT/Non-RT 통신) (001-ethercat-integration)
 - Docker 24.0+, Docker Compose V2, Bash scripting (002-docker)
+- C++20 (기존 MXRC 표준) (019-architecture-improvements)
+- 공유 메모리 (기존 DataStore), 파일 시스템 (스키마 YAML, 설정 파일) (019-architecture-improvements)
 
 ## Recent Changes
 - 018-systemd-process-management: Added C++20 (GCC 11+ 또는 Clang 14+) + libsystemd-dev (sd_notify API), spdlog >= 1.x, nlohmann_json >= 3.11.0, Prometheus C++ client (선택적)

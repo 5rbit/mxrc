@@ -96,6 +96,19 @@ enum class EventType {
     /** RT SAFE_MODE 복구 */
     RT_SAFE_MODE_EXITED,
 
+    // ===== Alarm Events =====
+    /** Alarm 발생 */
+    ALARM_RAISED,
+
+    /** Alarm 해제/리셋 */
+    ALARM_CLEARED,
+
+    /** Alarm 심각도 상향 */
+    ALARM_ESCALATED,
+
+    /** Alarm 확인 */
+    ALARM_ACKNOWLEDGED,
+
     // ===== System Events =====
     /** 알 수 없는 이벤트 타입 (오류 처리용) */
     UNKNOWN
@@ -143,6 +156,12 @@ inline std::string eventTypeToString(EventType type) {
         case EventType::RT_STATE_CHANGED: return "RT_STATE_CHANGED";
         case EventType::RT_SAFE_MODE_ENTERED: return "RT_SAFE_MODE_ENTERED";
         case EventType::RT_SAFE_MODE_EXITED: return "RT_SAFE_MODE_EXITED";
+
+        // Alarm Events
+        case EventType::ALARM_RAISED: return "ALARM_RAISED";
+        case EventType::ALARM_CLEARED: return "ALARM_CLEARED";
+        case EventType::ALARM_ESCALATED: return "ALARM_ESCALATED";
+        case EventType::ALARM_ACKNOWLEDGED: return "ALARM_ACKNOWLEDGED";
 
         // System Events
         case EventType::UNKNOWN:

@@ -10,7 +10,7 @@
 ## Overview
 
 MXRC의 EtherCAT 통합은 **IgH EtherCAT Master**를 사용하여 실시간 센서/모터 데이터 통신을 제공합니다. 1ms RT cycle에서 센서 읽기, 모터 명령 전송, Distributed Clock 동기화(±1μs)를 지원합니다.
-
+한
 ### Key Features
 
 - ✅ **실시간 센서 읽기**: Position, Velocity, Torque, Digital/Analog Input
@@ -405,22 +405,7 @@ IgH EtherCAT Master는 kernel-space 구현으로 더 낮은 latency 제공.
 
 ## Future Enhancements
 
-### 필드버스 추상화 계층 도입 (Fieldbus Abstraction Layer Introduction)
-
-MXRC 시스템의 장기적인 확장성과 유연성을 위해, EtherCAT에 국한되지 않는 일반적인 필드버스 추상화 계층 도입을 제안합니다. 현재 `IEtherCATMaster` 인터페이스는 EtherCAT 특정 구현에 초점을 맞추고 있으나, 향후 다른 필드버스(예: EtherNet/IP, PROFINET) 지원 필요성이 발생할 경우, 상위 레벨의 제어 로직을 크게 변경해야 할 수 있습니다.
-
-**개념**:
-- `IFieldbusMaster`와 같은 최상위 인터페이스를 정의하여, 필드버스 독립적인 기능(예: 주기적 통신, 장치 등록, 데이터 입출력)을 추상화합니다.
-- `EtherCATMaster`는 이 `IFieldbusMaster` 인터페이스의 한 구현체가 됩니다.
-- Sensor/Motor Manager 또한 `IFieldbusDevice`와 같은 추상화된 장치 인터페이스를 통해 필드버스 구현체와 통신하도록 변경합니다.
-
-**기대 효과**:
-- **확장성**: 새로운 필드버스 기술 도입 시 기존 제어 알고리즘 코드 변경 없이 새로운 구현체만 추가하면 됩니다.
-- **유지보수성**: 필드버스 종속적인 코드와 제어 로직을 명확히 분리하여, 각 계층의 관심사를 분리하고 코드의 복잡도를 낮춥니다.
-- **테스트 용이성**: 필드버스 마스터를 쉽게 Mocking하여 하드웨어 없이도 상위 제어 로직을 테스트할 수 있습니다.
-
 ### Planned Features
-
 
 1. **Hot-plug Support**: Slave 동적 추가/제거
 2. **Redundancy**: Dual-port EtherCAT 지원

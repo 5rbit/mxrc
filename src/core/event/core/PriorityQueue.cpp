@@ -22,6 +22,23 @@ bool PriorityQueue::push(PrioritizedEvent&& event) {
     // Lock and push event
     {
         std::lock_guard<std::mutex> lock(mutex_);
+
+        // Feature 019 - US3: Coalescing policy
+        // If event has a coalescing_key, track it for later deduplication
+        if (event.coalescing_key.has_value()) {
+            const std::string& key = event.coalescing_key.value();
+
+            // Update the latest sequence number for this coalescing key
+            // Events with older sequence numbers will be skipped during pop()
+            auto it = coalescing_latest_seq_.find(key);
+            if (it != coalescing_latest_seq_.end()) {
+                // There's already an event with this key in the queue
+                // The old one will be coalesced (skipped) when popped
+                metrics_.events_coalesced.fetch_add(1, std::memory_order_relaxed);
+            }
+            coalescing_latest_seq_[key] = event.sequence_num;
+        }
+
         queue_.push(std::move(event));
     }
 
@@ -47,20 +64,45 @@ bool PriorityQueue::push(PrioritizedEvent&& event) {
 std::optional<PrioritizedEvent> PriorityQueue::pop() {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    if (queue_.empty()) {
-        return std::nullopt;
+    // Feature 019 - US3: TTL expiration + Coalescing - skip expired/coalesced events
+    while (!queue_.empty()) {
+        // Extract top event (highest priority)
+        PrioritizedEvent event = std::move(const_cast<PrioritizedEvent&>(queue_.top()));
+        queue_.pop();
+
+        // Update size for this pop
+        size_t new_size = size_.fetch_sub(1, std::memory_order_relaxed) - 1;
+        metrics_.current_size.store(new_size, std::memory_order_relaxed);
+
+        // Check if event has expired (TTL)
+        if (event.isExpired()) {
+            // Event expired, skip it and increment expired counter
+            metrics_.events_expired.fetch_add(1, std::memory_order_relaxed);
+            continue;  // Try next event
+        }
+
+        // Check if event has been coalesced (superseded by newer event with same key)
+        if (event.coalescing_key.has_value()) {
+            const std::string& key = event.coalescing_key.value();
+            auto it = coalescing_latest_seq_.find(key);
+
+            if (it != coalescing_latest_seq_.end() && it->second != event.sequence_num) {
+                // This event has been superseded by a newer one with the same key
+                // Skip it (already counted in coalesced metric during push)
+                continue;  // Try next event
+            }
+
+            // This is the latest event for this key, remove from tracking
+            coalescing_latest_seq_.erase(key);
+        }
+
+        // Event is valid, not expired, and not coalesced
+        metrics_.events_popped.fetch_add(1, std::memory_order_relaxed);
+        return event;
     }
 
-    // Extract top event (highest priority)
-    PrioritizedEvent event = std::move(const_cast<PrioritizedEvent&>(queue_.top()));
-    queue_.pop();
-
-    // Update metrics
-    size_t new_size = size_.fetch_sub(1, std::memory_order_relaxed) - 1;
-    metrics_.current_size.store(new_size, std::memory_order_relaxed);
-    metrics_.events_popped.fetch_add(1, std::memory_order_relaxed);
-
-    return event;
+    // Queue is empty or all events expired/coalesced
+    return std::nullopt;
 }
 
 bool PriorityQueue::shouldDrop(EventPriority priority) {

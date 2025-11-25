@@ -1,0 +1,115 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://mxrc.dev/schemas/alarm-config.schema.json",
+  "title": "MXRC Alarm Configuration Schema",
+  "description": "Schema for alarm configuration YAML files in MXRC robot control system",
+  "type": "object",
+  "required": ["version", "alarms"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Configuration file format version",
+      "pattern": "^\\d+\\.\\d+$",
+      "examples": ["1.0"]
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of this alarm configuration"
+    },
+    "alarms": {
+      "type": "array",
+      "description": "List of alarm definitions",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/alarm"
+      }
+    }
+  },
+  "definitions": {
+    "alarm": {
+      "type": "object",
+      "required": ["code", "name", "severity"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Unique alarm code (E=Error/Critical, W=Warning, I=Info)",
+          "pattern": "^[EWI]\\d{3}$",
+          "examples": ["E001", "W001", "I001"]
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable alarm name",
+          "minLength": 1,
+          "maxLength": 100,
+          "examples": ["Emergency Stop Activated", "Battery Low"]
+        },
+        "severity": {
+          "type": "string",
+          "description": "Alarm severity level",
+          "enum": ["CRITICAL", "WARNING", "INFO"]
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the alarm condition",
+          "maxLength": 500
+        },
+        "recommended_action": {
+          "type": "string",
+          "description": "Suggested action to resolve this alarm",
+          "maxLength": 500
+        },
+        "recurrence_window": {
+          "type": "integer",
+          "description": "Time window in seconds for tracking alarm recurrence",
+          "minimum": 1,
+          "maximum": 3600,
+          "default": 60
+        },
+        "recurrence_threshold": {
+          "type": "integer",
+          "description": "Number of occurrences within window to escalate severity",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 3
+        },
+        "auto_reset": {
+          "type": "boolean",
+          "description": "Whether alarm can be automatically resolved when condition clears",
+          "default": false
+        },
+        "response_time_ms": {
+          "type": "integer",
+          "description": "Maximum allowed response time in milliseconds",
+          "minimum": 1,
+          "maximum": 10000,
+          "examples": [100, 1000, 5000]
+        },
+        "category": {
+          "type": "string",
+          "description": "Alarm category for grouping and filtering",
+          "enum": [
+            "safety",
+            "hardware",
+            "communication",
+            "battery",
+            "position",
+            "maintenance",
+            "system"
+          ]
+        },
+        "affects_control_mode": {
+          "type": "boolean",
+          "description": "Whether this alarm forces a control mode transition",
+          "default": true
+        },
+        "target_control_mode": {
+          "type": "string",
+          "description": "Control mode to transition to when this alarm activates",
+          "enum": ["FAULT", "STANDBY", "MAINT"],
+          "default": "FAULT"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

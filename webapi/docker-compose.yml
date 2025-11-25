@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  webapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mxrc-webapi:latest
+    container_name: mxrc-webapi
+
+    # Use host network for minimal overhead
+    # Critical for performance (avoids bridge/NAT)
+    network_mode: host
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Resource limits
+    cpuset: "0,1"  # Bind to Non-RT cores only
+    mem_limit: 512m
+    mem_reservation: 256m
+
+    # Volumes
+    volumes:
+      # IPC socket (read-only for security)
+      - /var/run/mxrc:/var/run/mxrc:ro
+      # Config files (read-only)
+      - /opt/mxrc/config:/opt/mxrc/config:ro
+
+    # Environment variables
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      HOST: 0.0.0.0
+      LOG_LEVEL: info
+      IPC_SOCKET_PATH: /var/run/mxrc/ipc.sock
+      IPC_TIMEOUT_MS: 5000
+      IPC_SCHEMA_PATH: /opt/mxrc/config/ipc/ipc-schema.yaml
+      SYSTEMD_NOTIFY: "false"  # Disabled inside container
+      WATCHDOG_ENABLED: "false"
+
+    # Logging to journald
+    logging:
+      driver: journald
+      options:
+        tag: mxrc-webapi
+        labels: "service,component"
+
+    # Labels for organization
+    labels:
+      com.mxrc.service: "webapi"
+      com.mxrc.component: "api-server"
+      com.mxrc.version: "1.0.0"
+
+    # Health check (overrides Dockerfile HEALTHCHECK)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

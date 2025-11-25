@@ -878,6 +878,7 @@ add_executable(run_tests
     tests/unit/robot/pallet_shuttle/actions/PlacePalletAction_test.cpp
     tests/unit/robot/pallet_shuttle/sequences/PalletTransportSequence_test.cpp
     tests/unit/robot/pallet_shuttle/tasks/PalletTransportTask_test.cpp
+    tests/integration/robot/pallet_shuttle/basic_transport_test.cpp
     # Feature 016: Implementation sources for tests
     src/core/alarm/impl/Alarm.cpp
     src/core/alarm/impl/AlarmConfiguration.cpp

@@ -201,8 +201,8 @@
 
 ### 테스트 작성 (TDD)
 
-- [ ] T072 [P] [US3] TaskQueue 다중 작업 처리 단위 테스트 in tests/unit/core/control/TaskQueueTest.cpp
-- [ ] T073 [P] [US3] 긴급 작업 삽입 테스트 in tests/unit/core/control/TaskQueueTest.cpp
+- [x] T072 [P] [US3] TaskQueue 다중 작업 처리 단위 테스트 in tests/unit/core/control/TaskQueueTest.cpp
+- [x] T073 [P] [US3] 긴급 작업 삽입 테스트 in tests/unit/core/control/TaskQueueTest.cpp
 - [ ] T074 [US3] 다중 작업 순차 처리 통합 테스트 in tests/integration/robot/pallet_shuttle/basic_transport_test.cpp
 
 ### 구현
@@ -224,12 +224,12 @@
 
 ### 테스트 작성 (TDD)
 
-- [ ] T079 [P] [US4] PalletShuttleState 상태 조회 테스트 in tests/unit/robot/pallet_shuttle/state/PalletShuttleStateTest.cpp
+- [x] T079 [P] [US4] PalletShuttleState 상태 조회 테스트 in tests/unit/robot/pallet_shuttle/state/PalletShuttleStateTest.cpp
 - [ ] T080 [P] [US4] 작업 진행률 계산 테스트 in tests/unit/robot/pallet_shuttle/tasks/PalletTransportTaskTest.cpp
 
 ### 구현
 
-- [ ] T081 [US4] DataStore 실시간 상태 업데이트 in src/robot/pallet_shuttle/state/PalletShuttleState.cpp
+- [x] T081 [US4] DataStore 실시간 상태 업데이트 in src/robot/pallet_shuttle/state/PalletShuttleState.cpp
 - [ ] T082 [US4] 작업 진행률 추적 로직 구현 in src/robot/pallet_shuttle/tasks/PalletTransportTask.cpp
 - [ ] T083 [US4] Alarm 목록 조회 기능 구현 in src/core/alarm/impl/AlarmManager.cpp
 - [ ] T084 [US4] 작업 큐 상태 조회 기능 구현 in src/core/control/impl/TaskQueue.cpp
@@ -246,12 +246,12 @@
 
 ### 테스트 작성 (TDD)
 
-- [ ] T085 [P] [US6] SafetyCheckSequence 단위 테스트 in tests/unit/robot/pallet_shuttle/sequences/SafetyCheckSequenceTest.cpp
+- [x] T085 [P] [US6] SafetyCheckSequence 단위 테스트 in tests/unit/robot/pallet_shuttle/sequences/SafetyCheckSequenceTest.cpp
 - [ ] T086 [P] [US6] PERIODIC 모드 Task 실행 테스트 in tests/unit/core/task/TaskExecutorTest.cpp
 
 ### 구현
 
-- [ ] T087 [US6] SafetyCheckSequence 구현 (센서 점검) in src/robot/pallet_shuttle/sequences/SafetyCheckSequence.cpp
+- [x] T087 [US6] SafetyCheckSequence 구현 (센서 점검) in src/robot/pallet_shuttle/sequences/SafetyCheckSequence.cpp
 - [ ] T088 [US6] PERIODIC 모드 Task 스케줄링 in src/core/task/core/TaskExecutor.cpp
 - [ ] T089 [US6] 부품 마모도 임계값 체크 로직 in src/robot/pallet_shuttle/sequences/SafetyCheckSequence.cpp
 - [ ] T090 [US6] Info 수준 Alarm 발생 (예방 정비) in src/robot/pallet_shuttle/sequences/SafetyCheckSequence.cpp
